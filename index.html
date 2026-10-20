@@ -148,12 +148,15 @@ if(!THREE){document.getElementById('entry').innerHTML='<div class="panel"><h2>3D
 const config={apiKey:'AIzaSyALgmax4WiOkFrdxaNC1Bfp6MdsEFoIfUU',authDomain:'studio-m7owg.firebaseapp.com',databaseURL:'https://studio-m7owg-default-rtdb.firebaseio.com',projectId:'studio-m7owg',storageBucket:'studio-m7owg.firebasestorage.app',messagingSenderId:'263329516095',appId:'1:263329516095:web:3d90a3993135dce1d8068a'};
 let db=null;function database(){if(!db)db=getDatabase(initializeApp(config));return db;}const $=id=>document.getElementById(id);let id=(globalThis.crypto?.randomUUID?.()||'p'+Date.now().toString(36)+Math.random().toString(36).slice(2)),room='',soloMode=false,state=null,host=false,me={x:0,z:12,rot:0},yaw=0,keys={},lastSync=0,near=null,tradePartner=null,modalMode='',npcs=[];const SIZE=690;
 window.addEventListener('error',e=>{const d=document.getElementById('runtimeError');if(d)d.textContent='エラー: '+e.message});const scene=new THREE.Scene();scene.background=new THREE.Color(0x91c4db);scene.fog=new THREE.FogExp2(0x91c4db,.0027);const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,950);const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:"high-performance"});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1));document.body.prepend(renderer.domElement);scene.add(new THREE.HemisphereLight(0xffffff,0x426a46,2.2));const sun=new THREE.DirectionalLight(0xffe8ba,2);sun.position.set(80,120,60);scene.add(sun);
-const materialCache=new Map();const mat=c=>{if(!materialCache.has(c))materialCache.set(c,new THREE.MeshLambertMaterial({color:c}));return materialCache.get(c)};const boxGeometryCache=new Map();function boxGeo(w,h,d){const key=`${w},${h},${d}`;if(!boxGeometryCache.has(key))boxGeometryCache.set(key,new THREE.BoxGeometry(w,h,d));return boxGeometryCache.get(key)}const green=mat(0x497b46),sand=mat(0xc8b37c),water=mat(0x398bb0),brown=mat(0x65482d);function cube(w,h,d,m,x,y,z){let o=new THREE.Mesh(boxGeo(w,h,d),m);o.position.set(x,y,z);scene.add(o);return o}const cylinderGeometryCache=new Map();function cylinder(r,h,m,x,y,z){const key=`${r},${h}`;let geo=cylinderGeometryCache.get(key);if(!geo){geo=new THREE.CylinderGeometry(r,r,h,12);cylinderGeometryCache.set(key,geo)}let o=new THREE.Mesh(geo,m);o.position.set(x,y,z);scene.add(o);return o}cube(1100,.1,1100,water,0,-2,0);cylinder(333,3,sand,0,-2.7,0);cylinder(310.5,3,green,0,-1.5,0);let rand=(n)=>{let x=Math.sin(n*91.73+12.3)*43758.5453;return x-Math.floor(x)};function terrain(x,z){return Math.max(0,Math.sin(x*.022)*1.6+Math.cos(z*.018)*1.4+Math.sin((x+z)*.034)*.6)};
+// The voting room is the only world geometry built before the first frame.
+const outdoorWorld=new THREE.Group();outdoorWorld.name='outdoor-world';outdoorWorld.visible=false;scene.add(outdoorWorld);
+let worldTarget=scene,worldReady=false,worldLoadPromise=null;
+const materialCache=new Map();const mat=c=>{if(!materialCache.has(c))materialCache.set(c,new THREE.MeshLambertMaterial({color:c}));return materialCache.get(c)};const boxGeometryCache=new Map();function boxGeo(w,h,d){const key=`${w},${h},${d}`;if(!boxGeometryCache.has(key))boxGeometryCache.set(key,new THREE.BoxGeometry(w,h,d));return boxGeometryCache.get(key)}const green=mat(0x497b46),sand=mat(0xc8b37c),water=mat(0x398bb0),brown=mat(0x65482d);function cube(w,h,d,m,x,y,z){let o=new THREE.Mesh(boxGeo(w,h,d),m);o.position.set(x,y,z);worldTarget.add(o);return o}const cylinderGeometryCache=new Map();function cylinder(r,h,m,x,y,z){const key=`${r},${h}`;let geo=cylinderGeometryCache.get(key);if(!geo){geo=new THREE.CylinderGeometry(r,r,h,12);cylinderGeometryCache.set(key,geo)}let o=new THREE.Mesh(geo,m);o.position.set(x,y,z);worldTarget.add(o);return o}let rand=(n)=>{let x=Math.sin(n*91.73+12.3)*43758.5453;return x-Math.floor(x)};function terrain(x,z){return Math.max(0,Math.sin(x*.022)*1.6+Math.cos(z*.018)*1.4+Math.sin((x+z)*.034)*.6)};
 const obstacles=[];function addObstacle(x,z,r){obstacles.push({x,z,r})}
 // Three guaranteed large buildings, spaced around the island.
 const buildingSites=[{x:0,z:205,w:38,d:34,h:9},{x:-210,z:-112,w:36,d:34,h:6},{x:210,z:-112,w:40,d:32,h:9},{x:0,z:0,w:50,d:44,h:9}];
 buildingSites.forEach(b=>{b.h=15;});
-const largeBuildings=[];
+const largeBuildings=buildingSites.map(b=>({...b,doorW:13,stairs:true}));
 const roofRoomWalls=[];
 const interiorRoofs=[];const interiorRoofRails=[]; // roof meshes that become transparent only for the local camera
 // Exterior stairways are walkable ramps with visible steps and roof access.
@@ -399,55 +402,7 @@ for(let i=0;i<pathSegments.length;i++){
  bx:p.bx-dx*endCut/len,bz:p.bz-dz*endCut/len,width:p.width,
  fadeStart:!startCut&&!roadEndConnected(p,true),fadeEnd:!endCut&&!roadEndConnected(p,false)});
 }
-// Unified road surface: one continuous union mesh, without overlapping rectangular ends.
-// Clip to island and remove building/stair footprints. Coarse cells keep rendering fast.
-{
- const cell=1.35, vertices=[],indices=[];
- const min=-295,max=295;
- function insideRoad(x,z){
-  if(x*x+z*z>292*292)return false;
-  if(roadInsideBuilding(x,z,0.9))return false;
-  for(const p of roadRenderSegments){
-   if(pathDistance(x,z,p)<p.width/2)return true;
-  }
-  for(const curve of rounded){
-   for(let i=1;i<curve.points.length;i++){
-    const a=curve.points[i-1],b=curve.points[i],t=i/(curve.points.length-1);
-    const w=curve.startWidth*(1-t)+curve.endWidth*t;
-    const dx=b.x-a.x,dz=b.z-a.z;
-    const q=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz||1)));
-    if(Math.hypot(x-a.x-q*dx,z-a.z-q*dz)<w/2)return true;
-   }
-  }
-  return false;
- }
- // Build a single indexed surface, with no duplicate overlapping road planes.
- const N=Math.ceil((max-min)/cell), grid=new Uint8Array(N*N);
- for(let j=0;j<N;j++)for(let i=0;i<N;i++){
-  const x=min+(i+.5)*cell,z=min+(j+.5)*cell;
-  if(insideRoad(x,z))grid[j*N+i]=1;
- }
- // Remove isolated one-cell fragments and single-cell pinholes at junctions.
- for(let j=1;j<N-1;j++)for(let i=1;i<N-1;i++){
-  const k=j*N+i;if(!grid[k])continue;
-  if(!grid[k-1]&&!grid[k+1]&&!grid[k-N]&&!grid[k+N])grid[k]=0;
- }
- for(let j=0;j<N;j++)for(let i=0;i<N;i++)if(grid[j*N+i]){
-  const x=min+i*cell,z=min+j*cell,k=vertices.length/3;
-  vertices.push(x,.082,z,x+cell,.082,z,x+cell,.082,z+cell,x,.082,z+cell);
-  indices.push(k,k+2,k+1,k,k+3,k+2);
- }
- const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
- geo.setIndex(indices);geo.computeVertexNormals();
- const mesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:0xb9a27c,side:THREE.DoubleSide}));
- scene.add(mesh);
-}
-// No square junction pads: road strips meet at their endpoints.
-
-// Avoid generating trees within or immediately around building footprints.
-const sharedTreeCrownGeometry=new THREE.ConeGeometry(1,1,7);
-for(let i=0;i<600;i++){let a=rand(i+1)*Math.PI*2,r=Math.sqrt(rand(i+800))*297,x=Math.cos(a)*r,z=Math.sin(a)*r;if(r<22||onPath(x,z,4)||buildingSites.some((b,j)=>j!==2&&Math.abs(x-(b.x+b.w*.28))<9&&z>b.z-b.d/2-53&&z<b.z-b.d/2+3))continue;if(buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+8&&Math.abs(z-b.z)<b.d/2+8))continue;if(buildingSites.some((b,j)=>{const side=j===0?1:-1,sw=4.3,inner=b.x+side*(b.w/2+1.5+sw/2+1.2),outer=inner+side*(sw+1),front=b.z+b.d/2-4,back=front-(b.d-9);return x>Math.min(inner,outer)-sw/2-5&&x<Math.max(inner,outer)+sw/2+5&&z>back-6.2-5&&z<front+sw/2+5;}))continue;addObstacle(x,z,.85);let h=3+rand(i+300)*7;cylinder(.45,h,brown,x,h/2,z);let crown=new THREE.Mesh(sharedTreeCrownGeometry,mat([0x25552e,0x376b39,0x46763b][i%3]));crown.scale.set(2.5+rand(i+80)*2,7+rand(i+60)*4,2.5+rand(i+80)*2);crown.position.set(x,h+3,z);scene.add(crown)}
-for(let i=0;i<buildingSites.length;i++){
+function buildBuilding(i,interiorOnly=false){
  const {x,z,w,d,h}=buildingSites[i];
  const styles=[
   {wall:0xcbbd9e,trim:0x8a705a,roof:0x665749,glass:0x527f89,floor:0xb99169},
@@ -503,6 +458,35 @@ for(let i=0;i<buildingSites.length;i++){
  const mainRoof=cube(w+3,1.1,d+3,roof.clone(),x,h+.6,z);
  mainRoof.material.transparent=true;
  interiorRoofs.push({mesh:mainRoof,x,z,w,d,base:0,ceiling:h+1.2});
+ obstacles.push({x,z:z-d/2,halfX:w/2,halfZ:thick/2});
+ obstacles.push({x:x-w/2,z,halfX:thick/2,halfZ:d/2});
+ obstacles.push({x:x+w/2,z,halfX:thick/2,halfZ:d/2});
+ obstacles.push({x:x-(doorW+sideW)/2,z:z+d/2,halfX:sideW/2,halfZ:thick/2});
+ obstacles.push({x:x+(doorW+sideW)/2,z:z+d/2,halfX:sideW/2,halfZ:thick/2});
+ if(i===3){
+  const doorMaterial=new THREE.MeshStandardMaterial({color:0x2b2523,metalness:.35,roughness:.45,side:THREE.DoubleSide});
+  const entranceDoor=new THREE.Group();
+  // Full-height double doors with visible frame and handles.
+  const frameMat=mat(0x191a1d),handleMat=mat(0xc8aa75);
+  cube(doorW+.6,.38,.55,frameMat,x,doorH+.18,z+d/2);
+  for(const side of [-1,1])cube(.28,doorH,.55,frameMat,x+side*doorW/2,doorH/2,z+d/2);
+  // Two simple doors, shut during instructions and swung open afterwards.
+  for(const side of [-1,1]){
+   const pivot=new THREE.Group();
+   pivot.position.set(x+side*doorW/2,0,z+d/2);
+   const leaf=new THREE.Mesh(new THREE.BoxGeometry(doorW/2,doorH,.23),doorMaterial);
+   leaf.position.set(-side*doorW/4,doorH/2,0);
+   pivot.add(leaf);
+   const handle=new THREE.Mesh(new THREE.BoxGeometry(.14,.85,.19),handleMat);
+   handle.position.set(-side*(doorW/2-1.05),doorH*.45,.19);
+   pivot.add(handle);entranceDoor.add(pivot);
+   pivot.userData.side=side;
+  }
+  worldTarget.add(entranceDoor);
+  window.__blackIntroDoor=entranceDoor;
+ }
+ const b={x,z,w,d,h,doorW,stairs:true};largeBuildings[i]=b;
+ const finishExterior=()=>{
  const roomW=i===0?12:11,roomD=i===2?10:9,roomH=6.6;
  const roomX=x+(i===1?4:-3),roomZ=z-d*.19;
  const floorY=h+1.2,roomWall=mat(style.wall),roomTrim=mat(style.trim);
@@ -535,34 +519,6 @@ for(let i=0;i<buildingSites.length;i++){
   if(side===-1)cube(i===1?3.1:2.2,1.3,.16,glass,x+j*w/6,1.7+floor*3,z-d/2-.09);
   // Side window plates omitted to avoid stray square fragments.
  }
- obstacles.push({x,z:z-d/2,halfX:w/2,halfZ:thick/2});
- obstacles.push({x:x-w/2,z,halfX:thick/2,halfZ:d/2});
- obstacles.push({x:x+w/2,z,halfX:thick/2,halfZ:d/2});
- obstacles.push({x:x-(doorW+sideW)/2,z:z+d/2,halfX:sideW/2,halfZ:thick/2});
- obstacles.push({x:x+(doorW+sideW)/2,z:z+d/2,halfX:sideW/2,halfZ:thick/2});
- if(i===3){
-  const doorMaterial=new THREE.MeshStandardMaterial({color:0x2b2523,metalness:.35,roughness:.45,side:THREE.DoubleSide});
-  const entranceDoor=new THREE.Group();
-  // Full-height double doors with visible frame and handles.
-  const frameMat=mat(0x191a1d),handleMat=mat(0xc8aa75);
-  cube(doorW+.6,.38,.55,frameMat,x,doorH+.18,z+d/2);
-  for(const side of [-1,1])cube(.28,doorH,.55,frameMat,x+side*doorW/2,doorH/2,z+d/2);
-  // Two simple doors, shut during instructions and swung open afterwards.
-  for(const side of [-1,1]){
-   const pivot=new THREE.Group();
-   pivot.position.set(x+side*doorW/2,0,z+d/2);
-   const leaf=new THREE.Mesh(new THREE.BoxGeometry(doorW/2,doorH,.23),doorMaterial);
-   leaf.position.set(-side*doorW/4,doorH/2,0);
-   pivot.add(leaf);
-   const handle=new THREE.Mesh(new THREE.BoxGeometry(.14,.85,.19),handleMat);
-   handle.position.set(-side*(doorW/2-1.05),doorH*.45,.19);
-   pivot.add(handle);entranceDoor.add(pivot);
-   pivot.userData.side=side;
-  }
-  scene.add(entranceDoor);
-  window.__blackIntroDoor=entranceDoor;
- }
- const b={x,z,w,d,h,doorW,stairs:true};largeBuildings.push(b);
    // Wide open-riser U staircase; both flights, landings and railings share geometry.
    if(b.stairs){
     const side=i===0?1:-1,sw=4.3,gap=1.0,landingDepth=6.2;
@@ -608,7 +564,7 @@ for(let i=0;i<buildingSites.length;i++){
      const v=new THREE.Vector3(bx-ax,by-ay,bz-az),len=v.length();
      const rail=new THREE.Mesh(new THREE.CylinderGeometry(.085,.085,len,7),trim);
      rail.position.set((ax+bx)/2,(ay+by)/2,(az+bz)/2);
-     rail.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());scene.add(rail);return rail;
+     rail.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());worldTarget.add(rail);return rail;
     }
     // Railings stop at both turning entrances; no railing crosses the walking lane.
     for(const [flightIndex,f] of flights.entries())for(const edge of [-1,1]){
@@ -694,13 +650,74 @@ for(let i=0;i<buildingSites.length;i++){
       bridgeX0,bridgeX1,bridgeZ0,bridgeZ1});
    }
  // Removed tall central beacon: it intersected the rooftop hut and appeared as a floating rod.
+ };
+ if(interiorOnly)return finishExterior;
+ finishExterior();
 }
+const finishBlackExterior=buildBuilding(3,true);
 const hidingSpots=[];
+function* buildOutdoorWorld(){
+cube(1100,.1,1100,water,0,-2,0);cylinder(333,3,sand,0,-2.7,0);cylinder(310.5,3,green,0,-1.5,0);
+yield;
+// Unified road surface: one continuous union mesh, without overlapping rectangular ends.
+// Clip to island and remove building/stair footprints. Coarse cells keep rendering fast.
+function* buildRoadSurface(){
+ const cell=1.35, vertices=[],indices=[];
+ const min=-295,max=295;
+ function insideRoad(x,z){
+  if(x*x+z*z>292*292)return false;
+  if(roadInsideBuilding(x,z,0.9))return false;
+  for(const p of roadRenderSegments){
+   if(pathDistance(x,z,p)<p.width/2)return true;
+  }
+  for(const curve of rounded){
+   for(let i=1;i<curve.points.length;i++){
+    const a=curve.points[i-1],b=curve.points[i],t=i/(curve.points.length-1);
+    const w=curve.startWidth*(1-t)+curve.endWidth*t;
+    const dx=b.x-a.x,dz=b.z-a.z;
+    const q=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz||1)));
+    if(Math.hypot(x-a.x-q*dx,z-a.z-q*dz)<w/2)return true;
+   }
+  }
+  return false;
+ }
+ // Build a single indexed surface, with no duplicate overlapping road planes.
+ const N=Math.ceil((max-min)/cell), grid=new Uint8Array(N*N);
+ for(let j=0;j<N;j++){yield;for(let i=0;i<N;i++){
+  const x=min+(i+.5)*cell,z=min+(j+.5)*cell;
+  if(insideRoad(x,z))grid[j*N+i]=1;
+ }}
+ // Remove isolated one-cell fragments and single-cell pinholes at junctions.
+ for(let j=1;j<N-1;j++)for(let i=1;i<N-1;i++){
+  const k=j*N+i;if(!grid[k])continue;
+  if(!grid[k-1]&&!grid[k+1]&&!grid[k-N]&&!grid[k+N])grid[k]=0;
+ }
+ for(let j=0;j<N;j++){yield;for(let i=0;i<N;i++)if(grid[j*N+i]){
+  const x=min+i*cell,z=min+j*cell,k=vertices.length/3;
+  vertices.push(x,.082,z,x+cell,.082,z,x+cell,.082,z+cell,x,.082,z+cell);
+  indices.push(k,k+2,k+1,k,k+3,k+2);
+ }}
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+ geo.setIndex(indices);geo.computeVertexNormals();
+ const mesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:0xb9a27c,side:THREE.DoubleSide}));
+ worldTarget.add(mesh);
+}
+yield* buildRoadSurface();
+// No square junction pads: road strips meet at their endpoints.
+
+// Avoid generating trees within or immediately around building footprints.
+const sharedTreeCrownGeometry=new THREE.ConeGeometry(1,1,7);
+for(let i=0;i<600;i++){if(i%12===0)yield;let a=rand(i+1)*Math.PI*2,r=Math.sqrt(rand(i+800))*297,x=Math.cos(a)*r,z=Math.sin(a)*r;if(r<22||onPath(x,z,4)||buildingSites.some((b,j)=>j!==2&&Math.abs(x-(b.x+b.w*.28))<9&&z>b.z-b.d/2-53&&z<b.z-b.d/2+3))continue;if(buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+8&&Math.abs(z-b.z)<b.d/2+8))continue;if(buildingSites.some((b,j)=>{const side=j===0?1:-1,sw=4.3,inner=b.x+side*(b.w/2+1.5+sw/2+1.2),outer=inner+side*(sw+1),front=b.z+b.d/2-4,back=front-(b.d-9);return x>Math.min(inner,outer)-sw/2-5&&x<Math.max(inner,outer)+sw/2+5&&z>back-6.2-5&&z<front+sw/2+5;}))continue;addObstacle(x,z,.85);let h=3+rand(i+300)*7;cylinder(.45,h,brown,x,h/2,z);let crown=new THREE.Mesh(sharedTreeCrownGeometry,mat([0x25552e,0x376b39,0x46763b][i%3]));crown.scale.set(2.5+rand(i+80)*2,7+rand(i+60)*4,2.5+rand(i+80)*2);crown.position.set(x,h+3,z);worldTarget.add(crown)}
+for(const i of [0,1,2]){
+ const exterior=buildBuilding(i,true);yield;exterior();yield;
+}
+finishBlackExterior();yield;
+
 // 木の根元・藪にイスを隠せる。箱は全て撤去。
 // Forty low-poly bushes, separate from trees. Bushes are hiding places but never solid obstacles.
 const bushGeometry=new THREE.IcosahedronGeometry(1.65,0),bushMaterials=[mat(0x285a32),mat(0x346b3a),mat(0x3d7540)];
 const bushInstances=[[],[],[]];
-for(let i=0;i<220;i++){
+for(let i=0;i<220;i++){if(i%4===0)yield;
  const type=i<180?'bush':'tree';let placed=false;
  for(let attempt=0;attempt<22&&!placed;attempt++){
   const a=rand(i*31+attempt+3200)*Math.PI*2,r=25+rand(i*43+attempt+3300)*268,x=Math.cos(a)*r,z=Math.sin(a)*r;
@@ -715,7 +732,7 @@ for(let i=0;i<220;i++){
    // Shared geometry and materials keep 40 bushes lightweight.
    for(let j=0;j<5;j++){const a=j*2.39996;bushInstances[j%3].push([x+Math.cos(a)*1.65,1.45,z+Math.sin(a)*1.65]);}
   }
-  if(type==='tree')scene.add(g);hidingSpots.push({id:'H'+i,x,z,type});placed=true;
+  if(type==='tree')worldTarget.add(g);hidingSpots.push({id:'H'+i,x,z,type});placed=true;
  }
 }
 const _bushMatrix=new THREE.Matrix4(),_bushScale=new THREE.Vector3(1.4,1,1.4),_bushQuaternion=new THREE.Quaternion();
@@ -723,7 +740,7 @@ bushInstances.forEach((positions,kind)=>{
  if(!positions.length)return;
  const mesh=new THREE.InstancedMesh(bushGeometry,bushMaterials[kind],positions.length);
  positions.forEach(([x,y,z],i)=>{_bushMatrix.compose(new THREE.Vector3(x,y,z),_bushQuaternion,_bushScale);mesh.setMatrixAt(i,_bushMatrix)});
- mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();scene.add(mesh);
+ mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();worldTarget.add(mesh);
 });
 // Dense, staggered tree lines: crowns overlap to form woodland walls, while paths and buildings stay open.
 // Reuse shared geometry to avoid hundreds of separate geometry allocations.
@@ -733,7 +750,7 @@ const forestTrunkMat=brown,forestCrownMat=[mat(0x28572e),mat(0x32683a),mat(0x407
 // Batch the woodland into just four GPU draw calls (one trunk + three crown colors).
 // All positions and physical obstacles remain exactly the same.
 const forestInstances=[[],[],[],[]];
-for(let row=0;row<25;row++){
+for(let row=0;row<25;row++){yield;
  const horizontal=row%2===0;
  const centerX=(rand(row*37+14020)-.5)*470;
  const centerZ=(rand(row*41+14021)-.5)*470;
@@ -756,7 +773,7 @@ forestInstances.forEach((positions,kind)=>{
  const mesh=new THREE.InstancedMesh(kind===0?forestTrunkGeo:forestCrownGeo,kind===0?forestTrunkMat:forestCrownMat[kind-1],positions.length);
  mesh.name='batched-forest-'+kind;
  positions.forEach(([x,y,z],i)=>{_forestMatrix.makeTranslation(x,y,z);mesh.setMatrixAt(i,_forestMatrix)});
- mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();scene.add(mesh);
+ mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();worldTarget.add(mesh);
 });
 // Colored wayfinding signs along the paths, with collision-safe placement.
 const signThemes=[
@@ -838,14 +855,46 @@ function nearestRoadAngle(x,z){
 }
 signCandidates.sort((a,b)=>a.priority-b.priority);
 let signPlaced=0;const signPositions=[];
-for(const c of signCandidates){
+for(const c of signCandidates){yield;
  if(signPlaced>=45)break;
  if(signPositions.some(p=>Math.hypot(c.x-p.x,c.z-p.z)<25))continue;
  const theme=signThemes[signPlaced%signThemes.length],word=theme[Math.floor(trailRand(signPlaced+702)*3)],color=signColors[signPlaced%signColors.length];
  cylinder(.13,3.05,mat(0x595650),c.x,1.525,c.z);
  const board=new THREE.Mesh(boxGeo(3.7,1.48,.16),[mat(color),mat(color),mat(color),mat(color),new THREE.MeshBasicMaterial({map:signTexture(word,color)}),mat(color)]);
- board.position.set(c.x,3.55,c.z);board.rotation.y=nearestRoadAngle(c.x,c.z)??(c.angle+Math.PI/2);scene.add(board);
+ board.position.set(c.x,3.55,c.z);board.rotation.y=nearestRoadAngle(c.x,c.z)??(c.angle+Math.PI/2);worldTarget.add(board);
  addObstacle(c.x,c.z,.45);signPositions.push(c);signPlaced++;
+}
+}
+function startWorldLoading(){
+ if(worldReady)return Promise.resolve(true);
+ if(worldLoadPromise)return worldLoadPromise;
+ worldLoadPromise=(async()=>{
+  // Give the room and the first instruction slide two paint opportunities.
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  const work=buildOutdoorWorld();let done=false;
+  while(!done){
+   const deadline=performance.now()+4;
+   do{worldTarget=outdoorWorld;try{done=work.next().done;}finally{worldTarget=scene;}}
+   while(!done&&performance.now()<deadline);
+   if(!done)await new Promise(resolve=>setTimeout(resolve,0));
+  }
+  // Warm material programs during the introduction, before exposing the island.
+  outdoorWorld.visible=true;
+  let compiling;try{compiling=renderer.compileAsync(scene,camera);}finally{outdoorWorld.visible=false;}
+  await compiling;
+  npcCollisionIndex=null;npcTerrainGrid=null;npcGroundStairs=null;npcNavigation.clear();_opaqueRoofConfigured=false;
+  worldReady=true;performance.mark('island-world-ready');
+  if(state&&host&&state.worldPreparing)await mutate(s=>{
+   if(s.host!==id||!s.worldPreparing)return;
+   s.chairs=seedChairs();s.worldPreparing=false;
+  });
+  return true;
+ })().catch(error=>{
+  worldTarget=scene;outdoorWorld.visible=false;
+  $('runtimeError').textContent='マップの読み込みに失敗しました。ページを再読み込みしてください。';
+  console.error('World loading failed',error);return false;
+ });
+ return worldLoadPromise;
 }
 // Shared collision tests for world objects, standing people and placed chairs.
 function roofEdgeBlocked(x,z,r=.7){
@@ -1465,7 +1514,7 @@ function miniPoint(x,z,p){const dx=x-p.cx,dz=z-p.cz,co=Math.cos(p.angle),si=Math
 function miniWorld(x,y,p){const dx=(x-p.W/2)/p.scale,dz=-(y-p.H/2)/p.scale,co=Math.cos(p.angle),si=Math.sin(p.angle);return {x:p.cx-dx*co+dz*si,z:p.cz+dx*si+dz*co}}
 function setMiniExpanded(v){hideMapSelection();miniExpanded=v;if(!v)pinShareTarget=null;miniPanel.classList.toggle('expanded',v);miniBackdrop.classList.toggle('active',v);miniCanvas.width=miniCanvas.height=v?768:320;drawMiniMap()}
 miniBackdrop.addEventListener('pointerdown',e=>{e.stopPropagation();setMiniExpanded(false)});
-function drawMiniMap(){
+function drawMiniMap(){if(!worldReady)return;
  if(!document.body.classList.contains('playing'))return;
  recordExploration();const p=miniParams(),c=miniCtx,W=p.W,H=p.H,k=p.scale;
  c.clearRect(0,0,W,H);c.fillStyle='#14282c';c.fillRect(0,0,W,H);
@@ -1589,7 +1638,7 @@ function syncVoteResultPopup(){
  }
  popup.style.display=(state.parent===id&&voteResultParentHidden)?'none':'block';
 }
-function renderUI(){if(!state)return;syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));$('wallet').replaceChildren();if(p){for(const [issuer,count] of Object.entries(p.wallet||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])){const cell=document.createElement('span');cell.className='coin-entry';cell.innerHTML='';const nm=document.createElement('span');nm.className='coin-name';nm.textContent=(state.players?.[issuer]?.name||'不明')+' ×';const stack=document.createElement('span');stack.className='coin-stack';const emoji=document.createElement('span');emoji.className='coin-stack-emoji';emoji.textContent='🪙';const number=document.createElement('span');number.className='coin-stack-number';number.textContent=String(count);stack.append(emoji,number);cell.append(nm,stack);$('wallet').appendChild(cell)}}const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
+function renderUI(){if(!state)return;if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));$('wallet').replaceChildren();if(p){for(const [issuer,count] of Object.entries(p.wallet||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])){const cell=document.createElement('span');cell.className='coin-entry';cell.innerHTML='';const nm=document.createElement('span');nm.className='coin-name';nm.textContent=(state.players?.[issuer]?.name||'不明')+' ×';const stack=document.createElement('span');stack.className='coin-stack';const emoji=document.createElement('span');emoji.className='coin-stack-emoji';emoji.textContent='🪙';const number=document.createElement('span');number.className='coin-stack-number';number.textContent=String(count);stack.append(emoji,number);cell.append(nm,stack);$('wallet').appendChild(cell)}}const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
 開票：${Object.entries(state.voteCounts||{}).map(([k,n])=>(state.players[k]?.name||k)+' '+n+'票').join(' / ')||'未開票'}`;if(renderUI.oldPhase!==state.phase&&state.phase){const notices={instructions:'',sitIntro:insideBlackBuilding(me.x,me.z)?'':'着席！',search:'',return:'TIME UP!\n投票に戻れ！',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:'',finished:'ゲーム終了！'};if(renderUI.oldPhase!==undefined&&notices[state.phase])announce(notices[state.phase]);else if(!notices[state.phase]){$('gameNotice').style.display='none';clearTimeout(announce.timer)}renderUI.oldPhase=state.phase}if(renderUI.oldRemoved!==state.lastRemoved&&state.lastRemoved){renderUI.oldRemoved=state.lastRemoved}if(state.phase==='sitIntro'&&insideBlackBuilding(me.x,me.z)){$('gameNotice').style.display='none';clearTimeout(announce.timer)}refreshActions();receiveSharedPin()}
 async function mutate(fn){if(soloMode){if(!state)return;fn(state);renderUI();return;}if(!room)return;let result=await runTransaction(ref(database(),`rooms/${room}`),s=>{if(!s)return;fn(s);return s},{applyLocally:false});if(!result.committed)log('操作できませんでした')}
@@ -1603,7 +1652,7 @@ $('join').onclick=async()=>{try{await ensureFirebase();$('join').disabled=true;$
 // Same room + same exact name always resolves to the same Firebase player record.
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
 id='U'+Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
-let root=ref(database(),`rooms/${room}`);await runTransaction(root,s=>s||{host:id,hostName:name,phase:'lobby',round:0,chairs:seedChairs(),accessories:initialAccessories(),players:{},votes:{}},{applyLocally:false});
+let root=ref(database(),`rooms/${room}`);await runTransaction(root,s=>s||{host:id,hostName:name,phase:'lobby',round:0,chairs:worldReady?seedChairs():{},accessories:initialAccessories(),players:{},votes:{}},{applyLocally:false});
 await update(ref(database(),`rooms/${room}/accessories`),Object.fromEntries(accessoryCatalog.map((_,i)=>['gear'+i,null])));
 const playerPath=ref(database(),`rooms/${room}/players/${id}`);
 const joined=await runTransaction(playerPath,p=>p?{...p,name,online:true}:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true},{applyLocally:false});
@@ -1645,21 +1694,8 @@ async function prepareDisconnectChair(p){
  }catch(e){console.warn('切断時のイス配置予約に失敗',e)}
  finally{disconnectChairBusy=false;}
 }
-function launchSolo(includeIntro){document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,chairs:seedChairs(),accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();if(!includeIntro){mutate(s=>{if(s.phase==='instructions'){s.phase='sitIntro';s.deadline=Date.now()+3000;s.introSkipped=true;}});}log('オフライン練習モード：NPCを補充して合計20人で開始');}
-$('solo').onclick=()=>{
- if(document.getElementById('soloIntroPrompt'))return;
- const overlay=document.createElement('div');overlay.id='soloIntroPrompt';
- overlay.style.cssText='position:fixed;inset:0;z-index:110;background:#172521b8;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box';
- const panel=document.createElement('div');panel.style.cssText='width:min(370px,100%);padding:30px 24px;background:#fff9eb;border-radius:25px;box-shadow:0 15px 40px #0005;text-align:center;color:#4b463b;font-family:inherit';
- const title=document.createElement('div');title.textContent='インストを入れますか？';title.style.cssText='font-size:23px;font-weight:800;margin-bottom:25px';
- const actions=document.createElement('div');actions.style.cssText='display:flex;justify-content:center;gap:14px';
- for(const [label,include,color] of [['はい',true,'#a5c8ac'],['いいえ',false,'#e5c5a0']]){
-  const btn=document.createElement('button');btn.type='button';btn.textContent=label;
-  btn.style.cssText=`min-width:115px;padding:14px 20px;border:0;border-radius:14px;background:${color};color:#343d32;font-size:18px;font-weight:800;box-shadow:0 4px 0 #0002;cursor:pointer`;
-  btn.onclick=()=>{overlay.remove();launchSolo(include)};actions.appendChild(btn);
- }
- panel.append(title,actions);overlay.append(panel);document.body.append(overlay);
-};
+function launchSolo(){document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,chairs:worldReady?seedChairs():{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
+$('solo').onclick=()=>launchSolo();
 const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=40000, VOTE_MS=30000, ERASE_MS=20000, VOTE_INTRO_MS=7000, RESULTS_MS=7000;
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
 const randBetween=(a,b)=>a+Math.random()*(b-a);
@@ -1667,7 +1703,7 @@ function announce(message){const el=$('gameNotice');el.textContent=message;el.st
 function initRound(s){s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=Date.now()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const p of Object.values(s.players)){p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
 function indoorSpawn(i){const b=buildingSites[3];return {x:b.x+((i%5)-2)*7,z:b.z+3+Math.floor(i/5)*4.2};}
 function createNPC(s,k,i){const pt=indoorSpawn(i);const angle=Math.PI;return {name:'NPC '+(i+1),npc:true,online:true,joined:Date.now(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:randBetween(3.5,6),run:randBetween(8,12),caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
-$('start').onclick=()=>mutate(s=>{if(s.host!==id||s.phase!=='lobby')return;const humans=Object.entries(s.players).filter(([k,p])=>!p.npc&&p.online!==false);if(!humans.length)return;const npcCount=Math.max(0,TOTAL_PLAYERS-humans.length);for(let i=0;i<npcCount;i++){const k='NPC'+i;s.players[k]=createNPC(s,k,i)}for(let j=0;j<humans.length;j++){const [k,p]=humans[j];const spawn=indoorSpawn(npcCount+j);p.x=spawn.x;p.z=spawn.z;p.y=0;p.rot=Math.PI;p.initial=true;p.alive=true;p.wallet={[k]:23};p.previous=0;p.touched=true;p.sitting=0;p.returned=false}for(let i=0;i<npcCount;i++){const a=s.players['NPC'+i];for(let j=i+1;j<npcCount;j++){const b=s.players['NPC'+j];if(Math.random()<.12){a.trust['NPC'+j]=randBetween(.2,.8);b.trust['NPC'+i]=a.trust['NPC'+j]}}}s.started=Date.now();s.chairs=seedChairs();s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;initRound(s);s.phase='instructions';s.introStarted=Date.now();s.deadline=s.introStarted+54000;if(soloMode){const sp=s.players[id];me.x=sp.x;me.z=sp.z;me.rot=sp.rot;yaw=me.rot;playerHeight=0;}});
+$('start').onclick=()=>mutate(s=>{if(s.host!==id||s.phase!=='lobby')return;const humans=Object.entries(s.players).filter(([k,p])=>!p.npc&&p.online!==false);if(!humans.length)return;const npcCount=Math.max(0,TOTAL_PLAYERS-humans.length);for(let i=0;i<npcCount;i++){const k='NPC'+i;s.players[k]=createNPC(s,k,i)}for(let j=0;j<humans.length;j++){const [k,p]=humans[j];const spawn=indoorSpawn(npcCount+j);p.x=spawn.x;p.z=spawn.z;p.y=0;p.rot=Math.PI;p.initial=true;p.alive=true;p.wallet={[k]:23};p.previous=0;p.touched=true;p.sitting=0;p.returned=false}for(let i=0;i<npcCount;i++){const a=s.players['NPC'+i];for(let j=i+1;j<npcCount;j++){const b=s.players['NPC'+j];if(Math.random()<.12){a.trust['NPC'+j]=randBetween(.2,.8);b.trust['NPC'+i]=a.trust['NPC'+j]}}}s.started=Date.now();s.chairs=worldReady?seedChairs():{};s.worldPreparing=!worldReady;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;initRound(s);s.phase='instructions';s.introStarted=Date.now();s.deadline=s.introStarted+54000;if(soloMode){const sp=s.players[id];me.x=sp.x;me.z=sp.z;me.rot=sp.rot;yaw=me.rot;playerHeight=0;}});
 $('touch').onclick=()=>mutate(s=>{let p=s.players[id];if(s.phase==='search'&&p?.alive&&Math.hypot(p.x-VOTE_X,p.z-VOTE_Z)<6){p.touched=true;p.sitting=0}});
 // Nearby chair is marked at its exact world position, with its existing number.
 // The number plate is on the chair's -Z back. Only that side reveals the pin action.
@@ -1731,7 +1767,7 @@ function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=
 $('erase').onclick=()=>{const n=$('chairNumber').value;mutate(s=>{if(s.phase!=='erase'||s.parent!==id)return;finishErase(s,n)})};
 function chooseNPCVote(s,k){const p=s.players[k],candidates=Object.entries(s.players).filter(([_,v])=>v.alive);if(!candidates.length)return null;let best=null,score=-Infinity;for(const [key,c] of candidates){let value=Math.random()*2.4+(p.trust?.[key]||0)*3+(key===k?(p.personality==='積極型'?2:0):0);if(p.personality==='追従型')value+=(p.trust?.[key]||0)*3;if(p.personality==='独立型'&&key===k)value+=1.8;if(p.personality==='戦略型')value+=(s.lastVoteCounts?.[key]||0)*.2;if(p.personality==='気まぐれ型')value+=Math.random()*3;if(value>score){score=value;best=key}}return best}
 function chooseErase(s,k){const p=s.players[k],available=Object.entries(s.chairs).filter(([_,c])=>!c.removed);if(!available.length)return null;const scored=available.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
-function advanceState(s,now){if(now<s.deadline)return;const phase=s.phase;if(phase==='instructions'){s.phase='sitIntro';s.deadline=now+3000}
+function advanceState(s,now){if(now<s.deadline)return;const phase=s.phase;if(phase==='instructions'){if(!worldReady||s.worldPreparing||now-(s.introStarted||now)<54000)return;s.phase='sitIntro';s.deadline=now+3000}
 else if(phase==='sitIntro'){s.phase='search';s.deadline=now+SEARCH_MS}
 else if(phase==='search'){for(const p of Object.values(s.players)){p.wasAliveBeforeSearch=!!p.alive;if(p.alive&&!p.sitting)p.alive=false;if(p.sitting)p.previous=p.sitting;p.returned=false}const newlyOut=Object.entries(s.players).filter(([_,p])=>p.wasAliveBeforeSearch&&!p.alive);
  s.eliminatedNames=newlyOut.map(([_,p])=>p.name);
@@ -1749,7 +1785,7 @@ else if(phase==='voteIntro'){s.voteEligible={};for(const [k,p] of Object.entries
 else if(phase==='vote'){const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+RESULTS_MS;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
 else if(phase==='results'){if(s.tieNoErase){s.tieNoErase=false;initRound(s)}else{s.phase='erase';s.deadline=now+86400000}}
 else if(phase==='eraseReveal'){initRound(s)}}
-let advancing=false;async function advance(){if(!host||!state||advancing||phase()==='lobby'||phase()==='finished'||Date.now()<state.deadline)return;advancing=true;try{await mutate(s=>{if(s.deadline<=Date.now())advanceState(s,Date.now())})}finally{advancing=false}}
+let advancing=false;async function advance(){if(state?.phase==='instructions'&&(!worldReady||state.worldPreparing))return;if(!host||!state||advancing||phase()==='lobby'||phase()==='finished'||Date.now()<state.deadline)return;advancing=true;try{await mutate(s=>{if(s.deadline<=Date.now())advanceState(s,Date.now())})}finally{advancing=false}}
 setInterval(advance,700);
 // Host alone simulates all NPC decisions; the shared database is authoritative.
 function npcDecision(s,k,p,now){
@@ -2186,25 +2222,8 @@ npcMove(s,k,p,destination,speed,dt);
 
 }
 if(s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
-let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=Date.now();const tickEvery=soloMode?280:850;if(tickNow-npcLastTick<tickEvery)return;npcLastTick=tickNow;if(!host||!state||npcBusy||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=Date.now();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,soloMode?.28:.85,now)})}finally{npcBusy=false}},140);
+let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=Date.now();const tickEvery=soloMode?280:850;if(tickNow-npcLastTick<tickEvery)return;npcLastTick=tickNow;if(!worldReady||!host||!state||npcBusy||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=Date.now();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,soloMode?.28:.85,now)})}finally{npcBusy=false}},140);
 const modal=$('modal');$('modalCancel').onclick=()=>{modal.classList.remove('open');$('modalConfirm').textContent='決定';$('modalCancel').textContent='キャンセル';};
-// Touch or click the actual black double door during the instruction slides.
-function askOpenIntroDoor(){
- if(phase()!=='instructions')return;
- const b=buildingSites[3];
- if(Math.hypot(me.x-b.x,me.z-(b.z+b.d/2))>12)return;
- openModal('もう始めますか。','<p style="text-align:center;font-size:1.2em">インストを終了して、着席を開始しますか。</p>','introDoor');
- $('modalConfirm').textContent='はい';$('modalCancel').textContent='いいえ';
-}
-const introDoorRaycaster=new THREE.Raycaster();
-renderer.domElement.addEventListener('click',e=>{
- if(phase()!=='instructions'||!window.__blackIntroDoor||modal.classList.contains('open'))return;
- const rect=renderer.domElement.getBoundingClientRect();
- const point=new THREE.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);
- introDoorRaycaster.setFromCamera(point,camera);
- if(introDoorRaycaster.intersectObjects(window.__blackIntroDoor.children,true).length)askOpenIntroDoor();
-});
-
 function nearbyPickup(){if(!state?.coinDrops)return null;const now=Date.now();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(now-d.created>=10000||d.recipient===id||d.owner===id)).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
 $('pickupCoin').onclick=()=>{const nearest=nearbyPickup();if(!nearest)return;mutate(s=>{const d=s.coinDrops?.[nearest[0]],p=s.players?.[id];if(!d||!p||Math.hypot(p.x-d.x,p.z-d.z)>3||Date.now()-d.created<10000&&d.recipient!==id&&d.owner!==id)return;p.wallet??={};p.wallet[d.issuer]=(p.wallet[d.issuer]||0)+d.count;delete s.coinDrops[nearest[0]];})};
 const coinMeshes={};const coinGoldMat=new THREE.MeshStandardMaterial({color:0xffd84b,metalness:.67,roughness:.14});const coinSilverMat=new THREE.MeshStandardMaterial({color:0xf2f7ff,metalness:.72,roughness:.12});const coinGoldGeo=new THREE.CylinderGeometry(.335,.335,.095,32);const coinSilverGeo=new THREE.TorusGeometry(.36,.085,10,40);
@@ -2305,7 +2324,7 @@ $('modalConfirm').onclick=async()=>{if(modalMode==='voteButtons'){
  }catch(e){alert('投票の通信に失敗しました：'+(e.message||e));}
  finally{confirm.disabled=false;}
  return;
- }if(modalMode==='introDoor'){await mutate(s=>{if(s.phase!=='instructions')return;s.phase='sitIntro';s.deadline=Date.now()+3000;s.introSkipped=true;});modal.classList.remove('open');$('modalConfirm').textContent='決定';$('modalCancel').textContent='キャンセル';return;}if(modalMode==='trade'){const n=Math.floor(Number($('tradeAmount').value)),issuer=$('tradeIssuer').value,partner=tradePartner;if(!partner||!Number.isInteger(n)||n<1||nearestPartner()?.id!==partner.id){alert('相手の近くで操作してください');return;}await mutate(s=>{const a=s.players[id],b=s.players[partner.id];if(!a||!b||!(a.wallet?.[issuer]>=n)||Math.hypot(a.x-b.x,a.z-b.z)>4)return;a.wallet[issuer]-=n;s.coinDrops??={};const dropId='coin_'+id+'_'+Date.now()+'_'+Math.floor(Math.random()*1e7);const baseX=a.x+Math.sin(a.rot||0)*1.1,baseZ=a.z+Math.cos(a.rot||0)*1.1;
+ }if(modalMode==='trade'){const n=Math.floor(Number($('tradeAmount').value)),issuer=$('tradeIssuer').value,partner=tradePartner;if(!partner||!Number.isInteger(n)||n<1||nearestPartner()?.id!==partner.id){alert('相手の近くで操作してください');return;}await mutate(s=>{const a=s.players[id],b=s.players[partner.id];if(!a||!b||!(a.wallet?.[issuer]>=n)||Math.hypot(a.x-b.x,a.z-b.z)>4)return;a.wallet[issuer]-=n;s.coinDrops??={};const dropId='coin_'+id+'_'+Date.now()+'_'+Math.floor(Math.random()*1e7);const baseX=a.x+Math.sin(a.rot||0)*1.1,baseZ=a.z+Math.cos(a.rot||0)*1.1;
 const existing=Object.values(s.coinDrops).filter(d=>d.count>0);
 let dropX=baseX,dropZ=baseZ;
 // Place repeated drops in a small spiral so separate coins stay visible and collectible.
@@ -2320,7 +2339,7 @@ const stick=document.getElementById('stickBase'),knob=document.getElementById('s
 function setStick(e){const r=stick.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),radius=48,l=Math.hypot(dx,dy),scale=l>radius?radius/l:1;joyX=dx*scale/radius;joyY=-dy*scale/radius;knob.style.transform=`translate(${joyX*radius}px,${-joyY*radius}px)`}
 stick.addEventListener('pointerdown',e=>{e.preventDefault();stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);setStick(e)});stick.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer){e.preventDefault();setStick(e)}});function resetStick(e){if(e.pointerId!==stickPointer)return;stickPointer=null;joyX=joyY=0;knob.style.transform='translate(0,0)'}stick.addEventListener('pointerup',resetStick);stick.addEventListener('pointercancel',resetStick);window.addEventListener('blur',()=>{joyX=joyY=0;knob.style.transform='translate(0,0)';for(const k in keys)keys[k]=false});
 window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return;if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault();keys[e.code]=true;if(e.code==='KeyE'){let a=nearestAction();if(a)a.click()}});window.addEventListener('keyup',e=>{keys[e.code]=false});renderer.domElement.addEventListener('pointerdown',e=>{if(viewPointer!==null)return;viewPointer=e.pointerId;viewX=e.clientX;viewY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==viewPointer)return;yaw-=(e.clientX-viewX)*.006;pitch=Math.max(-.45,Math.min(.8,pitch+(e.clientY-viewY)*.004));viewX=e.clientX;viewY=e.clientY});function endView(e){if(e.pointerId===viewPointer)viewPointer=null}renderer.domElement.addEventListener('pointerup',endView);renderer.domElement.addEventListener('pointercancel',endView);window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(document.hidden){previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair){me.x=chair.x;me.z=chair.z;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;if(player()?.carrying)speed*=0.5;let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
+let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair){me.x=chair.x;me.z=chair.z;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;if(player()?.carrying)speed*=0.5;let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
  // Never step off the rooftop slab, including the stair-side entrance corner.
  // A descent is permitted only onto a real stair flight or its bridge.
  if(current>2.5 && playerHeight>2.5){
@@ -2436,6 +2455,7 @@ if(indoorBuilding){
  camera.position.y=Math.min(camera.position.y,b.h-1.7);
 }
 camera.lookAt(me.x,playerHeight+3,me.z);if(t-lastAccessoryUpdate>90){lastAccessoryUpdate=t;drawCoinDrops();renderGroundAccessories();}renderer.render(scene,camera)}requestAnimationFrame(frame);
+performance.mark("island-room-ready");
 window.dispatchEvent(new Event("islandGameModuleReady"));
 </script><script>
 // No world construction, rendering, NPC simulation, or room connection until Play.
