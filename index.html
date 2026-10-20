@@ -1528,7 +1528,7 @@ function seedChairs(){
   for(let step=0;step<450&&!spot;step++){
    const a=angle+step*2.39996,rr=step===0?r:28+Math.sqrt(rand(i*809+step*13))*260;
    const x=Math.cos(a)*rr,z=Math.sin(a)*rr;
-   if(Math.hypot(x,z)>290||staticBlocked(x,z,1.2))continue;
+   if(Math.hypot(x,z)>290||staticBlocked(x,z,1.2)||bushBlocked(x,z,1.2))continue;
    if(Object.values(out).some(c=>Math.hypot(x-c.x,z-c.z)<4))continue;
    spot={x,z};
   }
@@ -1752,8 +1752,13 @@ else if(phase==='eraseReveal'){initRound(s)}}
 let advancing=false;async function advance(){if(!host||!state||advancing||phase()==='lobby'||phase()==='finished'||Date.now()<state.deadline)return;advancing=true;try{await mutate(s=>{if(s.deadline<=Date.now())advanceState(s,Date.now())})}finally{advancing=false}}
 setInterval(advance,700);
 // Host alone simulates all NPC decisions; the shared database is authoritative.
-function npcDecision(s,k,p,now){if(p.decisionAt>now)return;p.decisionAt=now+randBetween(1700,4300);if(s.phase==='search'&&p.alive&&!p.sitting){const chairs=Object.entries(s.chairs).filter(([n,c])=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Number(n)!==p.previous);if(!chairs.length)return;const choice=chairs.map(([n,c])=>{const distance=Math.hypot(c.x-p.x,c.z-p.z);const others=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&!v.sitting&&Math.hypot(v.x-c.x,v.z-c.z)<14).length;let score=-distance*.14-others*(p.personality==='独立型'?5:2)+Math.random()*12;if(p.memory?.[n])score+=5;if(p.personality==='慎重型')score-=distance*.12;if(p.personality==='積極型')score+=distance*.035;return {n,c,score}}).sort((a,b)=>b.score-a.score);if(p.personality==='気まぐれ型'&&Math.random()<.35)choice.reverse();p.targetChair=choice[0]?.n||null;const newGoal=p.targetChair?{x:s.chairs[p.targetChair].x,z:s.chairs[p.targetChair].z}:null;
-// A committed ring route must finish; defer new chair targets until the ring exit.
+function npcDecision(s,k,p,now){
+ const committed=s.chairs?.[p.targetChair];
+ if(p.goal&&committed&&!npcWorldBlocked(s,committed.x,committed.z,.78)&&!committed.removed&&!committed.carrier&&!committed.hiddenAt&&!committed.occupied&&Number(p.targetChair)!==p.previous){
+  p.goal={x:committed.x,z:committed.z};return;
+ }
+ if(p.decisionAt>now)return;p.decisionAt=now+randBetween(1700,4300);if(s.phase==='search'&&p.alive&&!p.sitting){const chairs=Object.entries(s.chairs).filter(([n,c])=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Number(n)!==p.previous&&!npcWorldBlocked(s,c.x,c.z,.78));if(!chairs.length){p.targetChair=null;p.goal=null;return;}const choice=chairs.map(([n,c])=>{const distance=Math.hypot(c.x-p.x,c.z-p.z);const others=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&!v.sitting&&Math.hypot(v.x-c.x,v.z-c.z)<14).length;let score=-distance*.14-others*(p.personality==='独立型'?5:2)+Math.random()*12;if(p.memory?.[n])score+=5;if(p.personality==='慎重型')score-=distance*.12;if(p.personality==='積極型')score+=distance*.035;return {n,c,score}}).sort((a,b)=>b.score-a.score);if(p.personality==='気まぐれ型'&&Math.random()<.35)choice.reverse();p.targetChair=choice[0]?.n||null;const newGoal=p.targetChair?{x:s.chairs[p.targetChair].x,z:s.chairs[p.targetChair].z}:null;
+// Keep this chair until it becomes unavailable or is reached.
 p.goal=newGoal;p.waypoint=null; }
 if(s.phase==='return')p.goal=npcReturnGoal(k);}
 // NPCs try to collect fallen costumes. Each NPC/item encounter gets one 1-in-3 roll.
@@ -1796,110 +1801,248 @@ function npcNearbySolids(x,z){
  }
  return npcCollisionIndex.get(Math.floor(x/12)+','+Math.floor(z/12))||{solids:[],bushes:[]};
 }
-let npcDynamicCollision=null;
-function npcIndexActors(s){
- const buckets=new Map();
- for(const [items,type,r] of [[Object.entries(s.players||{}),'players',1.5],[Object.entries(s.chairs||{}),'chairs',1.85]])for(const entry of items){
-  const v=entry[1],x=type==='players'&&entry[0]===id?me.x:v.x,z=type==='players'&&entry[0]===id?me.z:v.z;
-  for(let ix=Math.floor((x-r)/12);ix<=Math.floor((x+r)/12);ix++)for(let iz=Math.floor((z-r)/12);iz<=Math.floor((z+r)/12);iz++){
-   const tag=ix+','+iz;let bucket=buckets.get(tag);if(!bucket){bucket={players:[],chairs:[]};buckets.set(tag,bucket);}bucket[type].push(entry);
-  }
- }
- return buckets;
+// Ground navigation uses the same geometry as movement. People and movable
+// chairs belong to local avoidance, never to the cached terrain graph.
+function npcWorldBlocked(s,x,z,r=.7){
+ if(!Number.isFinite(x)||!Number.isFinite(z)||x*x+z*z>290*290)return true;
+ const oldHeight=playerHeight;
+ try{playerHeight=0;const nearby=npcNearbySolids(x,z);
+  return staticBlocked(x,z,r,nearby.solids)||bushBlocked(x,z,r,nearby.bushes)||
+   (s.phase==='instructions'&&blackEntranceClosed(x,z,r))||openedDoorBlocked(x,z,r);
+ }finally{playerHeight=oldHeight;}
 }
-// NPCs use the same ground-level solid collision as players, plus shared player/chair positions.
+// Exact segment tests avoid sample-dependent corner clipping. A long visibility
+// ray and a short movement step must agree about the same wall or door leaf.
+function npcSegmentBoxBlocked(x0,z0,x1,z1,cx,cz,hx,hz,r){
+ const ax=Math.abs(x0-cx)-hx,az=Math.abs(z0-cz)-hz,bx=Math.abs(x1-cx)-hx,bz=Math.abs(z1-cz)-hz;
+ if(Math.max(ax,0)**2+Math.max(az,0)**2<r*r||Math.max(bx,0)**2+Math.max(bz,0)**2<r*r)return true;
+ let lo=0,hi=1;
+ for(const [a,b,h] of [[x0-cx,x1-x0,hx],[z0-cz,z1-z0,hz]]){
+  if(Math.abs(b)<1e-9){if(Math.abs(a)>h){lo=2;break;}}
+  else{let t0=(-h-a)/b,t1=(h-a)/b;if(t0>t1)[t0,t1]=[t1,t0];lo=Math.max(lo,t0);hi=Math.min(hi,t1);}
+ }
+ if(lo<=hi)return true;
+ for(const x of [cx-hx,cx+hx])for(const z of [cz-hz,cz+hz])if(npcSegmentDistance2(x,z,x0,z0,x1,z1)<r*r)return true;
+ return false;
+}
+let npcGroundStairs=null;
+function npcGroundStairShapes(){
+ if(npcGroundStairs)return npcGroundStairs;
+ npcGroundStairs=[];
+ for(const st of stairways)for(const f of st.flights){
+  const band=(low,high)=>{
+   const slope=(f.y1-f.y0)/(f.z1-f.z0);
+   if(Math.abs(slope)<1e-9)return f.y0>low&&f.y0<high?[f.z0,f.z1]:null;
+   const a=f.z0+(low-f.y0)/slope,b=f.z0+(high-f.y0)/slope;
+   const z0=Math.max(f.z0,Math.min(a,b)),z1=Math.min(f.z1,Math.max(a,b));return z1>z0?[z0,z1]:null;
+  };
+  const rail=band(-2,.85),under=band(1.6,2.85);
+  if(rail){const z0=Math.max(rail[0],f.z0+.8),z1=Math.min(rail[1],f.z1-.8);if(z1>z0)for(const side of [-1,1])npcGroundStairs.push({x:f.x+side*f.width/2,z:(z0+z1)/2,halfX:.06,halfZ:(z1-z0)/2});}
+  if(under)npcGroundStairs.push({x:f.x,z:(under[0]+under[1])/2,halfX:f.width/2,halfZ:(under[1]-under[0])/2});
+ }
+ return npcGroundStairs;
+}
+function npcStaticClearPath(s,x0,z0,x1,z1,r=.7){
+ if(![x0,z0,x1,z1].every(Number.isFinite)||x0*x0+z0*z0>290**2||x1*x1+z1*z1>290**2)return false;
+ const box=o=>npcSegmentBoxBlocked(x0,z0,x1,z1,o.x,o.z,o.halfX,o.halfZ,r);
+ if(npcSegmentBoxBlocked(x0,z0,x1,z1,VOTE_X,VOTE_Z,3.7+r,2.15+r,0))return false;
+ for(const o of npcGroundStairShapes())if(box(o))return false;
+ // The static index includes the radius padding, so a swept segment only
+ // needs buckets inside its bounding rectangle; each shape is tested once.
+ npcNearbySolids(x0,z0);const tested=new Set();
+ for(let ix=Math.floor(Math.min(x0,x1)/12);ix<=Math.floor(Math.max(x0,x1)/12);ix++)for(let iz=Math.floor(Math.min(z0,z1)/12);iz<=Math.floor(Math.max(z0,z1)/12);iz++){
+  const bucket=npcCollisionIndex.get(ix+','+iz);if(!bucket)continue;
+  for(const o of bucket.solids){if(tested.has(o))continue;tested.add(o);
+   if(o.halfX!==undefined?box(o):npcSegmentDistance2(o.x,o.z,x0,z0,x1,z1)<(o.r+r)**2)return false;
+  }
+  for(const o of bucket.bushes){if(tested.has(o))continue;tested.add(o);if(npcSegmentDistance2(o.x,o.z,x0,z0,x1,z1)<(4.35+r)**2)return false;}
+ }
+ const b=buildingSites[3],front=b.z+b.d/2,width=largeBuildings[3]?.doorW||13;
+ if(s.phase==='instructions')return !npcSegmentBoxBlocked(x0,z0,x1,z1,b.x,front,6.5+r,1.15+r,0);
+ for(const side of [-1,1]){
+  const angle=side*Math.PI*.55,cos=Math.cos(angle),sin=Math.sin(angle),hinge=b.x+side*width/2;
+  const local=(x,z)=>({x:(x-hinge)*cos-(z-front)*sin,z:(x-hinge)*sin+(z-front)*cos});
+  const a=local(x0,z0),c=local(x1,z1);
+  if(npcSegmentBoxBlocked(a.x,a.z,c.x,c.z,-side*width/4,0,width/4+.15+r,.24+r,0))return false;
+ }
+ return true;
+}
+let npcActorState=null,npcActors=[],npcChairActors=[];
+function npcActorLists(s){
+ if(npcActorState!==s)return {players:Object.entries(s.players||{}),chairs:Object.entries(s.chairs||{})};
+ return {players:npcActors,chairs:npcChairActors};
+}
 function npcBlocked(s,k,x,z,r=.7){
- if(!Number.isFinite(x)||!Number.isFinite(z)||Math.hypot(x,z)>290)return true;
- const oldHeight=playerHeight;let solid;
- try{playerHeight=0;const nearby=npcNearbySolids(x,z);solid=staticBlocked(x,z,r,nearby.solids)||bushBlocked(x,z,r,nearby.bushes)||
-   (s.phase==='instructions'&&blackEntranceClosed(x,z,r))||openedDoorBlocked(x,z,r);}
- finally{playerHeight=oldHeight;}
- if(solid)return true;
- const actors=npcDynamicCollision?.get(Math.floor(x/12)+','+Math.floor(z/12));
- for(const [other,v] of (npcDynamicCollision?(actors?.players||[]):Object.entries(s.players||{}))){
+ if(npcWorldBlocked(s,x,z,r))return true;
+ const actors=npcActorLists(s);
+ for(const [other,v] of actors.players){
   if(other===k||v.online===false||(v.y||0)>3)continue;
   const px=other===id?me.x:v.x,pz=other===id?me.z:v.z;
-  if((px-x)**2+(pz-z)**2<(r+.7)**2){
-   return true;
-  }
+  if((px-x)**2+(pz-z)**2<(r+.7)**2)return true;
  }
- for(const [chairId,c] of (npcDynamicCollision?(actors?.chairs||[]):Object.entries(s.chairs||{}))){
+ for(const [chairId,c] of actors.chairs){
   if(c.removed||c.hiddenAt||c.carrier)continue;
-  const dx=c.x-x,dz=c.z-z,range=r+1.1;
-  if(Math.abs(dx)>range||Math.abs(dz)>range)continue;
-  const d2=dx*dx+dz*dz;
-  if(d2<range*range && !(String(s.players[k]?.targetChair)===chairId&&d2>.64))return true;
+  const d2=(c.x-x)**2+(c.z-z)**2;
+  if(d2<(r+1.1)**2&&!(String(s.players[k]?.targetChair)===chairId&&d2>.81))return true;
  }
  return false;
 }
 function npcClearPath(s,k,x0,z0,x1,z1){
- const d=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.ceil(d/.6));
- for(let i=1;i<=n;i++){
-  const t=i/n;if(npcBlocked(s,k,x0+(x1-x0)*t,z0+(z1-z0)*t,.64))return false;
- }
+ const n=Math.max(1,Math.ceil(Math.hypot(x1-x0,z1-z0)/.4));
+ for(let i=1;i<=n;i++){const t=i/n;if(npcBlocked(s,k,x0+(x1-x0)*t,z0+(z1-z0)*t))return false;}
  return true;
 }
-// Goal-driven navigation. Routes stay local to the host, not in Firebase.
 const npcNavigation=new Map();
-let npcPathPlansLeft=Infinity;
-function npcReturnGoal(k){const b=buildingSites[3],n=Number(String(k).replace(/\D/g,''))||0;return {x:b.x+((n%5)-2)*1.8,z:b.z+b.d/2-8-(Math.floor(n/5)%3)*2};}
+const NPC_GRID_STEP=1.5,NPC_GRID_WIDTH=389,NPC_GRID_MIN=-291;
+const npcGridDirections=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
+let npcTerrainGrid=null,npcNavDeadline=Infinity,npcNavNodesLeft=Infinity,npcNavOrder=0,npcNavRoom=null;
+function npcEnsureGrid(s){
+ const closed=s.phase==='instructions';
+ if(!npcTerrainGrid||npcTerrainGrid.closed!==closed){
+  const size=NPC_GRID_WIDTH*NPC_GRID_WIDTH;
+  npcTerrainGrid={closed,cells:new Uint8Array(size),known:new Uint8Array(size),edges:new Uint8Array(size)};
+  npcNavigation.clear();
+ }
+ return npcTerrainGrid;
+}
+function npcGridPoint(n){return {x:NPC_GRID_MIN+(n%NPC_GRID_WIDTH)*NPC_GRID_STEP,z:NPC_GRID_MIN+Math.floor(n/NPC_GRID_WIDTH)*NPC_GRID_STEP};}
+function npcGridOpen(s,n){
+ const grid=npcEnsureGrid(s);if(!grid.cells[n]){const p=npcGridPoint(n);grid.cells[n]=npcWorldBlocked(s,p.x,p.z,.78)?2:1;}
+ return grid.cells[n]===1;
+}
+function npcGridNeighbour(s,n,d){
+ const x=n%NPC_GRID_WIDTH,z=Math.floor(n/NPC_GRID_WIDTH),[dx,dz]=npcGridDirections[d];
+ if(x+dx<0||x+dx>=NPC_GRID_WIDTH||z+dz<0||z+dz>=NPC_GRID_WIDTH)return -1;
+ const next=n+dx+dz*NPC_GRID_WIDTH,grid=npcTerrainGrid,bit=1<<d;
+ if(!(grid.known[n]&bit)){
+  let clear=false;
+  if(npcGridOpen(s,next)){const a=npcGridPoint(n),b=npcGridPoint(next);clear=npcStaticClearPath(s,a.x,a.z,b.x,b.z,.78);}
+  grid.known[n]|=bit;grid.known[next]|=1<<(d^1);
+  if(clear){grid.edges[n]|=bit;grid.edges[next]|=1<<(d^1);}
+ }
+ return grid.edges[n]&bit?next:-1;
+}
+function npcHeapPush(heap,n){
+ let i=heap.length;heap.push(n);while(i){const j=(i-1)>>1;if(heap[j].f<=n.f)break;heap[i]=heap[j];i=j;}heap[i]=n;
+}
+function npcHeapPop(heap){
+ const first=heap[0],last=heap.pop();if(heap.length){let i=0;while(i*2+1<heap.length){let j=i*2+1;if(j+1<heap.length&&heap[j+1].f<heap[j].f)j++;if(heap[j].f>=last.f)break;heap[i]=heap[j];i=j;}heap[i]=last;}return first;
+}
+function npcCreateSearch(s,p,goal){
+ npcEnsureGrid(s);
+ const job={goal:{...goal},heap:[],nodes:new Map(),path:null,done:false,visited:0};
+ if(npcWorldBlocked(s,goal.x,goal.z,.72)){job.done=true;job.path=[];return job;}
+ const ix=Math.round((p.x-NPC_GRID_MIN)/NPC_GRID_STEP),iz=Math.round((p.z-NPC_GRID_MIN)/NPC_GRID_STEP);
+ // Connect the actual start to nearby cells. A moving NPC never defines a new grid.
+ for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+  const x=ix+dx,z=iz+dz;if(x<0||z<0||x>=NPC_GRID_WIDTH||z>=NPC_GRID_WIDTH)continue;
+  const n=x+z*NPC_GRID_WIDTH,q=npcGridPoint(n);
+  if(!npcGridOpen(s,n)||!npcStaticClearPath(s,p.x,p.z,q.x,q.z,.78))continue;
+  const g=Math.hypot(q.x-p.x,q.z-p.z),node={n,g,f:g+Math.hypot(goal.x-q.x,goal.z-q.z),parent:null};
+  job.nodes.set(n,node);npcHeapPush(job.heap,node);
+ }
+ return job;
+}
+function npcAdvanceSearch(s,job,limit=128){
+ let count=0;
+ while(job.heap.length&&count<limit&&npcNavNodesLeft>0){
+  if((count&15)===0&&performance.now()>=npcNavDeadline)return;
+  const n=npcHeapPop(job.heap);if(n.closed||job.nodes.get(n.n)!==n)continue;
+  n.closed=true;count++;npcNavNodesLeft--;job.visited++;
+  const q=npcGridPoint(n.n),remaining=Math.hypot(job.goal.x-q.x,job.goal.z-q.z);
+  if(remaining<2.2&&npcStaticClearPath(s,q.x,q.z,job.goal.x,job.goal.z,.78)){
+   const path=[];for(let v=n;v;v=v.parent)path.push(npcGridPoint(v.n));path.reverse();path.push({...job.goal});
+   job.path=path;job.done=true;job.heap=[];job.nodes.clear();return;
+  }
+  for(let d=0;d<8;d++){
+   const next=npcGridNeighbour(s,n.n,d);if(next<0)continue;
+   const g=n.g+NPC_GRID_STEP*(d<4?1:Math.SQRT2),old=job.nodes.get(next);if(old&&old.g<=g)continue;
+   const p=npcGridPoint(next),node={n:next,g,f:g+Math.hypot(job.goal.x-p.x,job.goal.z-p.z),parent:n};
+   job.nodes.set(next,node);npcHeapPush(job.heap,node);
+  }
+  if(job.visited>=16000)break;
+ }
+ if(!job.heap.length||job.visited>=16000){job.done=true;job.path=[];job.heap=[];job.nodes.clear();}
+}
+function npcReturnGoal(k){const b=buildingSites[3],n=Number(String(k).replace(/\D/g,''))||0;return {x:b.x+((n%5)-2)*7,z:b.z+3+(Math.floor(n/5)%4)*4.2};}
 function npcReturning(s){return ['return','voteIntro','vote','results','erase','eraseReveal'].includes(s.phase)}
 function npcDepartureSlot(k){let n=0;for(const ch of String(k))n=(n*31+ch.charCodeAt(0))%997;return n%16;}
-// A* samples actual collision geometry, including doors, vegetation and people.
-// Each edge is swept, so diagonal steps cannot cut wall corners or thin walls.
-function npcFindPath(s,k,p,goal){
- npcDynamicCollision=npcIndexActors(s);
- try{
- const spacing=2,heap=[],nodes=new Map(),blocked=new Map();
- const key=(x,z)=>x+','+z;
- const point=(x,z)=>({x:p.x+x*spacing,z:p.z+z*spacing});
- const push=n=>{heap.push(n);let i=heap.length-1;while(i){const j=(i-1)>>1;if(heap[j].f<=n.f)break;heap[i]=heap[j];i=j;}heap[i]=n;};
- const pop=()=>{const first=heap[0],last=heap.pop();if(heap.length){let i=0;while(i*2+1<heap.length){let j=i*2+1;if(j+1<heap.length&&heap[j+1].f<heap[j].f)j++;if(heap[j].f>=last.f)break;heap[i]=heap[j];i=j;}heap[i]=last;}return first;};
- const start={x:0,z:0,g:0,f:Math.hypot(goal.x-p.x,goal.z-p.z),parent:null};
- nodes.set('0,0',start);push(start);
- let visited=0;
- while(heap.length&&visited++<18000){
-  const n=pop();if(n.closed)continue;n.closed=true;
-  const q=point(n.x,n.z),remaining=Math.hypot(goal.x-q.x,goal.z-q.z);
-  // Chairs and occupied goals can be approached without walking into them.
-  if((remaining<2.5&&npcGoalReachable(s,k,q,goal))||(remaining<8&&npcClearPath(s,k,q.x,q.z,goal.x,goal.z))){
-   const path=[];for(let v=n;v.parent;v=v.parent)path.push(point(v.x,v.z));path.reverse();
-   if(npcClearPath(s,k,q.x,q.z,goal.x,goal.z))path.push({...goal});
-   return path;
-  }
-  for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
-   const x=n.x+dx,z=n.z+dz,tag=key(x,z),v=point(x,z);
-   if(!blocked.has(tag))blocked.set(tag,npcBlocked(s,k,v.x,v.z,.7));
-   if(blocked.get(tag)||!npcClearPath(s,k,q.x,q.z,v.x,v.z))continue;
-   const g=n.g+Math.hypot(dx,dz)*spacing,old=nodes.get(tag);
-   if(old&&old.g<=g)continue;
-   const next={x,z,g,f:g+Math.hypot(goal.x-v.x,goal.z-v.z),parent:n};nodes.set(tag,next);push(next);
-  }
- }
- return []; // Unreachable: wait and retry, never walk through the obstruction.
- }finally{npcDynamicCollision=null;}
-}
 function npcGoalReachable(s,k,p,goal){
- const d=Math.hypot(goal.x-p.x,goal.z-p.z),t=d?Math.max(0,(d-.9)/d):0;
- return npcClearPath(s,k,p.x,p.z,p.x+(goal.x-p.x)*t,p.z+(goal.z-p.z)*t);
+ return npcStaticClearPath(s,p.x,p.z,goal.x,goal.z);
 }
 function npcNavigationTarget(s,k,p,now){
  const goal=p.goal;if(!goal)return null;
- let nav=npcNavigation.get(room+":"+k);
- if(npcClearPath(s,k,p.x,p.z,goal.x,goal.z)){npcNavigation.delete(room+":"+k);return goal;}
- const changed=!nav||Math.hypot(nav.goal.x-goal.x,nav.goal.z-goal.z)>1;
- if(nav)while(nav.path.length&&Math.hypot(p.x-nav.path[0].x,p.z-nav.path[0].z)<.35)nav.path.shift();
- const obstructed=nav?.path.length&&!npcClearPath(s,k,p.x,p.z,nav.path[0].x,nav.path[0].z);
- if(changed||now>=nav.retryAt&&(obstructed||!nav.path.length||now-nav.created>6000)){
-  if(npcPathPlansLeft<=0)return null;
-  npcPathPlansLeft--;
-  nav={goal:{...goal},path:npcFindPath(s,k,p,goal),created:now,retryAt:now+1000};npcNavigation.set(room+":"+k,nav);
+ const key=room+':'+k;let nav=npcNavigation.get(key);
+ if(!nav||Math.hypot(nav.goal.x-goal.x,nav.goal.z-goal.z)>.75){
+  const direct=npcStaticClearPath(s,p.x,p.z,goal.x,goal.z,.78);
+  nav={goal:{...goal},path:direct?[{...goal}]:[],cursor:0,job:null,retryAt:0,failures:0};npcNavigation.set(key,nav);
  }
- if(!nav.path.length||!npcClearPath(s,k,p.x,p.z,nav.path[0].x,nav.path[0].z))return null;
- // Skip visible intermediate samples for smooth motion, never skip collision checks.
- let furthest=0;for(let i=1;i<Math.min(nav.path.length,8);i++){if(!npcClearPath(s,k,p.x,p.z,nav.path[i].x,nav.path[i].z))break;furthest=i;}
- if(furthest)nav.path.splice(0,furthest);
- return nav.path[0];
+ if(!nav.path.length&&!nav.job&&now>=nav.retryAt)nav.job=npcCreateSearch(s,p,goal);
+ if(nav.job){
+  npcAdvanceSearch(s,nav.job);
+  if(nav.job.done){
+   nav.path=nav.job.path;nav.cursor=0;nav.job=null;
+   if(!nav.path.length){nav.failures++;nav.retryAt=now+Math.min(30000,2000*2**Math.min(nav.failures,4));}
+  }
+ }
+ if(!nav.path.length)return null;
+ while(nav.cursor<nav.path.length-1&&Math.hypot(p.x-nav.path[nav.cursor].x,p.z-nav.path[nav.cursor].z)<.4)nav.cursor++;
+ let furthest=nav.cursor;
+ for(let i=nav.cursor+1;i<Math.min(nav.path.length,nav.cursor+5);i++){
+  const q=nav.path[i];if(!npcStaticClearPath(s,p.x,p.z,q.x,q.z,.78))break;furthest=i;
+ }
+ const target=nav.path[furthest];
+ const length=Math.hypot(target.x-p.x,target.z-p.z),t=length?Math.min(6,length)/length:0;
+ if(!npcStaticClearPath(s,p.x,p.z,p.x+(target.x-p.x)*t,p.z+(target.z-p.z)*t,.78)){
+  nav.path=[];nav.job=null;nav.retryAt=now+250;return null;
+ }
+ nav.cursor=furthest;return target;
+}
+function npcSegmentDistance2(x,z,x0,z0,x1,z1){
+ const dx=x1-x0,dz=z1-z0,d=dx*dx+dz*dz,t=d?Math.max(0,Math.min(1,((x-x0)*dx+(z-z0)*dz)/d)):0;
+ return (x-x0-t*dx)**2+(z-z0-t*dz)**2;
+}
+function npcMovementClear(s,k,p,x,z){
+ if(!npcStaticClearPath(s,p.x,p.z,x,z,.78))return false;
+ const actors=npcActorLists(s);
+ for(const [other,v] of actors.players){
+  if(other===k||v.online===false||(v.y||0)>3)continue;
+  const px=other===id?me.x:v.x,pz=other===id?me.z:v.z;
+  if(Math.abs(px-p.x)>2.5||Math.abs(pz-p.z)>2.5)continue;
+  const before=(px-p.x)**2+(pz-p.z)**2,after=(px-x)**2+(pz-z)**2;
+  // A crowded spawn may already overlap. Only a separating move may escape it.
+  if(before<1.35**2&&after>before+.0001)continue;
+  if(npcSegmentDistance2(px,pz,p.x,p.z,x,z)<1.35**2)return false;
+ }
+ for(const [chairId,c] of actors.chairs){
+  if(c.removed||c.hiddenAt||c.carrier)continue;
+  const radius=String(s.players[k]?.targetChair)===chairId ? .9 : 1.8;
+  if(npcSegmentDistance2(c.x,c.z,p.x,p.z,x,z)<radius*radius)return false;
+ }
+ return true;
+}
+function npcMove(s,k,p,target,speed,dt){
+ let distance=speed*dt,moved=0;
+ const turns=[0,.4,-.4,.8,-.8,1.2,-1.2,1.65,-1.65,2.1,-2.1];
+ while(distance>.01){
+  const dx=target.x-p.x,dz=target.z-p.z,d=Math.hypot(dx,dz);if(d<.15)break;
+  const step=Math.min(.45,distance,d),heading=Math.atan2(dx,dz);
+  let best=null,bestScore=-Infinity;
+  for(const turn of turns){
+   const a=heading+turn,x=p.x+Math.sin(a)*step,z=p.z+Math.cos(a)*step;
+   if(!npcMovementClear(s,k,p,x,z))continue;
+   // Prefer progress, then a consistent right-hand passing side. A small
+   // clearance probe starts going around a person before physical contact.
+   const aheadX=x+Math.sin(a)*.65,aheadZ=z+Math.cos(a)*.65;
+   const clear=npcMovementClear(s,k,{...p,x,z},aheadX,aheadZ);
+   const score=(d-Math.hypot(target.x-x,target.z-z))/step+(clear ? .45 : 0)-Math.abs(turn)*.04+(turn>0?.025:0);
+   if(score>bestScore){bestScore=score;best={x,z,a};}
+   if(turn===0&&clear)break;
+  }
+  if(!best)break;
+  p.x=best.x;p.z=best.z;p.rot=best.a;distance-=step;moved+=step;
+ }
+ return moved;
 }
 // NPC hide-spot inspection: one NPC per spot, 5 seconds, and no crowding.
 // Decisions happen only on the host's existing NPC tick (no extra timers).
@@ -1915,8 +2058,17 @@ function npcSpotBusy(s,k,spot){
  }
  return false;
 }
+function npcSpotApproachGoal(s,p,spot){
+ let best=null,distance=Infinity;
+ for(let i=0;i<16;i++){const a=i*Math.PI/8,q={x:spot.x+Math.cos(a)*5.3,z:spot.z+Math.sin(a)*5.3};
+  if(npcWorldBlocked(s,q.x,q.z,.78))continue;
+  const d=Math.hypot(q.x-p.x,q.z-p.z);if(d<distance){distance=d;best=q;}
+ }
+ return best;
+}
 function npcChooseSpot(s,k,p,now){
- if(s.phase!=='search'||p.sitting||p.carrying||p.npcSpotSearch)return;
+ const chair=s.chairs?.[p.targetChair];
+ if(s.phase!=='search'||p.sitting||p.carrying||p.npcSpotSearch||p.goal&&chair&&!chair.occupied&&!chair.removed&&!chair.carrier&&!chair.hiddenAt)return;
  if((p.npcSpotDecisionAt||0)>now)return;
  p.npcSpotDecisionAt=now+randBetween(9000,17000);
  if(Math.random()>.42)return;
@@ -1928,8 +2080,9 @@ function npcChooseSpot(s,k,p,now){
  candidates.sort((a,b)=>Math.hypot(p.x-a.x,p.z-a.z)-Math.hypot(p.x-b.x,p.z-b.z));
  const spot=candidates[Math.floor(Math.random()*Math.min(4,candidates.length))];
  if(p.buildingRoute)return;
+ const approach=npcSpotApproachGoal(s,p,spot);if(!approach)return;
  p.npcSpotSearch={spotId:spot.id,stage:'approach',until:0};
- const angle=(npcDepartureSlot(k)%12)*Math.PI/6;p.goal={x:spot.x+Math.cos(angle)*5.8,z:spot.z+Math.sin(angle)*5.8};p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
+ p.goal=approach;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
 }
 function npcUpdateSpot(s,k,p,now){
  const job=p.npcSpotSearch;if(!job)return false;
@@ -1941,6 +2094,7 @@ function npcUpdateSpot(s,k,p,now){
   p.npcSpotSearch=null;p.goal=null;p.decisionAt=0;return false;
  }
  if(job.stage==='approach'){
+  if(!p.goal)p.goal=npcSpotApproachGoal(s,p,spot);
   if(Math.hypot(p.x-spot.x,p.z-spot.z)<5.5){job.stage='searching';job.until=now+5000;p.goal=null;p.waypoint=null;p.localBypass=null;}
   return true;
  }
@@ -1948,7 +2102,7 @@ function npcUpdateSpot(s,k,p,now){
  p.npcSearchedSpots??={};p.npcSearchedSpots[spot.id]=true;
  const found=Object.entries(s.chairs||{}).find(([_,c])=>!c.removed&&c.hiddenAt===spot.id);
  if(found){
-  const [n,c]=found;c.hiddenAt=null;c.x=spot.x;c.z=spot.z;
+  const [n,c]=found;const landing=accessibleCostumeDrop(p.x,p.z,spot);c.hiddenAt=null;c.x=landing.x;c.z=landing.z;
   p.memory??={};p.memory[n]=true;
  }else if(Math.random()<1/3&&accessoryCatalog.length){
   const chosen=accessoryCatalog[Math.floor(Math.random()*accessoryCatalog.length)];
@@ -1958,38 +2112,18 @@ function npcUpdateSpot(s,k,p,now){
  }
  p.npcSpotSearch=null;p.goal=null;p.decisionAt=0;return false;
 }
-// Find a short visible waypoint to walk around walls instead of endlessly pushing into them.
-function npcSimulate(s,dt,now){npcPathPlansLeft=2;const npcEntries=Object.entries(s.players).filter(([_,p])=>p.npc);for(const [k,p] of npcEntries){p.npcKey=k;
- if(p.progressX===undefined){p.progressX=p.x;p.progressZ=p.z;p.progressAt=now;p.noProgressCount=0;}
- // NPCs spawning almost on top of another get a deterministic personal dispersal target.
- if(!p.initialDispersed&&s.phase==='search'){
-  p.initialDispersed=true;const b=buildingSites[3],front=b.z+b.d/2;
-  if(insideBlackBuilding(p.x,p.z)){
-   const slot=npcDepartureSlot(k);p.idleStep=slot%3;
-   p.departureAt=Math.max(p.departureAt||0,now+(slot%12)*950);
-  }
- }
- if(now-(p.progressAt||0)>4200){
-  const progress=Math.hypot(p.x-p.progressX,p.z-p.progressZ);
-  if(p.goal&&progress<1.1){
-   p.noProgressCount=(p.noProgressCount||0)+1;
-   p.stuck=0;
-   if(p.noProgressCount>=2){
-    // Do not teleport: change the route and give the obstacle a fresh approach.
-    if(!p.buildingRoute){p.waypoint=null;p.routeRetryAt=0;}
-    p.bypassSide=(p.bypassSide||1)*-1;
-    if(s.phase==='search'&&!p.departureDone){p.departureAt=Math.min(p.departureAt||now,now);p.doorStage=-1;}
-    if(npcReturning(s)){if(!p.buildingRoute)p.returnDoorStep=false;p.goal=npcReturnGoal(k);}
-    else if(p.departureDone){p.routeRetryAt=0;p.decisionAt=now+1600;}
-    p.noProgressCount=0;
-   }
-  }else if(progress>=1.1)p.noProgressCount=0;
-  p.progressX=p.x;p.progressZ=p.z;p.progressAt=now;
- }
- if(s.phase==='search')npcTryCostume(s,k,p);if(s.phase==='search'&&p.alive&&p.sitting)continue;if(s.phase==='vote'&&insideBlackBuilding(p.x,p.z)){if(canCastVote(s,k)&&!s.votes?.[k]&&now>s.deadline-VOTE_MS+randBetween(2500,15000)){const choice=chooseNPCVote(s,k);if(choice){s.votes[k]=choice;p.voted=true}}p.returned=true;p.goal=null;p.waypoint=null;p.buildingRoute=null;continue}if(s.phase==='finished')continue;// A chair-search intention is independent of alive/sitting status. Only willing NPCs exit.
+// Update decisions and local motion on the existing host tick; spread terrain work across ticks.
+function npcSimulate(s,dt,now){
+ npcEnsureGrid(s);npcNavDeadline=performance.now()+5;npcNavNodesLeft=2048;
+ if(npcNavRoom!==room){npcNavigation.clear();npcNavRoom=room;}
+ npcActorState=s;npcActors=Object.entries(s.players);npcChairActors=Object.entries(s.chairs||{});
+ const entries=npcActors.filter(([_,p])=>p.npc),offset=npcNavOrder++%Math.max(1,entries.length);
+ const npcEntries=entries.slice(offset).concat(entries.slice(0,offset));
+ for(const [k,p] of npcEntries){
+ if(s.phase==='search')npcTryCostume(s,k,p);if(s.phase==='search'&&p.alive&&p.sitting)continue;if(s.phase==='vote'&&insideBlackBuilding(p.x,p.z)){if(canCastVote(s,k)&&!s.votes?.[k]&&now>s.deadline-VOTE_MS+randBetween(2500,15000)){const choice=chooseNPCVote(s,k);if(choice){s.votes[k]=choice;p.voted=true}}}if(s.phase==='finished')continue;// A chair-search intention is independent of alive/sitting status. Only willing NPCs exit.
 if(s.phase==='search'&&p.searchIntentRound!==s.round){
  p.searchIntentRound=s.round;p.searchIntent=true;p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
- // One departure every ~0.55 seconds; the other NPCs wait away from the doorway.
+ // The front rows depart first; waiting NPCs stay clear of the doorway.
  p.departureAt=now+(Math.max(0,4-Math.floor((p.z-buildingSites[3].z-3)/4.2))*5+(npcDepartureSlot(k)%5))*850;
  p.departureDone=false;
 }
@@ -1997,7 +2131,7 @@ if(s.phase==='search'&&p.searchIntentRound!==s.round){
 if(npcReturning(s)){
  p.searchIntent=false;p.npcSpotSearch=null;
  const home=npcReturnGoal(k);
- if(insideBlackBuilding(p.x,p.z)){
+ if(Math.hypot(p.x-home.x,p.z-home.z)<1.5&&npcGoalReachable(s,k,p,home)){
   p.returned=true;p.returnDoorStep=false;p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
   continue; // Stay indoors until the next seating round.
  }
@@ -2011,7 +2145,7 @@ if(npcReturning(s)){
 }
 // Queue searching NPCs at the start of the round instead of 20+ simultaneous
 // door collisions. Non-searchers stay inside and do not block the threshold.
-// Dedicated departure state: keep the route stable until the door is fully cleared.
+// Stagger intentions; navigation discovers the doorway from collision geometry.
 if(s.phase==='search'&&!p.departureDone){
  const b=buildingSites[3],front=b.z+b.d/2;
  if(!p.searchIntent){
@@ -2038,19 +2172,18 @@ if(!p.buildingRoute&&!inspectingSpot&&!npcReturning(s)&&!(s.phase==='search'&&!p
 if(!p.goal&&!inspectingSpot){if(s.phase==='search'&&!p.departureDone)continue;if(s.phase==='search'&&!p.alive)continue;const nearbyItems=Object.entries(s.accessories||{}).filter(([key,a])=>a&&!p.costumeTried?.[key]&&Math.hypot(p.x-a.x,p.z-a.z)<32);if(nearbyItems.length&&Math.random()<.5){const item=nearbyItems[Math.floor(Math.random()*nearbyItems.length)][1];p.goal={x:item.x,z:item.z};}else{const a=Math.random()*Math.PI*2;if(s.phase==='search'&&!p.searchIntent&&insideBlackBuilding(p.x,p.z)){const b=buildingSites[3];p.goal={x:b.x+Math.sin(a)*Math.min(8,b.w/4),z:b.z+Math.cos(a)*Math.min(8,b.d/4)}}else p.goal={x:Math.cos(a)*randBetween(15,100),z:Math.sin(a)*randBetween(15,100)}}}
 // Discard legacy fixed routes when resuming an existing room.
 p.buildingRoute=null;p.waypoint=null;p.localBypass=null;p.returnDoorStep=false;
+if(!p.goal){p.waypoint=null;continue;}
 const distToGoal=Math.hypot(p.goal.x-p.x,p.goal.z-p.z);
-if(distToGoal<2.5&&npcGoalReachable(s,k,p,p.goal)){
+if(!inspectingSpot&&distToGoal<(npcReturning(s)?1.4:2.5)&&npcGoalReachable(s,k,p,p.goal)){
  if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&!c.removed&&!c.carrier&&!c.occupied&&!c.hiddenAt&&Number(p.targetChair)!==p.previous&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);c.occupied=k;p.memory??={};p.memory[p.targetChair]=true;continue;}}
  p.goal=null;p.decisionAt=0;npcNavigation.delete(room+":"+k);continue;
 }
 const destination=npcNavigationTarget(s,k,p,now);
-if(!destination)continue;
-const dx=destination.x-p.x,dz=destination.z-p.z,dist=Math.hypot(dx,dz);
+if(!destination){p.waypoint=null;continue;}
+p.waypoint={x:destination.x,z:destination.z};
 const speed=(s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run:p.walk;
-const step=Math.min(speed*dt,dist);
-if(dist>.01){const x=p.x+dx/dist*step,z=p.z+dz/dist*step;
- if(npcClearPath(s,k,p.x,p.z,x,z)){p.x=x;p.z=z;p.rot=Math.atan2(dx,dz);}
-}
+npcMove(s,k,p,destination,speed,dt);
+
 }
 if(s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
 let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=Date.now();const tickEvery=soloMode?280:850;if(tickNow-npcLastTick<tickEvery)return;npcLastTick=tickNow;if(!host||!state||npcBusy||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=Date.now();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,soloMode?.28:.85,now)})}finally{npcBusy=false}},140);
@@ -2229,7 +2362,7 @@ let p=player();if(p&&t-lastSync>110){lastSync=t;if(soloMode){p.x=me.x;p.y=player
   // Smooth only the visible mesh between network updates, never the actual game state.
   if(v.npc){
    // Constant-speed interpolation: no exponential easing (which caused rhythmic slowing).
-   // NPC simulation remains at its original 1150 ms interval; no extra AI/network work.
+   // Prediction follows the current route segment, never the distant goal.
    const motion=a.userData.npcMotion||(a.userData.npcMotion={x:tx,z:tz,stamp:t,velocity:0});
    if(motion.x!==tx||motion.z!==tz){
     const changedDistance=Math.hypot(tx-motion.x,tz-motion.z);
@@ -2239,21 +2372,23 @@ let p=player();if(p&&t-lastSync>110){lastSync=t;if(soloMode){p.x=me.x;p.y=player
    }
    // Predict a short distance toward the already-selected waypoint, rather than
    // stopping at every network snapshot. Never predict during search animations.
-   const committed=v.localBypass||v.waypoint||v.goal;
+   const committed=v.waypoint;
    const canPredict=committed&&!v.npcSpotSearch?.stage&&!v.sitting&&
      (state.phase==='search'||state.phase==='return')&&
      Math.hypot(committed.x-tx,committed.z-tz)>1.5;
    const age=Math.min(.48,Math.max(0,(t-motion.stamp)/1000));
    const baseSpeed=(state.phase==='return'||state.phase==='search'&&state.deadline-Date.now()<35000)?(v.run||9):(v.walk||5);
-   const aimX=canPredict?tx+(committed.x-tx)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.hypot(committed.x-tx,committed.z-tz)-.8):tx;
-   const aimZ=canPredict?tz+(committed.z-tz)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.hypot(committed.x-tx,committed.z-tz)-.8):tz;
+   let aimX=canPredict?tx+(committed.x-tx)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.hypot(committed.x-tx,committed.z-tz)-.8):tx;
+   let aimZ=canPredict?tz+(committed.z-tz)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.hypot(committed.x-tx,committed.z-tz)-.8):tz;
+   if(canPredict&&!npcStaticClearPath(state,tx,tz,aimX,aimZ)){aimX=tx;aimZ=tz;}
    const deltaX=aimX-a.position.x,deltaZ=aimZ-a.position.z;
    const remaining=Math.hypot(deltaX,deltaZ);
    if(remaining>.0001){
     const speed=Math.max(baseSpeed,Math.min(20,motion.velocity*1.2));
     const distance=Math.min(remaining,speed*dt);
-    a.position.x+=deltaX/remaining*distance;
-    a.position.z+=deltaZ/remaining*distance;
+    const nx=a.position.x+deltaX/remaining*distance,nz=a.position.z+deltaZ/remaining*distance;
+    if(npcStaticClearPath(state,a.position.x,a.position.z,nx,nz)){a.position.x=nx;a.position.z=nz;}
+    else{a.position.x=tx;a.position.z=tz;}
    }
    a.position.y+=(ty-a.position.y)*Math.min(1,dt*12);
    const diff=Math.atan2(Math.sin(tr-a.rotation.y),Math.cos(tr-a.rotation.y));
