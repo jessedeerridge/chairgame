@@ -20,7 +20,7 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    document.addEventListener('click',event=>{if(event.target.closest('#solo')&&!window.bootClick)window.bootClick=performance.now();},{capture:true});
    const code=document.querySelector('#deferredGameCode');
-   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.bootTest={status:()=>({ready:worldReady,outdoorVisible:outdoorWorld.visible,outdoorMeshes:outdoorWorld.children.length,obstacles:obstacles.length,hidingSpots:hidingSpots.length,stairs:stairways.length}),getState:()=>state,advanceState,npcSimulate,npcWorldBlocked,screenReady:()=>voteWall.material.map===voteWallTexture,door:()=>window.__blackIntroDoor,scene,outdoorWorld};performance.mark("island-room-ready");`);
+   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.bootTest={status:()=>({ready:worldReady,outdoorVisible:outdoorWorld.visible,outdoorMeshes:outdoorWorld.children.length,obstacles:obstacles.length,hidingSpots:hidingSpots.length,stairs:stairways.length}),getState:()=>state,advanceState,pauseHostForTest:()=>{host=false;},introPage:()=>introPlaybackFor(state)?.page,completeIntroForTest:async()=>{introPlayback=null;let now=performance.now();for(let i=0;i<=9;i++){tickIntroPlayback(state,now+i*6001,true,true);paintVoteWall();renderer.render(scene,camera);markIntroFramePresented(state,now+i*6001);}await syncIntroCompletion(performance.now());},npcSimulate,npcWorldBlocked,screenReady:()=>voteWall.material.map===voteWallTexture,door:()=>window.__blackIntroDoor,scene,outdoorWorld};performance.mark("island-room-ready");`);
    window.addEventListener('islandGameModuleReady',()=>{window.firstRoom=window.bootTest.status();window.roomReadyMs=performance.now()-window.bootClick;});
   });
   await page.click('#solo');await page.waitForFunction(()=>window.__islandGameReady,{timeout:60000});
@@ -32,8 +32,10 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>window.bootTest.status().ready&&!window.bootTest.getState().worldPreparing,{timeout:60000});
   const loaded=await page.evaluate(()=>({status:window.bootTest.status(),phase:window.bootTest.getState().phase,chairs:Object.keys(window.bootTest.getState().chairs).length,readyMs:Math.round(performance.getEntriesByName('island-world-ready')[0].startTime-window.bootClick)}));
   assert.equal(loaded.phase,'instructions','loading completion skipped the introduction');assert.equal(loaded.chairs,15);assert.equal(loaded.status.stairs,4);assert.equal(loaded.status.hidingSpots,220);assert(loaded.status.outdoorMeshes>1000);assert.equal(loaded.status.outdoorVisible,false);
-  const transitions=await page.evaluate(()=>{
-   const t=window.bootTest,s=t.getState();t.advanceState(s,s.introStarted+53999);const before=s.phase;t.advanceState(s,s.introStarted+54001);const after=s.phase;t.advanceState(s,s.deadline+1);const search=s.phase;
+  const pageBefore=await page.evaluate(()=>{window.bootTest.pauseHostForTest();return window.bootTest.introPage();});
+  await page.waitForFunction(previous=>window.bootTest.introPage()===previous+1,pageBefore,{timeout:10000});
+  const transitions=await page.evaluate(async()=>{
+   const t=window.bootTest,s=t.getState();t.advanceState(s,s.introStarted+999999);const before=s.phase;await t.completeIntroForTest();t.advanceState(s,Date.now());const after=s.phase;t.advanceState(s,s.deadline+1);const search=s.phase;
    const now=Date.now();s.deadline=now+90000;for(let i=0;i<120;i++)t.npcSimulate(s,.28,now+i*280);
    return {before,after,search,npcs:Object.values(s.players).filter(p=>p.npc).length,collisions:Object.values(s.players).filter(p=>p.npc&&t.npcWorldBlocked(s,p.x,p.z,.65)).length};
   });

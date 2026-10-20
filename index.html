@@ -130,6 +130,7 @@ body.playing #actions{left:calc((100vw - 205px)/2);width:min(620px,calc(100vw - 
 @media(max-height:620px){#entry .panel{padding:14px 24px 18px}#entry .entry-art{height:58px}#entry .entry-chair{height:50px;width:60px;font-size:35px}#entry h1{margin-bottom:12px;font-size:27px}#entry .entry-eyebrow{margin:6px 0 4px}#entry .entry-form{gap:7px}#entry input,#entry button{min-height:41px}}
 #actions button .action-icon{display:block;width:36px;height:36px;min-width:36px;flex:none;margin-top:12px;pointer-events:none}
 body.playing{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}body.playing input,body.playing textarea,body.playing [contenteditable="true"]{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
+#modalTitle .medal-icon{width:26px;height:26px;vertical-align:-4px;margin-right:7px}#tradeCoinChoices button{display:flex;align-items:center;justify-content:center;gap:7px}#tradeCoinChoices .medal-icon{width:23px;height:23px;flex:none}
 </style><div id="runtimeError" style="position:fixed;top:0;left:0;z-index:30;color:#fff;background:#8a2323;padding:8px;max-width:100%;pointer-events:none"></div><div id="stickBase"><div id="stickKnob"></div></div><div id="entry"><div class="panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><div class="entry-eyebrow">LET’S PLAY!</div><h1>ISLAND<br><span>CHAIR GAME</span></h1><div class="entry-form"><input id="name" placeholder="なまえ" maxlength="16" aria-label="プレイヤー名"><input id="room" placeholder="ルームコード" maxlength="16" aria-label="ルームコード"><button id="join">あそぶ <span aria-hidden="true">➜</span></button><button id="solo">ひとりでおためし</button></div></div></div><div id="hud"><div id="status">未接続</div><div id="players"></div><div id="wallet"></div><div id="log"></div></div><div id="clock" hidden><span id="phaseInstruction"></span><span id="clockSeconds"></span></div><div id="gameNotice" style="white-space:pre-line;position:fixed;top:24%;left:50%;transform:translateX(-50%);background:#10242aee;color:white;padding:18px 26px;border-radius:15px;font-size:22px;font-weight:800;text-align:center;pointer-events:none;display:none;z-index:8"></div><div id="voteResultsPopup" style="display:none;position:fixed;z-index:16;top:22%;left:50%;transform:translateX(-50%);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 24px);max-height:85vh;overflow:hidden;background:rgba(16,36,42,.96);color:white;border:2px solid #e6d39d;border-radius:18px;padding:20px 25px;box-shadow:0 10px 35px #0007;text-align:center;pointer-events:none;font-size:22px;font-weight:800"><div style="font-size:24px;margin-bottom:12px">投票結果</div><div id="voteResultsRows" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;width:100%;box-sizing:border-box"></div></div><div id="gameStats" style="position:fixed;right:12px;top:85px;background:#10242acc;padding:10px;border-radius:10px;font-size:12px;max-width:250px;pointer-events:none"></div><div id="miniMapBackdrop"></div><div id="miniMapPanel"><canvas id="miniMapCanvas" width="768" height="768"></canvas><button id="miniEraser" title="この椅子マークを削除" aria-label="消しゴム">🧽</button><div id="mapNumberEditor" hidden><button id="mapNumberCancel" title="閉じる" aria-label="閉じる">×</button><div id="mapNumberDisplay">?</div><div id="mapNumberKeys"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="?">?</button><button data-key="0">0</button><button data-key="back">⌫</button></div><div class="map-editor-actions"><button id="mapNumberSave">✓</button></div></div></div><div id="actions" hidden><button id="start" hidden>ゲーム開始</button><button id="touch" data-action-label="とうひょう" hidden title="親を投票" aria-label="親を投票"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#7298ab" d="m5 21 15-7 15 7v15H5Z"/><path d="M13 23h14"/><path fill="#fff3d7" d="m14 3 15 5-6 17-15-5Z"/><path d="m14 13 3 4 7-6"/></svg></button><button id="sit" data-action-label="すわる" hidden title="座る" aria-label="座る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></svg></button><button id="markChair" data-action-label="おぼえる" hidden title="地図に記録" aria-label="地図に記録"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></svg></button><button id="moveChair" data-action-label="はこぶ" hidden title="イスを持ち上げる" aria-label="イスを持ち上げる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(9 -2) scale(.65)"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="hideChair" data-action-label="かくす" hidden title="イスを隠す" aria-label="イスを隠す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#52864b" d="M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z"/><path fill="#9b663a" d="M17 24h6v13h-6z"/></svg></button><button id="revealChair" data-action-label="さがす" hidden title="隠したイスを取り出す" aria-label="隠したイスを取り出す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="11" fill="#aad7e0"/><path d="m24 24 12 12" stroke-width="6"/><path d="M10 15a6 6 0 0 1 6-6" stroke="#fff"/></svg></button><button id="trade" data-action-label="わたす" hidden title="コインをあげる" aria-label="コインをあげる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(6 -3) scale(.7)"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="givePin" data-action-label="おしえる" hidden title="椅子の位置を共有" aria-label="椅子の位置を共有"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8 -1) scale(.6)"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="pickupShirt" data-action-label="きる" hidden title="Tシャツを着る" aria-label="Tシャツを着る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#699ec8" d="m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z"/></svg></button><button id="pickupAccessory" data-action-label="かぶる" hidden title="帽子をかぶる・眼鏡をつける" aria-label="帽子をかぶる・眼鏡をつける"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#805b9d" d="m11 7 3-3 12 3 3 23H11Z"/><path fill="#d5a861" d="M11 23h18v6H11z"/><ellipse cx="20" cy="31" rx="17" ry="5" fill="#805b9d"/></svg></button><button id="pickupCoin" data-action-label="ひろう" hidden title="コインを拾う" aria-label="コインを拾う"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/><path d="M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4"/></svg></button><button id="voteOpen" hidden>親を投票</button><button id="eraseOpen" hidden>イスを消去</button></div><div id="modal"><div class="panel"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="buttons"><button id="modalCancel">閉じる</button><button id="modalConfirm">決定</button></div></div></div><select id="target" hidden></select><select id="issuer" hidden></select><input id="amount" type="number" value="1" hidden><select id="voteTarget" hidden></select><select id="chairNumber" hidden></select><button id="send" hidden></button><button id="vote" hidden></button><button id="erase" hidden></button>
 <script type="text/plain" id="deferredGameCode">
 let THREE;
@@ -1076,11 +1077,61 @@ cube(23.2,12.8,.42,mat(0x080c13),VOTE_X,8.1,voteWallZ-.28);
 cube(22.6,12.2,.15,new THREE.MeshStandardMaterial({color:0x9aadb7,metalness:.8,roughness:.25}),VOTE_X,8.1,voteWallZ-.02);
 const voteWall=new THREE.Mesh(new THREE.PlaneGeometry(22.05,11.65),new THREE.MeshBasicMaterial({map:voteWallTexture,side:THREE.DoubleSide}));
 voteWall.position.set(VOTE_X,8.1,voteWallZ+.09);scene.add(voteWall);
+// Advance from frames that actually presented a page, not database callbacks or
+// an absolute wall clock. A delayed frame may advance ONE page, never catch up.
+const INTRO_PAGE_MS=6000,INTRO_PAGE_COUNT=9;
+let introPlayback=null;
+function introSessionKey(s){return room+':'+(s.introStarted||s.started||0);}
+function introPlaybackFor(s){
+ if(s?.phase!=='instructions')return null;
+ const key=introSessionKey(s);
+ if(!introPlayback||introPlayback.key!==key)introPlayback={key,page:0,elapsed:0,lastFrameAt:null,presented:false,complete:false,waitingForWorld:false};
+ return introPlayback;
+}
+function tickIntroPlayback(s,now,visible=true,contentReady=true){
+ const playback=introPlaybackFor(s);if(!playback)return null;
+ if(!visible){playback.lastFrameAt=null;return playback;}
+ // The final player/chair count must also get its full display duration once
+ // background construction has produced the actual chairs.
+ if(playback.page===INTRO_PAGE_COUNT-1&&!contentReady){
+  playback.elapsed=0;playback.lastFrameAt=null;playback.presented=false;playback.waitingForWorld=true;return playback;
+ }
+ if(playback.waitingForWorld){playback.waitingForWorld=false;playback.presented=false;playback.lastFrameAt=null;}
+ if(playback.presented&&playback.lastFrameAt!==null&&!playback.complete){
+  playback.elapsed+=Math.max(0,now-playback.lastFrameAt);
+  if(playback.elapsed>=INTRO_PAGE_MS){
+   if(playback.page<INTRO_PAGE_COUNT-1){playback.page++;playback.elapsed=0;playback.presented=false;}
+   else playback.complete=true;
+  }
+ }
+ playback.lastFrameAt=now;return playback;
+}
+function markIntroFramePresented(s,now){
+ const playback=introPlaybackFor(s);
+ if(playback&&!playback.presented){playback.presented=true;playback.lastFrameAt=now;}
+}
+function pauseIntroPlayback(){if(introPlayback)introPlayback.lastFrameAt=null;}
+document.addEventListener('visibilitychange',pauseIntroPlayback);
+function introParticipantsReady(s){
+ const humans=Object.values(s.players||{}).filter(p=>!p.npc&&p.online!==false);
+ return humans.length>0&&humans.every(p=>p.introSeen===introSessionKey(s));
+}
+let introAckBusy=false,introAckRetryAt=0;
+async function syncIntroCompletion(now){
+ const playback=introPlaybackFor(state);
+ if(!playback?.complete||!state.players?.[id]||state.players[id].introSeen===playback.key||introAckBusy||now<introAckRetryAt)return;
+ const key=playback.key;introAckBusy=true;
+ try{
+  if(soloMode){state.players[id].introSeen=key;}
+  else await update(ref(database(),`rooms/${room}/players/${id}`),{introSeen:key});
+ }catch(error){introAckRetryAt=performance.now()+2000;console.warn('説明の完了同期を再試行します',error);}
+ finally{introAckBusy=false;}
+}
 let voteWallStateKey='';
 const formatCountdown=seconds=>{const n=Math.max(0,Math.ceil(seconds));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')};
 function paintVoteWall(){
- const s=state;
- const data=s?JSON.stringify([s.phase,s.round,s.voteCounts,s.lastRemoved,s.parent,s.eliminatedNames,s.introStarted,s.selectedEraseChair,s.winner,s.finalRanks,Math.max(0,Math.ceil(((s.deadline||0)-Date.now())/1000)),s.players&&Object.fromEntries(Object.entries(s.players).map(([k,v])=>[k,v.name]))]):'waiting';
+ const s=state,playback=introPlaybackFor(s);
+ const data=s?JSON.stringify([playback?.page,s.phase==='instructions'?[s.worldPreparing,Object.values(s.players||{}).filter(p=>p.initial&&p.alive).length,Object.values(s.chairs||{}).filter(c=>!c.removed).length]:null,s.phase,s.round,s.voteCounts,s.lastRemoved,s.parent,s.eliminatedNames,s.introStarted,s.selectedEraseChair,s.winner,s.finalRanks,Math.max(0,Math.ceil(((s.deadline||0)-Date.now())/1000)),s.players&&Object.fromEntries(Object.entries(s.players).map(([k,v])=>[k,v.name]))]):'waiting';
  if(data===voteWallStateKey)return;voteWallStateKey=data;
  const c=voteWallCtx,W=1200,H=720;
  const bg=c.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#101f35');bg.addColorStop(1,'#080f20');c.fillStyle=bg;c.fillRect(0,0,W,H);
@@ -1118,8 +1169,7 @@ function paintVoteWall(){
   });c.textAlign='center';
  }
  else if(s.phase==='instructions'){
-  const elapsed=Math.max(0,Date.now()-(s.introStarted||Date.now()));
-  const slide=Math.min(8,Math.floor(elapsed/6000));
+  const slide=playback.page;
   c.textAlign='center';
   if(slide===0){
     // 白いマスクの人物をスクリーンに描画
@@ -1638,12 +1688,37 @@ function syncVoteResultPopup(){
  }
  popup.style.display=(state.parent===id&&voteResultParentHidden)?'none':'block';
 }
-function walletMedalIcon(){
+function walletMedalIcon(className='coin-stack-icon'){
  const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');
- icon.setAttribute('class','coin-stack-icon');icon.setAttribute('viewBox','0 0 24 24');
+ icon.setAttribute('class',className);icon.setAttribute('viewBox','0 0 24 24');
  icon.setAttribute('aria-hidden','true');icon.setAttribute('focusable','false');
  icon.innerHTML='<circle cx="12" cy="12" r="10.5" fill="#e7b63e" stroke="#ffedb0" stroke-width="1.5"/><circle cx="12" cy="12" r="8" fill="#c89425" stroke="#f7d979" stroke-width="1"/><path d="M6 7 8 5M16 19l2-2" fill="none" stroke="#fff0b4" stroke-width="1.2" stroke-linecap="round"/>';
  return icon;
+}
+// Canvas textures use the same vector circles as the DOM medal, without emoji fonts.
+function drawMedalCanvas(ctx,x,y,size,smile=false){
+ ctx.save();ctx.translate(x,y);ctx.scale(size/24,size/24);
+ const circle=(cx,cy,r,fill,stroke,width)=>{ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke();}};
+ circle(12,12,10.5,smile?'#ffd15f':'#e7b63e','#ffedb0',1.5);
+ circle(12,12,8,smile?'#ffe789':'#c89425','#f7d979',1);
+ ctx.strokeStyle='#fff5cf';ctx.lineWidth=1.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(6,7);ctx.lineTo(8,5);ctx.moveTo(16,19);ctx.lineTo(18,17);ctx.stroke();
+ if(smile){
+  circle(8.4,10.8,.85,'#97512b');circle(15.6,10.8,.85,'#97512b');
+  circle(6.8,13.2,1.05,'#ffa58a');circle(17.2,13.2,1.05,'#ffa58a');
+  ctx.beginPath();ctx.arc(12,12.2,3.4,Math.PI*.2,Math.PI*.8);ctx.strokeStyle='#97512b';ctx.lineWidth=1;ctx.stroke();
+ }
+ ctx.restore();
+}
+function paintPrizeMedals(canvas,rank,coins){
+ const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);
+ const gold=rank!==null&&rank<=3,font=gold?79:65,icon=gold?76:64;
+ const rankText=gold?rank+'位':'',amount=String(coins),gap=16;
+ ctx.save();ctx.font='bold '+font+'px sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineWidth=12;ctx.lineJoin='round';
+ ctx.strokeStyle='#292018';ctx.fillStyle=gold?'#ffcf52':'#ffffff';
+ const rankWidth=rankText?ctx.measureText(rankText).width+gap:0,total=rankWidth+icon+gap+ctx.measureText(amount).width,scale=Math.min(1,490/total);
+ ctx.translate(canvas.width/2,80);ctx.scale(scale,scale);let x=-total/2;
+ if(rankText){ctx.strokeText(rankText,x,0);ctx.fillText(rankText,x,0);x+=rankWidth;}
+ drawMedalCanvas(ctx,x,-icon/2,icon);x+=icon+gap;ctx.strokeText(amount,x,0);ctx.fillText(amount,x,0);ctx.restore();
 }
 function renderUI(){if(!state)return;if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));$('wallet').replaceChildren();if(p){for(const [issuer,count] of Object.entries(p.wallet||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])){const cell=document.createElement('span');cell.className='coin-entry';cell.classList.toggle('is-eliminated',state.players?.[issuer]?.initial===true&&state.players[issuer].alive===false);const nm=document.createElement('span');nm.className='coin-name';nm.textContent=(state.players?.[issuer]?.name||'不明')+' ×';const stack=document.createElement('span');stack.className='coin-stack';const icon=walletMedalIcon();const number=document.createElement('span');number.className='coin-stack-number';number.textContent=String(count);stack.append(icon,number);cell.append(nm,stack);$('wallet').appendChild(cell)}}const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
@@ -1774,8 +1849,13 @@ function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=
 $('erase').onclick=()=>{const n=$('chairNumber').value;mutate(s=>{if(s.phase!=='erase'||s.parent!==id)return;finishErase(s,n)})};
 function chooseNPCVote(s,k){const p=s.players[k],candidates=Object.entries(s.players).filter(([_,v])=>v.alive);if(!candidates.length)return null;let best=null,score=-Infinity;for(const [key,c] of candidates){let value=Math.random()*2.4+(p.trust?.[key]||0)*3+(key===k?(p.personality==='積極型'?2:0):0);if(p.personality==='追従型')value+=(p.trust?.[key]||0)*3;if(p.personality==='独立型'&&key===k)value+=1.8;if(p.personality==='戦略型')value+=(s.lastVoteCounts?.[key]||0)*.2;if(p.personality==='気まぐれ型')value+=Math.random()*3;if(value>score){score=value;best=key}}return best}
 function chooseErase(s,k){const p=s.players[k],available=Object.entries(s.chairs).filter(([_,c])=>!c.removed);if(!available.length)return null;const scored=available.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
-function advanceState(s,now){if(now<s.deadline)return;const phase=s.phase;if(phase==='instructions'){if(!worldReady||s.worldPreparing||now-(s.introStarted||now)<54000)return;s.phase='sitIntro';s.deadline=now+3000}
-else if(phase==='sitIntro'){s.phase='search';s.deadline=now+SEARCH_MS}
+function advanceState(s,now){const phase=s.phase;
+ if(phase==='instructions'){
+  if(!worldReady||s.worldPreparing||!introParticipantsReady(s))return;
+  s.phase='sitIntro';s.deadline=now+3000;return;
+ }
+ if(now<s.deadline)return;
+ if(phase==='sitIntro'){s.phase='search';s.deadline=now+SEARCH_MS}
 else if(phase==='search'){for(const p of Object.values(s.players)){p.wasAliveBeforeSearch=!!p.alive;if(p.alive&&!p.sitting)p.alive=false;if(p.sitting)p.previous=p.sitting;p.returned=false}const newlyOut=Object.entries(s.players).filter(([_,p])=>p.wasAliveBeforeSearch&&!p.alive);
  s.eliminatedNames=newlyOut.map(([_,p])=>p.name);
  s.eliminationOrder??=[];for(const [k,p] of newlyOut){p.eliminatedRound=s.round;if(!s.eliminationOrder.includes(k))s.eliminationOrder.push(k);}
@@ -1792,7 +1872,16 @@ else if(phase==='voteIntro'){s.voteEligible={};for(const [k,p] of Object.entries
 else if(phase==='vote'){const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+RESULTS_MS;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
 else if(phase==='results'){if(s.tieNoErase){s.tieNoErase=false;initRound(s)}else{s.phase='erase';s.deadline=now+86400000}}
 else if(phase==='eraseReveal'){initRound(s)}}
-let advancing=false;async function advance(){if(state?.phase==='instructions'&&(!worldReady||state.worldPreparing))return;if(!host||!state||advancing||phase()==='lobby'||phase()==='finished'||Date.now()<state.deadline)return;advancing=true;try{await mutate(s=>{if(s.deadline<=Date.now())advanceState(s,Date.now())})}finally{advancing=false}}
+let advancing=false;
+async function advance(){
+ if(!host||!state||advancing||phase()==='lobby'||phase()==='finished')return;
+ if(state.phase==='instructions'){
+  if(!worldReady||state.worldPreparing||!introParticipantsReady(state))return;
+ }else if(Date.now()<state.deadline)return;
+ advancing=true;
+ try{await mutate(s=>{if(s.phase==='instructions'||s.deadline<=Date.now())advanceState(s,Date.now());});}
+ finally{advancing=false;}
+}
 setInterval(advance,700);
 // Host alone simulates all NPC decisions; the shared database is authoritative.
 function npcDecision(s,k,p,now){
@@ -2233,10 +2322,39 @@ let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=Date.now
 const modal=$('modal');$('modalCancel').onclick=()=>{modal.classList.remove('open');$('modalConfirm').textContent='決定';$('modalCancel').textContent='キャンセル';};
 function nearbyPickup(){if(!state?.coinDrops)return null;const now=Date.now();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(now-d.created>=10000||d.recipient===id||d.owner===id)).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
 $('pickupCoin').onclick=()=>{const nearest=nearbyPickup();if(!nearest)return;mutate(s=>{const d=s.coinDrops?.[nearest[0]],p=s.players?.[id];if(!d||!p||Math.hypot(p.x-d.x,p.z-d.z)>3||Date.now()-d.created<10000&&d.recipient!==id&&d.owner!==id)return;p.wallet??={};p.wallet[d.issuer]=(p.wallet[d.issuer]||0)+d.count;delete s.coinDrops[nearest[0]];})};
-const coinMeshes={};const coinGoldMat=new THREE.MeshStandardMaterial({color:0xffd84b,metalness:.67,roughness:.14});const coinSilverMat=new THREE.MeshStandardMaterial({color:0xf2f7ff,metalness:.72,roughness:.12});const coinGoldGeo=new THREE.CylinderGeometry(.335,.335,.095,32);const coinSilverGeo=new THREE.TorusGeometry(.36,.085,10,40);
+const coinMeshes={};
+// All drops share this small texture, materials and geometry: no extra draw calls.
+const coinFaceCanvas=document.createElement('canvas');coinFaceCanvas.width=coinFaceCanvas.height=128;
+const coinFaceContext=coinFaceCanvas.getContext('2d');coinFaceContext.fillStyle='#ffd15f';coinFaceContext.fillRect(0,0,128,128);
+drawMedalCanvas(coinFaceContext,0,0,128,true);
+const coinFaceTexture=new THREE.CanvasTexture(coinFaceCanvas);coinFaceTexture.colorSpace=THREE.SRGBColorSpace;
+const coinGoldMat=new THREE.MeshLambertMaterial({color:0xffd15f}),coinSilverMat=new THREE.MeshLambertMaterial({color:0xfff3ca});
+const coinFaceMat=new THREE.MeshBasicMaterial({map:coinFaceTexture});
+const coinGoldGeo=new THREE.CylinderGeometry(.46,.46,.14,24),coinSilverGeo=new THREE.TorusGeometry(.46,.045,8,24);
 function coinInitials(name,all){const cleaned=String(name||'?').trim();const one=Array.from(cleaned)[0]||'?';const same=all.filter(v=>Array.from(String(v||''))[0]===one).length>1;return Array.from(cleaned).slice(0,same?2:1).join('');}
-function makeCoinMesh(){const g=new THREE.Group(),mesh=new THREE.Mesh(coinGoldGeo,coinGoldMat),rim=new THREE.Mesh(coinSilverGeo,coinSilverMat);rim.rotation.x=-Math.PI/2;g.add(mesh,rim);const cv=document.createElement('canvas');cv.width=128;cv.height=128;const tex=new THREE.CanvasTexture(cv);const label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));label.scale.set(1.25,1.25,1);label.position.y=.65;g.add(label);g.userData={canvas:cv,texture:tex,label};scene.add(g);return g;}
-function drawCoinDrops(){const drops=state?.coinDrops||{};const names=Object.values(state?.players||{}).map(p=>p.name);for(const [k,d] of Object.entries(drops)){let g=coinMeshes[k];if(!g){g=coinMeshes[k]=makeCoinMesh()}g.position.set(d.x,(d.y||0)+.25,d.z);const name=state?.players?.[d.issuer]?.name||'?';const txt=coinInitials(name,names)+' ×'+d.count;if(g.userData.lastText!==txt){g.userData.lastText=txt;const c=g.userData.canvas,ctx=c.getContext('2d');ctx.clearRect(0,0,128,128);ctx.fillStyle='#fff3cf';ctx.strokeStyle='#453313';ctx.lineWidth=6;ctx.font='bold 33px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.strokeText(txt,64,64,124);ctx.fillText(txt,64,64,124);g.userData.texture.needsUpdate=true;}}for(const k of Object.keys(coinMeshes))if(!drops[k]){scene.remove(coinMeshes[k]);coinMeshes[k].userData.texture.dispose();delete coinMeshes[k]}}
+function makeCoinMesh(){
+ const g=new THREE.Group(),coin=new THREE.Group(),mesh=new THREE.Mesh(coinGoldGeo,[coinGoldMat,coinFaceMat,coinGoldMat]),rim=new THREE.Mesh(coinSilverGeo,coinSilverMat);
+ rim.rotation.x=-Math.PI/2;rim.position.y=.055;coin.add(mesh,rim);g.add(coin);
+ const cv=document.createElement('canvas');cv.width=256;cv.height=96;
+ const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
+ const label=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));label.scale.set(1.8,.675,1);label.position.y=.85;g.add(label);
+ g.userData={canvas:cv,texture:tex,label,coin,seed:Math.random()*Math.PI*2};scene.add(g);return g;
+}
+function drawCoinDrops(){
+ const drops=state?.coinDrops||{},names=Object.values(state?.players||{}).map(p=>p.name),time=performance.now()/1000;
+ for(const [k,d] of Object.entries(drops)){
+  let g=coinMeshes[k];if(!g)g=coinMeshes[k]=makeCoinMesh();
+  g.position.set(d.x,(d.y||0)+.25+Math.sin(time*2.4+g.userData.seed)*.035,d.z);
+  g.userData.coin.rotation.z=Math.sin(time*1.8+g.userData.seed)*.10;
+  const name=state?.players?.[d.issuer]?.name||'?',txt=coinInitials(name,names)+' ×'+d.count;
+  if(g.userData.lastText!==txt){
+   g.userData.lastText=txt;const ctx=g.userData.canvas.getContext('2d');ctx.clearRect(0,0,256,96);
+   ctx.beginPath();ctx.roundRect(4,12,248,72,28);ctx.fillStyle='#fff8e5';ctx.fill();ctx.strokeStyle='#e4ba64';ctx.lineWidth=4;ctx.stroke();
+   ctx.fillStyle='#68462a';ctx.font='bold 40px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,128,49,220);g.userData.texture.needsUpdate=true;
+  }
+ }
+ for(const k of Object.keys(coinMeshes))if(!drops[k]){scene.remove(coinMeshes[k]);coinMeshes[k].userData.texture.dispose();coinMeshes[k].userData.label.material.dispose();delete coinMeshes[k];}
+}
 function nearestPartner(){let best=null,dist=4;for(let [k,p] of players()){if(k===id||p.online===false)continue;let d=Math.hypot(me.x-p.x,me.z-p.z);if(d<dist){best={id:k,name:p.name,npc:!!p.npc};dist=d}}return best}
 async function shareChairPin(recipient,number,x,z){
  if(!state||!state.players?.[recipient])return;
@@ -2267,8 +2385,9 @@ function updateTradeAmount(n){const input=$('tradeAmount'),issuer=$('tradeIssuer
 function selectTradeCoin(key){$('tradeIssuer').value=key;for(const btn of document.querySelectorAll('#tradeCoinChoices button'))btn.classList.toggle('selected',btn.dataset.issuer===key);updateTradeAmount(1);}
 $('trade').onclick=()=>{tradePartner=nearestPartner();if(!tradePartner)return;const coins=Object.entries(player()?.wallet||{}).filter(([k,v])=>v>0);if(!coins.length){log('落とせるコインがありません');return;}
 const opts=coins.map(([k,v])=>`<option value="${k}">${state.players[k]?.name||'コイン'}（${v}枚）</option>`).join('');
-openModal('🪙 コインをわたす',`<div style="text-align:center">${tradePartner.name} にわたすコインを選んでね</div><select id="tradeIssuer" hidden>${opts}</select><div id="tradeCoinChoices"></div><div id="tradeQuantity"><button type="button" id="tradeMinus">−</button><strong id="tradeAmountValue">1</strong><button type="button" id="tradePlus">＋</button><button type="button" id="tradeAll">ALL</button></div><input id="tradeAmount" type="number" min="1" value="1" hidden>`,'trade');
-const holder=$('tradeCoinChoices');for(const [key,count] of coins){const b=document.createElement('button');b.type='button';b.dataset.issuer=key;b.textContent=(state.players?.[key]?.name||'コイン')+' 🪙 '+count;b.onclick=()=>selectTradeCoin(key);holder.appendChild(b)}
+openModal('コインをわたす',`<div style="text-align:center">${tradePartner.name} にわたすコインを選んでね</div><select id="tradeIssuer" hidden>${opts}</select><div id="tradeCoinChoices"></div><div id="tradeQuantity"><button type="button" id="tradeMinus">−</button><strong id="tradeAmountValue">1</strong><button type="button" id="tradePlus">＋</button><button type="button" id="tradeAll">ALL</button></div><input id="tradeAmount" type="number" min="1" value="1" hidden>`,'trade');
+$('modalTitle').prepend(walletMedalIcon('medal-icon'));
+const holder=$('tradeCoinChoices');for(const [key,count] of coins){const b=document.createElement('button');b.type='button';b.dataset.issuer=key;b.append(document.createTextNode(state.players?.[key]?.name||'コイン'),walletMedalIcon('medal-icon'),document.createTextNode(String(count)));b.onclick=()=>selectTradeCoin(key);holder.appendChild(b)}
 $('tradeMinus').onclick=()=>updateTradeAmount(Number($('tradeAmount').value)-1);$('tradePlus').onclick=()=>updateTradeAmount(Number($('tradeAmount').value)+1);$('tradeAll').onclick=()=>updateTradeAmount(Number(player()?.wallet?.[$('tradeIssuer').value]||1));selectTradeCoin(coins[0][0]);};
 let selectedVoteCandidate=null;
 function closeVoteWhenEnded(){
@@ -2346,7 +2465,7 @@ const stick=document.getElementById('stickBase'),knob=document.getElementById('s
 function setStick(e){const r=stick.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),radius=48,l=Math.hypot(dx,dy),scale=l>radius?radius/l:1;joyX=dx*scale/radius;joyY=-dy*scale/radius;knob.style.transform=`translate(${joyX*radius}px,${-joyY*radius}px)`}
 stick.addEventListener('pointerdown',e=>{e.preventDefault();stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);setStick(e)});stick.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer){e.preventDefault();setStick(e)}});function resetStick(e){if(e.pointerId!==stickPointer)return;stickPointer=null;joyX=joyY=0;knob.style.transform='translate(0,0)'}stick.addEventListener('pointerup',resetStick);stick.addEventListener('pointercancel',resetStick);window.addEventListener('blur',()=>{joyX=joyY=0;knob.style.transform='translate(0,0)';for(const k in keys)keys[k]=false});
 window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return;if(e.code.startsWith('Arrow')||e.code==='Space')e.preventDefault();keys[e.code]=true;if(e.code==='KeyE'){let a=nearestAction();if(a)a.click()}});window.addEventListener('keyup',e=>{keys[e.code]=false});renderer.domElement.addEventListener('pointerdown',e=>{if(viewPointer!==null)return;viewPointer=e.pointerId;viewX=e.clientX;viewY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==viewPointer)return;yaw-=(e.clientX-viewX)*.006;pitch=Math.max(-.45,Math.min(.8,pitch+(e.clientY-viewY)*.004));viewX=e.clientX;viewY=e.clientY});function endView(e){if(e.pointerId===viewPointer)viewPointer=null}renderer.domElement.addEventListener('pointerup',endView);renderer.domElement.addEventListener('pointercancel',endView);window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair){me.x=chair.x;me.z=chair.z;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;if(player()?.carrying)speed*=0.5;let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
+let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair){me.x=chair.x;me.z=chair.z;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;if(player()?.carrying)speed*=0.5;let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
  // Never step off the rooftop slab, including the stair-side entrance corner.
  // A descent is permitted only onto a real stair flight or its bridge.
  if(current>2.5 && playerHeight>2.5){
@@ -2368,13 +2487,9 @@ let p=player();if(p&&t-lastSync>110){lastSync=t;if(soloMode){p.x=me.x;p.y=player
   if(prize){prize.visible=state.phase==='finished'&&v.initial===true;
    if(prize.visible){const rank=state.finalRanks?.[k]||null;
     const coins=Object.values(v.wallet||{}).reduce((sum,n)=>sum+(Number(n)||0),0);
-    const text=(rank&&rank<=3?rank+'位  ':'')+'🪙 '+coins;
+    const text=String(rank)+':'+coins;
     if(prize.userData.lastText!==text){prize.userData.lastText=text;
-     const cv=a.userData.prizeCanvas,ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);
-     const gold=rank!==null&&rank<=3;
-     ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=12;ctx.lineJoin='round';
-     ctx.font=(gold?'bold 79px':'bold 65px')+' sans-serif';ctx.strokeStyle='#292018';ctx.fillStyle=gold?'#ffcf52':'#ffffff';
-     ctx.strokeText(text,256,80,500);ctx.fillText(text,256,80,500);
+     paintPrizeMedals(a.userData.prizeCanvas,rank,coins);
      a.userData.prizeTexture.needsUpdate=true;
     }
     prize.scale.set(rank&&rank<=3?3.7:2.9,rank&&rank<=3?1.15:.9,1);
@@ -2461,7 +2576,10 @@ if(indoorBuilding){
  camera.position.z=THREE.MathUtils.clamp(camera.position.z,b.z-b.d/2+margin,b.z+b.d/2-margin);
  camera.position.y=Math.min(camera.position.y,b.h-1.7);
 }
-camera.lookAt(me.x,playerHeight+3,me.z);if(t-lastAccessoryUpdate>90){lastAccessoryUpdate=t;drawCoinDrops();renderGroundAccessories();}renderer.render(scene,camera)}requestAnimationFrame(frame);
+camera.lookAt(me.x,playerHeight+3,me.z);if(t-lastAccessoryUpdate>90){lastAccessoryUpdate=t;drawCoinDrops();renderGroundAccessories();}tickIntroPlayback(state,performance.now(),true,worldReady&&!state?.worldPreparing);
+paintVoteWall();renderer.render(scene,camera);
+markIntroFramePresented(state,performance.now());syncIntroCompletion(performance.now());
+}requestAnimationFrame(frame);
 performance.mark("island-room-ready");
 window.dispatchEvent(new Event("islandGameModuleReady"));
 </script><script>
