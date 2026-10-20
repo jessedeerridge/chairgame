@@ -128,7 +128,9 @@ body.playing #actions{left:calc((100vw - 205px)/2);width:min(620px,calc(100vw - 
 #entry #solo{background:#286d59;color:#fff;border:2px solid #194b3d;min-height:48px;font-size:15px;font-weight:900;box-shadow:0 3px 0 #194b3d}
 #entry #solo:active{background:#194b3d;transform:translateY(2px);box-shadow:0 1px 0 #194b3d}
 @media(max-height:620px){#entry .panel{padding:14px 24px 18px}#entry .entry-art{height:58px}#entry .entry-chair{height:50px;width:60px;font-size:35px}#entry h1{margin-bottom:12px;font-size:27px}#entry .entry-eyebrow{margin:6px 0 4px}#entry .entry-form{gap:7px}#entry input,#entry button{min-height:41px}}
-</style><div id="runtimeError" style="position:fixed;top:0;left:0;z-index:30;color:#fff;background:#8a2323;padding:8px;max-width:100%;pointer-events:none"></div><div id="stickBase"><div id="stickKnob"></div></div><div id="entry"><div class="panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><div class="entry-eyebrow">LET’S PLAY!</div><h1>ISLAND<br><span>CHAIR GAME</span></h1><div class="entry-form"><input id="name" placeholder="なまえ" maxlength="16" aria-label="プレイヤー名"><input id="room" placeholder="ルームコード" maxlength="16" aria-label="ルームコード"><button id="join">あそぶ <span aria-hidden="true">➜</span></button><button id="solo">ひとりでおためし</button></div></div></div><div id="hud"><div id="status">未接続</div><div id="players"></div><div id="wallet"></div><div id="log"></div></div><div id="clock" hidden><span id="phaseInstruction"></span><span id="clockSeconds"></span></div><div id="gameNotice" style="white-space:pre-line;position:fixed;top:24%;left:50%;transform:translateX(-50%);background:#10242aee;color:white;padding:18px 26px;border-radius:15px;font-size:22px;font-weight:800;text-align:center;pointer-events:none;display:none;z-index:8"></div><div id="voteResultsPopup" style="display:none;position:fixed;z-index:16;top:22%;left:50%;transform:translateX(-50%);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 24px);max-height:85vh;overflow:hidden;background:rgba(16,36,42,.96);color:white;border:2px solid #e6d39d;border-radius:18px;padding:20px 25px;box-shadow:0 10px 35px #0007;text-align:center;pointer-events:none;font-size:22px;font-weight:800"><div style="font-size:24px;margin-bottom:12px">投票結果</div><div id="voteResultsRows" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;width:100%;box-sizing:border-box"></div></div><div id="gameStats" style="position:fixed;right:12px;top:85px;background:#10242acc;padding:10px;border-radius:10px;font-size:12px;max-width:250px;pointer-events:none"></div><div id="miniMapBackdrop"></div><div id="miniMapPanel"><canvas id="miniMapCanvas" width="768" height="768"></canvas><button id="miniEraser" title="この椅子マークを削除" aria-label="消しゴム">🧽</button><div id="mapNumberEditor" hidden><button id="mapNumberCancel" title="閉じる" aria-label="閉じる">×</button><div id="mapNumberDisplay">?</div><div id="mapNumberKeys"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="?">?</button><button data-key="0">0</button><button data-key="back">⌫</button></div><div class="map-editor-actions"><button id="mapNumberSave">✓</button></div></div></div><div id="actions" hidden><button id="start" hidden>ゲーム開始</button><button id="touch" data-action-label="とうひょう" hidden title="親を投票" aria-label="親を投票">🗳️</button><button id="sit" data-action-label="すわる" hidden title="座る" aria-label="座る">🪑</button><button id="markChair" data-action-label="おぼえる" hidden title="地図に記録" aria-label="地図に記録">📍</button><button id="moveChair" data-action-label="はこぶ" hidden title="イスを持ち上げる" aria-label="イスを持ち上げる">🫴</button><button id="hideChair" data-action-label="かくす" hidden title="イスを隠す" aria-label="イスを隠す">🌳</button><button id="revealChair" data-action-label="さがす" hidden title="隠したイスを取り出す" aria-label="隠したイスを取り出す">🔎</button><button id="trade" data-action-label="わたす" hidden title="コインをあげる" aria-label="コインをあげる"><span class="gift-hand">🫴</span><span class="gift-object">🪙</span></button><button id="givePin" data-action-label="おしえる" hidden title="椅子の位置を共有" aria-label="椅子の位置を共有"><span class="gift-hand">🫴</span><span class="gift-object">📍</span></button><button id="pickupShirt" data-action-label="きる" hidden title="Tシャツを着る" aria-label="Tシャツを着る">👕</button><button id="pickupAccessory" data-action-label="かぶる" hidden title="帽子をかぶる・眼鏡をつける" aria-label="帽子をかぶる・眼鏡をつける">🎩</button><button id="pickupCoin" data-action-label="ひろう" hidden title="コインを拾う" aria-label="コインを拾う"><span class="pickup-hand">🫳</span><span class="pickup-object">🪙</span></button><button id="voteOpen" hidden>親を投票</button><button id="eraseOpen" hidden>イスを消去</button></div><div id="modal"><div class="panel"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="buttons"><button id="modalCancel">閉じる</button><button id="modalConfirm">決定</button></div></div></div><select id="target" hidden></select><select id="issuer" hidden></select><input id="amount" type="number" value="1" hidden><select id="voteTarget" hidden></select><select id="chairNumber" hidden></select><button id="send" hidden></button><button id="vote" hidden></button><button id="erase" hidden></button>
+#actions button .action-icon{display:block;width:36px;height:36px;min-width:36px;flex:none;margin-top:12px;pointer-events:none}
+body.playing{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}body.playing input,body.playing textarea,body.playing [contenteditable="true"]{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
+</style><div id="runtimeError" style="position:fixed;top:0;left:0;z-index:30;color:#fff;background:#8a2323;padding:8px;max-width:100%;pointer-events:none"></div><div id="stickBase"><div id="stickKnob"></div></div><div id="entry"><div class="panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><div class="entry-eyebrow">LET’S PLAY!</div><h1>ISLAND<br><span>CHAIR GAME</span></h1><div class="entry-form"><input id="name" placeholder="なまえ" maxlength="16" aria-label="プレイヤー名"><input id="room" placeholder="ルームコード" maxlength="16" aria-label="ルームコード"><button id="join">あそぶ <span aria-hidden="true">➜</span></button><button id="solo">ひとりでおためし</button></div></div></div><div id="hud"><div id="status">未接続</div><div id="players"></div><div id="wallet"></div><div id="log"></div></div><div id="clock" hidden><span id="phaseInstruction"></span><span id="clockSeconds"></span></div><div id="gameNotice" style="white-space:pre-line;position:fixed;top:24%;left:50%;transform:translateX(-50%);background:#10242aee;color:white;padding:18px 26px;border-radius:15px;font-size:22px;font-weight:800;text-align:center;pointer-events:none;display:none;z-index:8"></div><div id="voteResultsPopup" style="display:none;position:fixed;z-index:16;top:22%;left:50%;transform:translateX(-50%);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 24px);max-height:85vh;overflow:hidden;background:rgba(16,36,42,.96);color:white;border:2px solid #e6d39d;border-radius:18px;padding:20px 25px;box-shadow:0 10px 35px #0007;text-align:center;pointer-events:none;font-size:22px;font-weight:800"><div style="font-size:24px;margin-bottom:12px">投票結果</div><div id="voteResultsRows" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;width:100%;box-sizing:border-box"></div></div><div id="gameStats" style="position:fixed;right:12px;top:85px;background:#10242acc;padding:10px;border-radius:10px;font-size:12px;max-width:250px;pointer-events:none"></div><div id="miniMapBackdrop"></div><div id="miniMapPanel"><canvas id="miniMapCanvas" width="768" height="768"></canvas><button id="miniEraser" title="この椅子マークを削除" aria-label="消しゴム">🧽</button><div id="mapNumberEditor" hidden><button id="mapNumberCancel" title="閉じる" aria-label="閉じる">×</button><div id="mapNumberDisplay">?</div><div id="mapNumberKeys"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="?">?</button><button data-key="0">0</button><button data-key="back">⌫</button></div><div class="map-editor-actions"><button id="mapNumberSave">✓</button></div></div></div><div id="actions" hidden><button id="start" hidden>ゲーム開始</button><button id="touch" data-action-label="とうひょう" hidden title="親を投票" aria-label="親を投票"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#7298ab" d="m5 21 15-7 15 7v15H5Z"/><path d="M13 23h14"/><path fill="#fff3d7" d="m14 3 15 5-6 17-15-5Z"/><path d="m14 13 3 4 7-6"/></svg></button><button id="sit" data-action-label="すわる" hidden title="座る" aria-label="座る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></svg></button><button id="markChair" data-action-label="おぼえる" hidden title="地図に記録" aria-label="地図に記録"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></svg></button><button id="moveChair" data-action-label="はこぶ" hidden title="イスを持ち上げる" aria-label="イスを持ち上げる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(9 -2) scale(.65)"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="hideChair" data-action-label="かくす" hidden title="イスを隠す" aria-label="イスを隠す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#52864b" d="M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z"/><path fill="#9b663a" d="M17 24h6v13h-6z"/></svg></button><button id="revealChair" data-action-label="さがす" hidden title="隠したイスを取り出す" aria-label="隠したイスを取り出す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="11" fill="#aad7e0"/><path d="m24 24 12 12" stroke-width="6"/><path d="M10 15a6 6 0 0 1 6-6" stroke="#fff"/></svg></button><button id="trade" data-action-label="わたす" hidden title="コインをあげる" aria-label="コインをあげる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(6 -3) scale(.7)"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="givePin" data-action-label="おしえる" hidden title="椅子の位置を共有" aria-label="椅子の位置を共有"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8 -1) scale(.6)"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="pickupShirt" data-action-label="きる" hidden title="Tシャツを着る" aria-label="Tシャツを着る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#699ec8" d="m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z"/></svg></button><button id="pickupAccessory" data-action-label="かぶる" hidden title="帽子をかぶる・眼鏡をつける" aria-label="帽子をかぶる・眼鏡をつける"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#805b9d" d="m11 7 3-3 12 3 3 23H11Z"/><path fill="#d5a861" d="M11 23h18v6H11z"/><ellipse cx="20" cy="31" rx="17" ry="5" fill="#805b9d"/></svg></button><button id="pickupCoin" data-action-label="ひろう" hidden title="コインを拾う" aria-label="コインを拾う"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/><path d="M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4"/></svg></button><button id="voteOpen" hidden>親を投票</button><button id="eraseOpen" hidden>イスを消去</button></div><div id="modal"><div class="panel"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="buttons"><button id="modalCancel">閉じる</button><button id="modalConfirm">決定</button></div></div></div><select id="target" hidden></select><select id="issuer" hidden></select><input id="amount" type="number" value="1" hidden><select id="voteTarget" hidden></select><select id="chairNumber" hidden></select><button id="send" hidden></button><button id="vote" hidden></button><button id="erase" hidden></button>
 <script type="text/plain" id="deferredGameCode">
 let THREE;
 let firebaseModules=null;
@@ -865,7 +867,7 @@ function roofEdgeBlocked(x,z,r=.7){
  }
  return false;
 }
-function staticBlocked(x,z,r=.7){
+function staticBlocked(x,z,r=.7,solids=obstacles){
  if(roofEdgeBlocked(x,z,r))return true;
  // Rooftop room walls are solid only for characters standing on the roof.
  if(playerHeight>3){for(const o of roofRoomWalls){if(playerHeight<o.level-1.2||playerHeight>o.level+o.height+1.0)continue;
@@ -897,7 +899,7 @@ function staticBlocked(x,z,r=.7){
     if(x>=st.bridgeX0-r&&x<=st.bridgeX1+r&&Math.abs(z-st.bridgeZ1)<r+.12)return true;
    }
   }
- for(const o of obstacles){
+ for(const o of solids){
   if(o.halfX!==undefined){
    const dx=Math.max(Math.abs(x-o.x)-o.halfX,0),dz=Math.max(Math.abs(z-o.z)-o.halfZ,0);
    if(dx*dx+dz*dz<r*r){
@@ -910,8 +912,8 @@ function staticBlocked(x,z,r=.7){
  return false;
 }
 
-function bushBlocked(x,z,r=.7){
- for(const spot of hidingSpots){
+function bushBlocked(x,z,r=.7,spots=hidingSpots){
+ for(const spot of spots){
   if(spot.type==='bush' && Math.hypot(x-spot.x,z-spot.z)<4.35+r)return true;
  }
  return false;
@@ -1752,7 +1754,7 @@ setInterval(advance,700);
 // Host alone simulates all NPC decisions; the shared database is authoritative.
 function npcDecision(s,k,p,now){if(p.decisionAt>now)return;p.decisionAt=now+randBetween(1700,4300);if(s.phase==='search'&&p.alive&&!p.sitting){const chairs=Object.entries(s.chairs).filter(([n,c])=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Number(n)!==p.previous);if(!chairs.length)return;const choice=chairs.map(([n,c])=>{const distance=Math.hypot(c.x-p.x,c.z-p.z);const others=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&!v.sitting&&Math.hypot(v.x-c.x,v.z-c.z)<14).length;let score=-distance*.14-others*(p.personality==='独立型'?5:2)+Math.random()*12;if(p.memory?.[n])score+=5;if(p.personality==='慎重型')score-=distance*.12;if(p.personality==='積極型')score+=distance*.035;return {n,c,score}}).sort((a,b)=>b.score-a.score);if(p.personality==='気まぐれ型'&&Math.random()<.35)choice.reverse();p.targetChair=choice[0]?.n||null;const newGoal=p.targetChair?{x:s.chairs[p.targetChair].x,z:s.chairs[p.targetChair].z}:null;
 // A committed ring route must finish; defer new chair targets until the ring exit.
-if(p.buildingRoute&&!p.buildingRoute.returning){p.pendingGoal=newGoal;}else{p.goal=newGoal;p.waypoint=null;} }
+p.goal=newGoal;p.waypoint=null; }
 if(s.phase==='return')p.goal=npcReturnGoal(k);}
 // NPCs try to collect fallen costumes. Each NPC/item encounter gets one 1-in-3 roll.
 function npcTryCostume(s,k,p){
@@ -1779,26 +1781,49 @@ function npcTryCostume(s,k,p){
   break;
  }
 }
+// Spatial buckets keep repeated path probes independent of the island's tree count.
+let npcCollisionIndex=null;
+function npcNearbySolids(x,z){
+ if(!npcCollisionIndex){
+  npcCollisionIndex=new Map();
+  for(const [items,type] of [[obstacles,'solids'],[hidingSpots.filter(v=>v.type==='bush'),'bushes']])for(const o of items){
+   const hx=(o.halfX??o.r??4.35)+1,hz=(o.halfZ??o.r??4.35)+1;
+   for(let ix=Math.floor((o.x-hx)/12);ix<=Math.floor((o.x+hx)/12);ix++)for(let iz=Math.floor((o.z-hz)/12);iz<=Math.floor((o.z+hz)/12);iz++){
+    const key=ix+','+iz;let bucket=npcCollisionIndex.get(key);
+    if(!bucket){bucket={solids:[],bushes:[]};npcCollisionIndex.set(key,bucket);}bucket[type].push(o);
+   }
+  }
+ }
+ return npcCollisionIndex.get(Math.floor(x/12)+','+Math.floor(z/12))||{solids:[],bushes:[]};
+}
+let npcDynamicCollision=null;
+function npcIndexActors(s){
+ const buckets=new Map();
+ for(const [items,type,r] of [[Object.entries(s.players||{}),'players',1.5],[Object.entries(s.chairs||{}),'chairs',1.85]])for(const entry of items){
+  const v=entry[1],x=type==='players'&&entry[0]===id?me.x:v.x,z=type==='players'&&entry[0]===id?me.z:v.z;
+  for(let ix=Math.floor((x-r)/12);ix<=Math.floor((x+r)/12);ix++)for(let iz=Math.floor((z-r)/12);iz<=Math.floor((z+r)/12);iz++){
+   const tag=ix+','+iz;let bucket=buckets.get(tag);if(!bucket){bucket={players:[],chairs:[]};buckets.set(tag,bucket);}bucket[type].push(entry);
+  }
+ }
+ return buckets;
+}
 // NPCs use the same ground-level solid collision as players, plus shared player/chair positions.
 function npcBlocked(s,k,x,z,r=.7){
  if(!Number.isFinite(x)||!Number.isFinite(z)||Math.hypot(x,z)>290)return true;
  const oldHeight=playerHeight;let solid;
- try{playerHeight=0;solid=staticBlocked(x,z,r)||bushBlocked(x,z,r)||
+ try{playerHeight=0;const nearby=npcNearbySolids(x,z);solid=staticBlocked(x,z,r,nearby.solids)||bushBlocked(x,z,r,nearby.bushes)||
    (s.phase==='instructions'&&blackEntranceClosed(x,z,r))||openedDoorBlocked(x,z,r);}
  finally{playerHeight=oldHeight;}
  if(solid)return true;
- for(const [other,v] of Object.entries(s.players||{})){
-  if(other===k||v.online===false||v.sitting||v.carrying)continue;
+ const actors=npcDynamicCollision?.get(Math.floor(x/12)+','+Math.floor(z/12));
+ for(const [other,v] of (npcDynamicCollision?(actors?.players||[]):Object.entries(s.players||{}))){
+  if(other===k||v.online===false||(v.y||0)>3)continue;
   const px=other===id?me.x:v.x,pz=other===id?me.z:v.z;
   if((px-x)**2+(pz-z)**2<(r+.7)**2){
-   const front=buildingSites[3].z+buildingSites[3].d/2;
-   const doorway=Math.abs(x-buildingSites[3].x)<8&&Math.abs(z-front)<19;
-   const startup=s.phase==='search'&&s.players[k]?.departureDone===false;
-   if(v.npc&&(doorway||startup))continue;
    return true;
   }
  }
- for(const [chairId,c] of Object.entries(s.chairs||{})){
+ for(const [chairId,c] of (npcDynamicCollision?(actors?.chairs||[]):Object.entries(s.chairs||{}))){
   if(c.removed||c.hiddenAt||c.carrier)continue;
   const dx=c.x-x,dz=c.z-z,range=r+1.1;
   if(Math.abs(dx)>range||Math.abs(dz)>range)continue;
@@ -1808,94 +1833,73 @@ function npcBlocked(s,k,x,z,r=.7){
  return false;
 }
 function npcClearPath(s,k,x0,z0,x1,z1){
- const d=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.ceil(d/1.6));
+ const d=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.ceil(d/.6));
  for(let i=1;i<=n;i++){
   const t=i/n;if(npcBlocked(s,k,x0+(x1-x0)*t,z0+(z1-z0)*t,.64))return false;
  }
  return true;
 }
-// Seven equally spaced waypoints on a large ring OUTSIDE each building.
-// Index 0 is straight outside the entrance (+Z); indexes 1..6 follow
-// the perimeter clockwise. The polygon edges clear even the building corners.
-// Twelve ordered points around each building, outside the walls and corners.
-const NPC_RING_COUNT=12;
-const npcBuildingRoutes=buildingSites.map(b=>{
- const radius=Math.hypot(b.w/2,b.d/2)+12;
- return Array.from({length:NPC_RING_COUNT},(_,i)=>{
-  const a=i*Math.PI*2/NPC_RING_COUNT;
-  return {x:b.x+Math.sin(a)*radius,z:b.z+Math.cos(a)*radius};
- });
-});
-// All NPCs want to return for the vote, regardless of elimination or seating.
+// Goal-driven navigation. Routes stay local to the host, not in Firebase.
+const npcNavigation=new Map();
+let npcPathPlansLeft=Infinity;
 function npcReturnGoal(k){const b=buildingSites[3],n=Number(String(k).replace(/\D/g,''))||0;return {x:b.x+((n%5)-2)*1.8,z:b.z+b.d/2-8-(Math.floor(n/5)%3)*2};}
 function npcReturning(s){return ['return','voteIntro','vote','results','erase','eraseReveal'].includes(s.phase)}
-function npcBuildingContaining(x,z){return buildingSites.findIndex(b=>Math.abs(x-b.x)<b.w/2-1&&Math.abs(z-b.z)<b.d/2-1)}
-function npcRouteNearBuilding(p,b){return Math.abs(p.x-b.x)<b.w/2+8&&Math.abs(p.z-b.z)<b.d/2+8}
-// Stagger departures instead of making every NPC crowd the same door on the same tick.
-// No additional timers, pathfinding or Firebase writes are introduced.
 function npcDepartureSlot(k){let n=0;for(const ch of String(k))n=(n*31+ch.charCodeAt(0))%997;return n%16;}
-function npcDepartureLane(k){return (npcDepartureSlot(k)%5-2)*1.05;}
-function npcIndoorExitGoal(k){const b=buildingSites[3];return {x:b.x+npcDepartureLane(k)*.35,z:b.z+b.d/2+8};}
-// Door transit has a dedicated straight corridor. Do not apply the building ring
-// or local sideways bypass until the NPC is CLEAR of the threshold.
-function npcDoorTransit(p){const b=buildingSites[3];return Math.abs(p.x-b.x)<7.2&&p.z>b.z+b.d/2-11&&p.z<b.z+b.d/2+10;}
-function npcDoorStep(k,p){const b=buildingSites[3],front=b.z+b.d/2;const lane=npcDepartureLane(k)*.35;
- if(p.z<front-2)return {x:b.x+lane,z:front-1};
- if(p.z<front+4)return {x:b.x+lane,z:front+5};
- return {x:b.x+lane,z:front+11};
-}
-function npcBeginBuildingRoute(p,buildingIndex){
- const pts=npcBuildingRoutes[buildingIndex];
- const inside=npcBuildingContaining(p.x,p.z)===buildingIndex;
- // From indoors the first waypoint is always the point outside the entrance.
- const start=inside?0:pts.reduce((best,q,i)=>Math.hypot(q.x-p.x,q.z-p.z)<Math.hypot(pts[best].x-p.x,pts[best].z-p.z)?i:best,0);
- const goalIndex=pts.reduce((best,q,i)=>Math.hypot(q.x-p.goal.x,q.z-p.goal.z)<Math.hypot(pts[best].x-p.goal.x,pts[best].z-p.goal.z)?i:best,0);
- const cw=(goalIndex-start+NPC_RING_COUNT)%NPC_RING_COUNT,ccw=(start-goalIndex+NPC_RING_COUNT)%NPC_RING_COUNT;
- p.buildingRoute={buildingIndex,index:start,direction:cw<=ccw?1:-1,goalIndex,visits:0,original:{...p.goal}};
- p.waypoint=inside?(buildingIndex===3?npcIndoorExitGoal(p.npcKey||'0'):{x:buildingSites[buildingIndex].x,z:buildingSites[buildingIndex].z+buildingSites[buildingIndex].d/2+2}): {...pts[start]};
- p.routeDoorStep=inside;
-}
-function npcAdvanceBuildingRoute(s,k,p){
- const route=p.buildingRoute;if(!route)return;
- const pts=npcBuildingRoutes[route.buildingIndex];
- // Never skip a waypoint: reach it before evaluating the next point.
- if(p.routeDoorStep){
-  if(Math.hypot(p.x-p.waypoint.x,p.z-p.waypoint.z)>1.5)return;
-  p.routeDoorStep=false;p.waypoint={...pts[route.index]};return;
- }
- if(Math.hypot(p.x-pts[route.index].x,p.z-pts[route.index].z)>1.15)return;
- // Returning NPCs must follow the ring in order to the entrance (index 0).
- if(route.returning&&route.index===0){
-  p.buildingRoute=null;p.waypoint={x:buildingSites[3].x,z:buildingSites[3].z+buildingSites[3].d/2-5};p.returnDoorStep=true;return;
- }
- // Follow every intermediate ring point in order; exit only at the selected destination index.
- if(!route.returning&&route.index===route.goalIndex){
-  p.buildingRoute=null;p.waypoint=null;
-  if(p.pendingGoal){p.goal=p.pendingGoal;p.pendingGoal=null;}
-  return;
- }
- route.visits++;
- if(route.visits>=NPC_RING_COUNT){p.buildingRoute=null;p.waypoint=null;p.routeRetryAt=Date.now()+5500;return;}
- route.index=(route.index+route.direction+NPC_RING_COUNT)%NPC_RING_COUNT;
- p.waypoint={...pts[route.index]};
-}
-// Small local obstacle bypass. Keeps the building ring intact and avoids heavy graph searches.
-// Probe both sides of the obstruction; persist the detour until the waypoint is reached.
-function npcLocalBypass(s,k,p,target){
- const dx=target.x-p.x,dz=target.z-p.z,d=Math.hypot(dx,dz);
- if(d<.1)return null;
- const ux=dx/d,uz=dz/d;
- const px=-uz,pz=ux;
- let best=null,bestScore=Infinity;
- for(const side of [1,-1])for(const lateral of [2.5,4.5,7,10,14]){
-  for(const forward of [2,4,7]){
-   const x=p.x+px*side*lateral+ux*forward,z=p.z+pz*side*lateral+uz*forward;
-   if(npcBlocked(s,k,x,z,.72)||!npcClearPath(s,k,p.x,p.z,x,z))continue;
-   const score=lateral*.65+Math.hypot(target.x-x,target.z-z)*.35+(p.bypassSide&&p.bypassSide!==side?4:0);
-   if(score<bestScore){bestScore=score;best={x,z,side};}
+// A* samples actual collision geometry, including doors, vegetation and people.
+// Each edge is swept, so diagonal steps cannot cut wall corners or thin walls.
+function npcFindPath(s,k,p,goal){
+ npcDynamicCollision=npcIndexActors(s);
+ try{
+ const spacing=2,heap=[],nodes=new Map(),blocked=new Map();
+ const key=(x,z)=>x+','+z;
+ const point=(x,z)=>({x:p.x+x*spacing,z:p.z+z*spacing});
+ const push=n=>{heap.push(n);let i=heap.length-1;while(i){const j=(i-1)>>1;if(heap[j].f<=n.f)break;heap[i]=heap[j];i=j;}heap[i]=n;};
+ const pop=()=>{const first=heap[0],last=heap.pop();if(heap.length){let i=0;while(i*2+1<heap.length){let j=i*2+1;if(j+1<heap.length&&heap[j+1].f<heap[j].f)j++;if(heap[j].f>=last.f)break;heap[i]=heap[j];i=j;}heap[i]=last;}return first;};
+ const start={x:0,z:0,g:0,f:Math.hypot(goal.x-p.x,goal.z-p.z),parent:null};
+ nodes.set('0,0',start);push(start);
+ let visited=0;
+ while(heap.length&&visited++<18000){
+  const n=pop();if(n.closed)continue;n.closed=true;
+  const q=point(n.x,n.z),remaining=Math.hypot(goal.x-q.x,goal.z-q.z);
+  // Chairs and occupied goals can be approached without walking into them.
+  if((remaining<2.5&&npcGoalReachable(s,k,q,goal))||(remaining<8&&npcClearPath(s,k,q.x,q.z,goal.x,goal.z))){
+   const path=[];for(let v=n;v.parent;v=v.parent)path.push(point(v.x,v.z));path.reverse();
+   if(npcClearPath(s,k,q.x,q.z,goal.x,goal.z))path.push({...goal});
+   return path;
+  }
+  for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
+   const x=n.x+dx,z=n.z+dz,tag=key(x,z),v=point(x,z);
+   if(!blocked.has(tag))blocked.set(tag,npcBlocked(s,k,v.x,v.z,.7));
+   if(blocked.get(tag)||!npcClearPath(s,k,q.x,q.z,v.x,v.z))continue;
+   const g=n.g+Math.hypot(dx,dz)*spacing,old=nodes.get(tag);
+   if(old&&old.g<=g)continue;
+   const next={x,z,g,f:g+Math.hypot(goal.x-v.x,goal.z-v.z),parent:n};nodes.set(tag,next);push(next);
   }
  }
- return best;
+ return []; // Unreachable: wait and retry, never walk through the obstruction.
+ }finally{npcDynamicCollision=null;}
+}
+function npcGoalReachable(s,k,p,goal){
+ const d=Math.hypot(goal.x-p.x,goal.z-p.z),t=d?Math.max(0,(d-.9)/d):0;
+ return npcClearPath(s,k,p.x,p.z,p.x+(goal.x-p.x)*t,p.z+(goal.z-p.z)*t);
+}
+function npcNavigationTarget(s,k,p,now){
+ const goal=p.goal;if(!goal)return null;
+ let nav=npcNavigation.get(room+":"+k);
+ if(npcClearPath(s,k,p.x,p.z,goal.x,goal.z)){npcNavigation.delete(room+":"+k);return goal;}
+ const changed=!nav||Math.hypot(nav.goal.x-goal.x,nav.goal.z-goal.z)>1;
+ if(nav)while(nav.path.length&&Math.hypot(p.x-nav.path[0].x,p.z-nav.path[0].z)<.35)nav.path.shift();
+ const obstructed=nav?.path.length&&!npcClearPath(s,k,p.x,p.z,nav.path[0].x,nav.path[0].z);
+ if(changed||now>=nav.retryAt&&(obstructed||!nav.path.length||now-nav.created>6000)){
+  if(npcPathPlansLeft<=0)return null;
+  npcPathPlansLeft--;
+  nav={goal:{...goal},path:npcFindPath(s,k,p,goal),created:now,retryAt:now+1000};npcNavigation.set(room+":"+k,nav);
+ }
+ if(!nav.path.length||!npcClearPath(s,k,p.x,p.z,nav.path[0].x,nav.path[0].z))return null;
+ // Skip visible intermediate samples for smooth motion, never skip collision checks.
+ let furthest=0;for(let i=1;i<Math.min(nav.path.length,8);i++){if(!npcClearPath(s,k,p.x,p.z,nav.path[i].x,nav.path[i].z))break;furthest=i;}
+ if(furthest)nav.path.splice(0,furthest);
+ return nav.path[0];
 }
 // NPC hide-spot inspection: one NPC per spot, 5 seconds, and no crowding.
 // Decisions happen only on the host's existing NPC tick (no extra timers).
@@ -1955,7 +1959,7 @@ function npcUpdateSpot(s,k,p,now){
  p.npcSpotSearch=null;p.goal=null;p.decisionAt=0;return false;
 }
 // Find a short visible waypoint to walk around walls instead of endlessly pushing into them.
-function npcSimulate(s,dt,now){const npcEntries=Object.entries(s.players).filter(([_,p])=>p.npc);for(const [k,p] of npcEntries){p.npcKey=k;
+function npcSimulate(s,dt,now){npcPathPlansLeft=2;const npcEntries=Object.entries(s.players).filter(([_,p])=>p.npc);for(const [k,p] of npcEntries){p.npcKey=k;
  if(p.progressX===undefined){p.progressX=p.x;p.progressZ=p.z;p.progressAt=now;p.noProgressCount=0;}
  // NPCs spawning almost on top of another get a deterministic personal dispersal target.
  if(!p.initialDispersed&&s.phase==='search'){
@@ -1975,7 +1979,7 @@ function npcSimulate(s,dt,now){const npcEntries=Object.entries(s.players).filter
     if(!p.buildingRoute){p.waypoint=null;p.routeRetryAt=0;}
     p.bypassSide=(p.bypassSide||1)*-1;
     if(s.phase==='search'&&!p.departureDone){p.departureAt=Math.min(p.departureAt||now,now);p.doorStage=-1;}
-    if(npcReturning(s)){if(!p.buildingRoute)p.returnDoorStep=npcDoorTransit(p);p.goal=npcReturnGoal(k);}
+    if(npcReturning(s)){if(!p.buildingRoute)p.returnDoorStep=false;p.goal=npcReturnGoal(k);}
     else if(p.departureDone){p.routeRetryAt=0;p.decisionAt=now+1600;}
     p.noProgressCount=0;
    }
@@ -2022,88 +2026,31 @@ if(s.phase==='search'&&!p.departureDone){
   const target={x:b.x+((npcDepartureSlot(k)%5)-2)*2.5,z:front-14-(npcDepartureSlot(k)%3)*2};
   if(!p.goal||Math.hypot(p.goal.x-target.x,p.goal.z-target.z)>1){p.goal=target;p.waypoint=null;}p.buildingRoute=null;
  }else{
-  // Never use the building ring in the doorway. Move through fixed milestones.
-  if(p.z>front+10){
-   // Once outside, commit to the exterior ring. Never steer back through the door.
-   p.departureDone=true;p.localBypass=null;p.decisionAt=0;
-   const pts=npcBuildingRoutes[3];
-   const outdoorGoal=p.goal&&p.goal.z>front+11?p.goal:{x:b.x+((npcDepartureSlot(k)%7)-3)*9,z:front+35};
-   const targetIndex=pts.reduce((best,q,i)=>Math.hypot(q.x-outdoorGoal.x,q.z-outdoorGoal.z)<Math.hypot(pts[best].x-outdoorGoal.x,pts[best].z-outdoorGoal.z)?i:best,1);
-   const direction=targetIndex>NPC_RING_COUNT/2?-1:1;
-   p.buildingRoute={buildingIndex:3,index:0,direction,goalIndex:targetIndex===0?(direction===1?2:10):targetIndex,visits:0,original:{...outdoorGoal},exitLocked:true};
-   p.goal=outdoorGoal;p.waypoint={...pts[0]};p.pendingGoal=null;
-
-  }else{
-   const lane=b.x+npcDepartureLane(k)*.25;
-   const stage=p.z<front-5?0:p.z<front+3?1:2;
-   if(p.doorStage!==stage){p.doorStage=stage;p.localBypass=null;}
-   p.goal={x:lane,z:stage===0?front-3:stage===1?front+5:front+13};
-   p.waypoint=null;p.buildingRoute=null;
-  }
+  // Choose the real destination indoors; pathfinding discovers the exit.
+  p.departureDone=true;p.goal=null;p.decisionAt=0;
+  p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
  }
 }
 if(!p.buildingRoute&&!npcReturning(s)&&!(s.phase==='search'&&!p.departureDone))npcChooseSpot(s,k,p,now);
 const inspectingSpot=!npcReturning(s)&&npcUpdateSpot(s,k,p,now);
 if(inspectingSpot&&p.npcSpotSearch?.stage==='searching')continue;
 if(!p.buildingRoute&&!inspectingSpot&&!npcReturning(s)&&!(s.phase==='search'&&!p.departureDone))npcDecision(s,k,p,now);
-if(!p.goal&&!inspectingSpot){if(s.phase==='search'&&!p.departureDone)continue;if(s.phase==='search'&&!p.alive)continue;const nearbyItems=Object.entries(s.accessories||{}).filter(([key,a])=>a&&!p.costumeTried?.[key]&&Math.hypot(p.x-a.x,p.z-a.z)<32);if(nearbyItems.length&&Math.random()<.5){const item=nearbyItems[Math.floor(Math.random()*nearbyItems.length)][1];p.goal={x:item.x,z:item.z};}else{const a=Math.random()*Math.PI*2;if(s.phase==='search'&&!p.searchIntent&&insideBlackBuilding(p.x,p.z)){const b=buildingSites[3];p.goal={x:b.x+Math.sin(a)*Math.min(8,b.w/4),z:b.z+Math.cos(a)*Math.min(8,b.d/4)}}else p.goal={x:Math.cos(a)*randBetween(15,100),z:Math.sin(a)*randBetween(15,100)}}}// Navigate the twelve-point ring only when a building obstructs the destination.
-if(p.buildingRoute){
- // Keep the ordered route locked; no ordinary target update may cancel it.
- if(!p.waypoint){const r=p.buildingRoute;p.waypoint={...npcBuildingRoutes[r.buildingIndex][r.index]};}
- if(Math.hypot(p.x-p.waypoint.x,p.z-p.waypoint.z)<1.15)npcAdvanceBuildingRoute(s,k,p);
+if(!p.goal&&!inspectingSpot){if(s.phase==='search'&&!p.departureDone)continue;if(s.phase==='search'&&!p.alive)continue;const nearbyItems=Object.entries(s.accessories||{}).filter(([key,a])=>a&&!p.costumeTried?.[key]&&Math.hypot(p.x-a.x,p.z-a.z)<32);if(nearbyItems.length&&Math.random()<.5){const item=nearbyItems[Math.floor(Math.random()*nearbyItems.length)][1];p.goal={x:item.x,z:item.z};}else{const a=Math.random()*Math.PI*2;if(s.phase==='search'&&!p.searchIntent&&insideBlackBuilding(p.x,p.z)){const b=buildingSites[3];p.goal={x:b.x+Math.sin(a)*Math.min(8,b.w/4),z:b.z+Math.cos(a)*Math.min(8,b.d/4)}}else p.goal={x:Math.cos(a)*randBetween(15,100),z:Math.sin(a)*randBetween(15,100)}}}
+// Discard legacy fixed routes when resuming an existing room.
+p.buildingRoute=null;p.waypoint=null;p.localBypass=null;p.returnDoorStep=false;
+const distToGoal=Math.hypot(p.goal.x-p.x,p.goal.z-p.z);
+if(distToGoal<2.5&&npcGoalReachable(s,k,p,p.goal)){
+ if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&!c.removed&&!c.carrier&&!c.occupied&&!c.hiddenAt&&Number(p.targetChair)!==p.previous&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);c.occupied=k;p.memory??={};p.memory[p.targetChair]=true;continue;}}
+ p.goal=null;p.decisionAt=0;npcNavigation.delete(room+":"+k);continue;
 }
-if(!p.buildingRoute&&p.goal){
- // For return, enter via the black building's +Z doorway, not a side wall.
- if(npcReturning(s)&&!insideBlackBuilding(p.x,p.z)&&!p.returnDoorStep&&!npcDoorTransit(p)&&!p.buildingRoute){
-  const pts=npcBuildingRoutes[3],entry=pts[0];
-  if(Math.hypot(p.x-entry.x,p.z-entry.z)>2){
-   const nearest=pts.reduce((best,q,i)=>Math.hypot(q.x-p.x,q.z-p.z)<Math.hypot(pts[best].x-p.x,pts[best].z-p.z)?i:best,0);
-   const clockwise=(NPC_RING_COUNT-nearest)%NPC_RING_COUNT,counterclockwise=nearest;
-   p.buildingRoute={buildingIndex:3,index:nearest,direction:clockwise<=counterclockwise?1:-1,goalIndex:0,visits:0,original:{...p.goal},returning:true};
-   p.waypoint={...pts[nearest]};
-  }else{p.waypoint={x:buildingSites[3].x,z:buildingSites[3].z+buildingSites[3].d/2-5};p.returnDoorStep=true;}
- }
- if(npcReturning(s)&&!p.buildingRoute&&npcDoorTransit(p)){
-  p.returnDoorStep=true;p.waypoint={x:buildingSites[3].x+npcDepartureLane(k)*.12,z:buildingSites[3].z+buildingSites[3].d/2-7};
-  p.goal=npcReturnGoal(k);
- }
- let buildingIndex=npcBuildingContaining(p.x,p.z);
- if(buildingIndex<0){buildingIndex=buildingSites.findIndex((b,i)=>npcRouteNearBuilding(p,b)&&!npcClearPath(s,k,p.x,p.z,p.goal.x,p.goal.z));}
- if(!p.buildingRoute&&buildingIndex>=0&&!npcDoorTransit(p)&&!p.returnDoorStep&&!npcClearPath(s,k,p.x,p.z,p.goal.x,p.goal.z)&&!(s.phase==='search'&&!p.departureDone&&buildingIndex===3)&&now>(p.routeRetryAt||0)){npcBeginBuildingRoute(p,buildingIndex);p.routeRetryAt=now+1600;}
+const destination=npcNavigationTarget(s,k,p,now);
+if(!destination)continue;
+const dx=destination.x-p.x,dz=destination.z-p.z,dist=Math.hypot(dx,dz);
+const speed=(s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run:p.walk;
+const step=Math.min(speed*dt,dist);
+if(dist>.01){const x=p.x+dx/dist*step,z=p.z+dz/dist*step;
+ if(npcClearPath(s,k,p.x,p.z,x,z)){p.x=x;p.z=z;p.rot=Math.atan2(dx,dz);}
 }
-// When a tree, bush, stair, door leaf or another character blocks the next
-// ring point, walk around it locally without abandoning the ordered ring.
-if(p.localBypass){
- if(Math.hypot(p.x-p.localBypass.x,p.z-p.localBypass.z)<1.2){p.localBypass=null;}
- else if(p.bypassSince&&now-p.bypassSince>14000){p.localBypass=null;p.bypassSince=now;}
-}
-const mainDestination=p.waypoint||p.goal;
-if(mainDestination&&!p.localBypass&&Math.hypot(mainDestination.x-p.x,mainDestination.z-p.z)>2.5){
- const d=Math.hypot(mainDestination.x-p.x,mainDestination.z-p.z),t=Math.min(4,d)/d;
- const ahead={x:p.x+(mainDestination.x-p.x)*t,z:p.z+(mainDestination.z-p.z)*t};
- if(!npcClearPath(s,k,p.x,p.z,ahead.x,ahead.z)){
-  const sideStep=npcLocalBypass(s,k,p,mainDestination);
-  if(sideStep){p.localBypass={x:sideStep.x,z:sideStep.z};p.bypassSide=sideStep.side;p.bypassSince=now;}
- }
-}
-const destination=p.localBypass||mainDestination;
-if(!destination){if(s.phase==='search'&&!p.sitting&&p.departureDone){p.decisionAt=0;p.goal={x:p.x+((npcDepartureSlot(k)%2)?5:-5),z:p.z+6};}continue;}
-let dx=destination.x-p.x,dz=destination.z-p.z,dist=Math.hypot(dx,dz);
-if(dist<3&&!p.localBypass&&!p.waypoint&&!p.returnDoorStep&&!(s.phase==='search'&&!p.departureDone)){if(s.phase==='return'&&insideBlackBuilding(p.x,p.z)){p.returned=true;p.goal=null;continue}if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&!c.removed&&!c.occupied&&!c.hiddenAt&&Number(p.targetChair)!==p.previous){const urgency=(s.deadline-now)/SEARCH_MS;if(Math.random()>(urgency>.4?.25:.03)){p.sitting=Number(p.targetChair);c.occupied=k;p.memory[p.targetChair]=true;continue}}}p.goal=null;p.decisionAt=0;continue}if(dist<.75&&p.localBypass){p.localBypass=null;continue}if(dist<.75&&p.waypoint){if(p.returnDoorStep){p.waypoint=null;p.returnDoorStep=false;p.goal=npcReturnGoal(k);if(insideBlackBuilding(p.x,p.z)){p.returned=true;p.goal=null;}continue;}if(p.buildingRoute)npcAdvanceBuildingRoute(s,k,p);else p.waypoint=null;continue}const speed=(s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run:p.walk;let moved=false;const step=Math.min(speed*dt,dist);
-// First move toward the target; if blocked, steer along the wall in small safe steps.
-for(const turn of (p.waypoint?[0,.3,-.3,.7,-.7]:[0,.55,-.55,1.2,-1.2])){
- const a=Math.atan2(dx,dz)+turn;
- for(const fraction of [1,.45]){
-  const len=step*fraction,x=p.x+Math.sin(a)*len,z=p.z+Math.cos(a)*len;
-  if(!npcClearPath(s,k,p.x,p.z,x,z))continue;
-  p.x=x;p.z=z;p.rot=a;moved=true;break;
- }
- if(moved)break;
-}
-if(!moved){
- p.stuck=(p.stuck||0)+1;
- if(p.stuck>3){p.stuck=0;const detour=p.localBypass?null:npcLocalBypass(s,k,p,p.waypoint||p.goal);if(detour){p.localBypass={x:detour.x,z:detour.z};p.bypassSide=detour.side;p.bypassSince=now;}else if(!p.buildingRoute){if(s.phase==='search'&&!p.departureDone){p.stuckRetryAt=now+900;}else{p.bypassSide=(p.bypassSide||1)*-1;p.routeRetryAt=now+1200;}p.localBypass=null;}}
-}else{p.stuck=0;}
 }
 if(s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
 let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=Date.now();const tickEvery=soloMode?280:850;if(tickNow-npcLastTick<tickEvery)return;npcLastTick=tickNow;if(!host||!state||npcBusy||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=Date.now();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,soloMode?.28:.85,now)})}finally{npcBusy=false}},140);
@@ -2153,7 +2100,9 @@ function receiveSharedPin(){const v=player()?.pinInbox;if(!v||!v.stamp||v.from==
 }
 $('givePin').onclick=()=>{const partner=nearestPartner();if(!partner)return;pinShareTarget=partner.id;setMiniExpanded(true);pinShareTarget=partner.id;};
 function nearestAction(){for(let b of ['touch','sit','hideChair','revealChair','moveChair','trade'])if(!$(b).hidden)return $(b);return null}
-function refreshActions(){if(!state)return;closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!(host&&ph==='lobby');$('touch').hidden=!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);$('touch').textContent='🗳️';let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=recentHiddenChair&&Date.now()-recentHiddenChair.at<=5000; $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){$('markChair').textContent='📍';$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);$('markChair').textContent='📍';$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';$('sit').textContent=p?.sitting?'🚶':'🪑';$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';$('moveChair').textContent=p?.carrying?'🫳':'🫴';$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();$('hideChair').textContent='🌳';$('revealChair').textContent='🔎';$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot);$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;$('pickupAccessory').textContent=nearGear?(nearGear[1].kind==='hat'?'🎩':'👓'):'🎩';$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-Date.now())/1000);}}
+const actionIcons={"chair": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></svg>", "walk": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"22\" cy=\"6\" r=\"4\" fill=\"#efc29d\"/><path d=\"m19 13 7 7 7 1m-15-7-7 8m8-9-3 12-7 11m8-11 10 11\" fill=\"none\" stroke=\"#387ca1\" stroke-width=\"4\"/></svg>", "pin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></svg>", "lift": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(9 -2) scale(.65)\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "place": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/><path d=\"M20 3v14m-5-5 5 5 5-5\"/></svg>", "hide": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#52864b\" d=\"M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z\"/><path fill=\"#9b663a\" d=\"M17 24h6v13h-6z\"/></svg>", "search": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"16\" cy=\"16\" r=\"11\" fill=\"#aad7e0\"/><path d=\"m24 24 12 12\" stroke-width=\"6\"/><path d=\"M10 15a6 6 0 0 1 6-6\" stroke=\"#fff\"/></svg>", "giveCoin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(6 -3) scale(.7)\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "givePin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(8 -1) scale(.6)\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "shirt": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#699ec8\" d=\"m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z\"/></svg>", "hat": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#805b9d\" d=\"m11 7 3-3 12 3 3 23H11Z\"/><path fill=\"#d5a861\" d=\"M11 23h18v6H11z\"/><ellipse cx=\"20\" cy=\"31\" rx=\"17\" ry=\"5\" fill=\"#805b9d\"/></svg>", "glasses": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g fill=\"#b3d9e4\"><circle cx=\"10\" cy=\"24\" r=\"8\"/><circle cx=\"30\" cy=\"24\" r=\"8\"/></g><path d=\"M18 23h4M3 20 6 8m31 12L34 8\"/></svg>", "pickup": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/><path d=\"M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4\"/></svg>", "vote": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#7298ab\" d=\"m5 21 15-7 15 7v15H5Z\"/><path d=\"M13 23h14\"/><path fill=\"#fff3d7\" d=\"m14 3 15 5-6 17-15-5Z\"/><path d=\"m14 13 3 4 7-6\"/></svg>"};
+function setActionIcon(id,kind){const button=$(id);if(button.dataset.icon===kind)return;button.innerHTML=actionIcons[kind];button.dataset.icon=kind;}
+function refreshActions(){if(!state)return;closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!(host&&ph==='lobby');$('touch').hidden=!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=recentHiddenChair&&Date.now()-recentHiddenChair.at<=5000; $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot);$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-Date.now())/1000);}}
 function openModal(title,body,mode){$('modalCancel').hidden=false;$('modalConfirm').hidden=false;modalMode=mode;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;modal.classList.add('open')}
 function updateTradeAmount(n){const input=$('tradeAmount'),issuer=$('tradeIssuer');if(!input||!issuer)return;const max=Number(player()?.wallet?.[issuer.value]||0);input.value=String(Math.max(1,Math.min(max||1,Math.floor(n)||1)));$('tradeAmountValue').textContent=input.value;}
 function selectTradeCoin(key){$('tradeIssuer').value=key;for(const btn of document.querySelectorAll('#tradeCoinChoices button'))btn.classList.toggle('selected',btn.dataset.issuer===key);updateTradeAmount(1);}
