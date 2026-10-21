@@ -1676,28 +1676,38 @@ setInterval(()=>{if(!document.hidden&&!miniExpanded)drawMiniMap()},50);
 setInterval(()=>{if(!document.hidden&&miniExpanded)drawMiniMap()},250);
 
 function seedChairs(){
- const out={};
- for(let i=1;i<=15;i++){
-  const angle=i*2.399,r=32+rand(i+2000)*255;
-  let spot=null;
-  for(let step=0;step<450&&!spot;step++){
-   const a=angle+step*2.39996,rr=step===0?r:28+Math.sqrt(rand(i*809+step*13))*260;
-   const x=Math.cos(a)*rr,z=Math.sin(a)*rr;
-   if(Math.hypot(x,z)>290||staticBlocked(x,z,1.2)||bushBlocked(x,z,1.2))continue;
-   if(Object.values(out).some(c=>Math.hypot(x-c.x,z-c.z)<4))continue;
-   spot={x,z};
+ const out={},available=hidingSpots.filter(v=>v.type==='tree'||v.type==='bush');
+ // Shuffle without sort's bias; hidden chairs reserve their locations first.
+ const shuffled=[...available];
+ for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
+ const hidden=[];
+ for(const spot of shuffled){
+  if(hidden.some(q=>Math.hypot(spot.x-q.x,spot.z-q.z)<4))continue;
+  hidden.push(spot);if(hidden.length===6)break;
+ }
+ if(hidden.length<6)throw new Error('イスの安全な隠し場所が不足');
+ for(let i=0;i<hidden.length;i++){
+  const spot=hidden[i];
+  out[i+1]={x:spot.x,z:spot.z,removed:false,carrier:null,occupied:null,hiddenAt:spot.id};
+ }
+ // Initial chairs stand on the ground, even when the host is on an upper floor.
+ const previousHeight=playerHeight;
+ try{
+  playerHeight=0;
+  for(let i=7;i<=15;i++){
+   let spot=null;
+   for(let step=0;step<2000&&!spot;step++){
+    const angle=Math.random()*Math.PI*2,r=Math.sqrt(28*28+Math.random()*(288*288-28*28));
+    const x=Math.cos(angle)*r,z=Math.sin(angle)*r;
+    if(staticBlocked(x,z,1.2)||bushBlocked(x,z,1.2))continue;
+    if(stairways.some(st=>x>st.minX-1.2&&x<st.maxX+1.2&&z>st.back-1.2&&z<st.front+1.2))continue;
+    if(Object.values(out).some(c=>Math.hypot(x-c.x,z-c.z)<4))continue;
+    spot={x,z};
+   }
+   if(!spot)throw new Error('イスの安全な初期配置に失敗');
+   out[i]={...spot,removed:false,carrier:null,occupied:null,hiddenAt:null};
   }
-  if(!spot)throw new Error('イスの安全な初期配置に失敗');
-  out[i]={...spot,removed:false,carrier:null,occupied:null,hiddenAt:null};
- }
- // Hide exactly 6 distinct chairs at random tree/bush locations when the game starts.
- const available=hidingSpots.filter(v=>v.type==='tree'||v.type==='bush');
- const shuffled=[...available].sort(()=>Math.random()-.5);
- const hideCount=6;
- for(let i=0;i<hideCount&&i<shuffled.length;i++){
-  const chair=out[i+1],spot=shuffled[i];
-  chair.x=spot.x;chair.z=spot.z;chair.hiddenAt=spot.id;
- }
+ }finally{playerHeight=previousHeight;}
  return out;
 }
 function log(s){$('log').innerHTML=`<div>${new Date().toLocaleTimeString()} ${s.replaceAll('<','&lt;')}</div>`+$('log').innerHTML}
