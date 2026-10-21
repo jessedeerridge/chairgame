@@ -11,3 +11,9 @@ test('seating announcement stays visible before guidance turns to the door each 
  state.phase='sitIntro';assert.equal(roomCameraFocus(100),'screen');assert.equal(roomCameraFocus(999),'screen');assert.equal(guideRoomView(1000),'door');assert.equal(yaw,0);
  state.phase='search';assert.equal(roomCameraFocus(1100),null);state.round=2;state.phase='sitIntro';assert.equal(roomCameraFocus(5000),'screen');assert.equal(roomCameraFocus(5900),'door');
 `));
+test('wall clipping shortens the TPS orbit without moving it diagonally off the player-screen line',()=>check(`
+ const b={x:0,z:0,w:50,d:44};assert.equal(roomOrbitDistance(0,0,Math.PI,b),10);
+ const orbitYaw=Math.atan2(8,-38),distance=roomOrbitDistance(-8,20,orbitYaw,b);
+ const x=-8-Math.sin(orbitYaw)*distance,z=20-Math.cos(orbitYaw)*distance;
+ assert(distance>0&&distance<1);assert(Math.abs(z-20.75)<.00001);assert(Math.abs(x-(-8-8/38*.75))<.00001);
+`));

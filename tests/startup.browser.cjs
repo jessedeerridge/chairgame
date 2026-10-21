@@ -41,14 +41,14 @@ const {chromium}=require('playwright');
   const focus=await page.evaluate(()=>{const t=window.bootTest;t.keys.KeyD=false;const v=t.projectScreen(),orbit=t.orbitTarget(),s=t.getState();const previous=s.phase;
    s.phase='sitIntro';const first=t.roomCameraFocus(performance.now());t.forceDoor();const next=t.guideRoomView(performance.now());
    const outside={x:t.me.x,z:t.me.z};t.me.z=50;const released=t.roomCameraFocus(performance.now());Object.assign(t.me,outside);s.phase=previous;
-   const expectedX=Math.max(-23.75,Math.min(23.75,t.me.x-Math.sin(orbit.yaw)*10)),expectedZ=Math.max(-20.75,Math.min(20.75,t.me.z-Math.cos(orbit.yaw)*10));return{normalTPSPosition:Math.abs(orbit.x-expectedX)<.05&&Math.abs(orbit.z-expectedZ)<.05,centered:Math.abs(v.x)<.0001&&Math.abs(v.y)<.0001,normalTPSHeight:Math.abs(orbit.y-(orbit.playerHeight+8))<.0001,first,next,released,scale:window.visualViewport.scale};});
-  assert(focus.centered);assert(focus.normalTPSHeight);assert(focus.normalTPSPosition);assert.equal(focus.first,'screen');assert.equal(focus.next,'door');assert.equal(focus.released,null);assert.equal(focus.scale,1);
+   const dx=t.me.x-orbit.x,dz=t.me.z-orbit.z;return{normalTPSPosition:Math.abs(dx*Math.cos(orbit.yaw)-dz*Math.sin(orbit.yaw))<.05&&Math.hypot(dx,dz)<=10.01,centered:Math.abs(v.x)<.0001&&Math.abs(v.y)<.0001,guidedTPSHeight:Math.abs(orbit.y-(orbit.playerHeight+3.4))<.0001,first,next,released,scale:window.visualViewport.scale};});
+  assert(focus.centered);assert(focus.guidedTPSHeight);assert(focus.normalTPSPosition);assert.equal(focus.first,'screen');assert.equal(focus.next,'door');assert.equal(focus.released,null);assert.equal(focus.scale,1);
   const framing=[];
   for(const viewport of [{width:390,height:844},{width:1280,height:720}]){
    await page.setViewportSize(viewport);
-   for(const [x,z] of [[14,15.6],[0,19.8],[-20,18]]){
+   for(const [x,z] of [[14,15.6],[0,19.8],[-20,18],[-8,20]]){
     await page.evaluate(([x,z])=>window.bootTest.setMe(x,z),[x,z]);
-    await page.waitForFunction(()=>{const t=window.bootTest,s=t.projectScreen(),orbit=t.orbitTarget(),yaw=Math.atan2(-t.me.x,-18-t.me.z),expectedX=Math.max(-23.75,Math.min(23.75,t.me.x-Math.sin(yaw)*10)),expectedZ=Math.max(-20.75,Math.min(20.75,t.me.z-Math.cos(yaw)*10));return Math.abs(t.camera.position.x-expectedX)<.1&&Math.abs(t.camera.position.z-expectedZ)<.1&&Math.abs(s.x)<.0001&&Math.abs(s.y)<.0001&&[.1,3.65].every(h=>{const p=t.projectPlayer(h);return p.z<1&&p.z>-1&&Math.abs(p.x)<.88&&Math.abs(p.y)<.88;});});
+    await page.waitForFunction(()=>{const t=window.bootTest,s=t.projectScreen(),orbit=t.orbitTarget(),yaw=Math.atan2(-t.me.x,-18-t.me.z);return Math.abs(Math.atan2(Math.sin(orbit.yaw-yaw),Math.cos(orbit.yaw-yaw)))<.01&&Math.abs(t.camera.position.x-orbit.x)<.1&&Math.abs(t.camera.position.z-orbit.z)<.1&&Math.abs(s.x)<1&&Math.abs(s.y)<1&&t.camera.fov===65&&[2.4,3.4].every(h=>{const p=t.projectPlayer(h);return p.z<1&&p.z>-1&&Math.abs(p.x)<.97&&Math.abs(p.y)<.97;});});
     framing.push(await page.evaluate(()=>({position:{...window.bootTest.me},fov:window.bootTest.camera.fov})));
    }
   }

@@ -2612,33 +2612,22 @@ function guideRoomView(now){
   yaw=Math.atan2(x-me.x,z-me.z);pitch=0;
  }return focus;
 }
-// Fit the whole character while keeping the presentation at the exact view center.
-function screenViewFov(cx,cy,cz,px,py,pz,aspect){
- const dx=-cx,dy=8.1-cy,dz=voteWallZ+.09-cz,len=Math.hypot(dx,dy,dz),horizontal=Math.hypot(dx,dz);
- if(horizontal<.001)return 120;
- const fx=dx/len,fy=dy/len,fz=dz/len,rx=-dz/horizontal,rz=dx/horizontal;
- const ux=-rz*fy,uy=horizontal/len,uz=rx*fy;
- let tangent=0;
- for(const height of [.1,3.65]){
-  const x=px-cx,y=py+height-cy,z=pz-cz,depth=x*fx+y*fy+z*fz;
-  if(depth<=.05)return 120;
-  tangent=Math.max(tangent,Math.abs(x*ux+y*uy+z*uz)/(depth*.82),Math.abs(x*rx+z*rz)/(depth*Math.max(.2,aspect)*.82));
- }
- return Math.max(65,Math.atan(tangent)*360/Math.PI);
+function roomOrbitDistance(x,z,yaw,b){
+ const dx=-Math.sin(yaw),dz=-Math.cos(yaw),margin=1.25;
+ let distance=10;
+ if(Math.abs(dx)>.0001)distance=Math.min(distance,((dx>0?b.x+b.w/2-margin:b.x-b.w/2+margin)-x)/dx);
+ if(Math.abs(dz)>.0001)distance=Math.min(distance,((dz>0?b.z+b.d/2-margin:b.z-b.d/2+margin)-z)/dz);
+ return Math.max(0,distance);
 }
-function fitScreenCamera(cx,cy,cz,px,py,pz,aspect){
- let best={y:cy,fov:screenViewFov(cx,cy,cz,px,py,pz,aspect)};
- if(best.fov<=75)return best;
- for(let y=cy-.25;y>=py+1.5;y-=.25){
-  const fov=screenViewFov(cx,y,cz,px,py,pz,aspect);
-  if(fov<best.fov)best={y,fov};
-  if(fov<=75){
-   let low=y,high=y+.25;
-   for(let i=0;i<8;i++){const mid=(low+high)/2;if(screenViewFov(cx,mid,cz,px,py,pz,aspect)>75)high=mid;else low=mid;}
-   return {y:low,fov:screenViewFov(cx,low,cz,px,py,pz,aspect)};
-  }
- }
- return best;
+// Keep a normal lens. Near walls, favor a visible upper body over extreme wide-angle fitting.
+function guidedScreenAim(cx,cy,cz,px,py,pz,aspect){
+ const screenYaw=Math.atan2(-cx,voteWallZ+.09-cz),screenPitch=Math.atan2(8.1-cy,Math.hypot(cx,voteWallZ+.09-cz));
+ const actorYaw=Math.atan2(px-cx,pz-cz),actorPitch=Math.atan2(py+2.6-cy,Math.hypot(px-cx,pz-cz));
+ const vertical=Math.atan(Math.tan(65*Math.PI/360)*.72),horizontal=Math.atan(Math.tan(65*Math.PI/360)*aspect*.88);
+ const yawDelta=Math.atan2(Math.sin(screenYaw-actorYaw),Math.cos(screenYaw-actorYaw));
+ const yaw=actorYaw+Math.max(-horizontal,Math.min(horizontal,yawDelta));
+ const pitch=actorPitch+Math.max(-vertical,Math.min(vertical,screenPitch-actorPitch));
+ return {x:cx+Math.sin(yaw)*Math.cos(pitch),y:cy+Math.sin(pitch),z:cz+Math.cos(yaw)*Math.cos(pitch)};
 }
 let stackIdle=null;
 function resetStackIdle(now){stackIdle={x:me.x,z:me.z,since:now};$('stackButton').hidden=true;}
@@ -2753,7 +2742,8 @@ const camPitch=pitch*10;
 // Indoors, constrain the camera to the same room as the player.
 // Clamp the camera target AND the interpolated camera, so quick rotations cannot reveal the outdoors.
 const indoorBuilding=playerHeight<8?buildingSites.find(b=>Math.abs(me.x-b.x)<b.w/2-.7&&Math.abs(me.z-b.z)<b.d/2-.7):null;
-_cameraTarget.set(me.x-Math.sin(yaw)*camDist,playerHeight+camHeight+camPitch,me.z-Math.cos(yaw)*camDist);
+_cameraTarget.set(me.x-Math.sin(yaw)*camDist,playerHeight+(roomFocus==='screen'?3.4:camHeight+camPitch),me.z-Math.cos(yaw)*camDist);
+if(roomFocus==='screen'&&indoorBuilding){const distance=roomOrbitDistance(me.x,me.z,yaw,indoorBuilding);_cameraTarget.x=me.x-Math.sin(yaw)*distance;_cameraTarget.z=me.z-Math.cos(yaw)*distance;}
 if(indoorBuilding){
  const b=indoorBuilding,margin=1.25;
  const minX=b.x-b.w/2+margin,maxX=b.x+b.w/2-margin;
@@ -2772,13 +2762,12 @@ if(indoorBuilding){
  camera.position.z=THREE.MathUtils.clamp(camera.position.z,b.z-b.d/2+margin,b.z+b.d/2-margin);
  camera.position.y=Math.min(camera.position.y,b.h-1.7);
 }
-// Keep the TPS orbit behind the character and fit their body below the centered screen.
-let viewFov=65;
+// Stable TPS lens and shoulder height; adjust aim only when the character would leave the frame.
 if(roomFocus==='screen'){
- const fit=fitScreenCamera(camera.position.x,camera.position.y,camera.position.z,me.x,playerHeight,me.z,camera.aspect);
- camera.position.y=fit.y;viewFov=fit.fov;camera.lookAt(0,8.1,voteWallZ+.09);
+ const aim=guidedScreenAim(camera.position.x,camera.position.y,camera.position.z,me.x,playerHeight,me.z,camera.aspect);
+ camera.lookAt(aim.x,aim.y,aim.z);
 }else camera.lookAt(me.x,playerHeight+3,me.z);
-if(Math.abs(camera.fov-viewFov)>.05){camera.fov=viewFov;camera.updateProjectionMatrix();}
+if(camera.fov!==65){camera.fov=65;camera.updateProjectionMatrix();}
 if(t-lastAccessoryUpdate>90){lastAccessoryUpdate=t;drawCoinDrops();renderGroundAccessories();}updateStackButton(performance.now());
 tickIntroPlayback(state,performance.now(),true,worldReady&&!state?.worldPreparing);
 paintVoteWall();renderer.render(scene,camera);
