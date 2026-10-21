@@ -21,7 +21,7 @@ function setup(){
  function accessibleCostumeDrop(x,z){return{x:x+2,z:z+2}}
  function canCastVote(){return false}function chooseNPCVote(){}
  const SEARCH_MS=90000,VOTE_MS=30000,accessoryCatalog=[];
- `+cut('function roofEdgeBlocked','function occupiedAt')+cut('// Spatial buckets','// NPC hide-spot inspection')+cut('function npcDecision','// NPCs try to collect')+cut('const NPC_SEARCH_OBSERVE_RADIUS','// Update decisions and local motion')+cut('function npcSimulate','let npcBusy='),c);
+ `+cut('function roofEdgeBlocked','function occupiedAt')+cut('// Spatial buckets','// NPC hide-spot inspection')+cut('function npcChairUsable','// NPCs try to collect')+cut('const NPC_SEARCH_OBSERVE_RADIUS','// Update decisions and local motion')+cut('function npcSimulate','let npcBusy='),c);
  vm.runInContext(`
  function game(players={},phase='search'){state={phase,round:1,deadline:1000000,players,chairs:{},votes:{},accessories:{}};return state;}
  function npc(x,z,goal){return {npc:true,alive:false,initialDispersed:true,departureDone:true,searchIntentRound:1,searchIntent:true,x,z,goal,walk:5,run:9,decisionAt:1e9,npcSpotDecisionAt:1e9,memory:{}};}
@@ -95,7 +95,7 @@ test('hide-spot approach enters searching without clearing its goal too early',(
  const p=npc(start.x,start.z,null);s.players.NPC0=p;p.npcSpotSearch={spotId:spot.id,stage:'approach',until:0};p.goal=npcSpotApproachGoal(s,p,spot);
  assert(p.goal,'no approach point');let searched=false;
  for(let i=0;i<50;i++){npcSimulate(s,.28,10000+i*280);if(p.npcSpotSearch?.stage==='searching'){searched=true;break;}}
- assert(searched,'NPC stopped outside the search radius or lost its goal');assert(Math.hypot(p.x-spot.x,p.z-spot.z)<5.5);
+ assert(searched,'NPC stopped outside the search radius or lost its goal');assert(Math.hypot(p.x-spot.x,p.z-spot.z)<6.4);
 `));
 test('incremental work stays bounded even when the goal is enclosed',()=>setup()(`
  const center=safe({x:0,z:120});for(const o of [{x:center.x-6,z:center.z,halfX:.3,halfZ:6},{x:center.x+6,z:center.z,halfX:.3,halfZ:6},{x:center.x,z:center.z-6,halfX:6,halfZ:.3},{x:center.x,z:center.z+6,halfX:6,halfZ:.3}])obstacles.push(o);
@@ -123,4 +123,16 @@ test('screen-side boundary blocks both ground navigation and swept NPC movement'
  obstacles.push(screenBarrierShape());const s=game();
  assert(!npcWorldBlocked(s,20,-15,.7));assert(npcWorldBlocked(s,20,-18,.7));
  assert(!npcStaticClearPath(s,20,-15,20,-20,.7));
+`));
+
+test('an ineligible remembered chair is discarded immediately despite the decision timer',()=>setup()(`
+ const p=npc(0,60,{x:0,z:65}),s=game({NPC0:p});p.alive=true;p.previous='1';p.targetChair='1';p.decisionAt=1e9;
+ s.chairs={1:{x:0,z:65},2:{x:12,z:65}};npcDecision(s,'NPC0',p,10000);
+ assert.notEqual(p.targetChair,'1');assert(!p.goal||p.goal.x!==0||p.goal.z!==65);
+`));
+test('a stale empty-chair flag cannot seat a second NPC on the seated owner',()=>setup()(`
+ const owner=npc(0,65,null),other=npc(0,62.6,{x:0,z:65}),s=game({NPC0:owner,NPC1:other});
+ owner.alive=true;owner.sitting=1;other.alive=true;other.targetChair='1';
+ s.chairs={1:{x:0,z:65,occupied:null},2:{x:12,z:65}};
+ npcSimulate(s,.28,10000);assert.equal(owner.sitting,1);assert.notEqual(other.sitting,1);assert.equal(s.chairs[1].occupied,'NPC0');
 `));

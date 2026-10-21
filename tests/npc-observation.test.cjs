@@ -55,3 +55,26 @@ test('phase changes cancel a hide and release the carrier without losing the cha
  assert(npcUpdateReturnHide(s,'NPC0',p,1000));s.phase='voteIntro';assert.equal(npcUpdateReturnHide(s,'NPC0',p,1100),false);
  assert.equal(s.chairs[2].carrier,null);assert.equal(p.carrying,0);assert.equal(p.npcSpotHide,null);assert(!s.spotSearchHistory);
 `));
+
+test('an approach that cannot make progress is canceled instead of waiting forever',()=>setup()(`
+ const s=game(),p=s.players.NPC0;p.x=20;p.z=60;p.npcSpotSearch={spotId:'A',stage:'approach',until:0,startedAt:1000,progressAt:1000,anchorX:20,anchorZ:60};p.goal={x:20,z:46};
+ npcUpdateSpot(s,'NPC0',p,40000);assert.equal(p.npcSpotSearch,null);assert(!s.spotSearchHistory);
+`));
+test('a hiding action that fits the remaining time completes without requiring another full five seconds',()=>setup()(`
+ const s=game(),p=s.players.NPC0;s.phase='return';p.x=20;p.z=45;p.carrying=2;
+ s.chairs={2:{x:20,z:45,carrier:'NPC0'}};p.npcSpotHide={spotId:'A',chair:2,stage:'hiding',until:6000};
+ s.deadline=12000;assert(npcUpdateReturnHide(s,'NPC0',p,5000));
+ assert.equal(npcUpdateReturnHide(s,'NPC0',p,6000),false);assert.equal(s.chairs[2].hiddenAt,'A');
+`));
+test('a failed gathering choice is retried when a hiding spot becomes available',()=>setup()(`
+ const s=game(),p=s.players.NPC0;s.phase='return';p.x=20;p.z=48;p.sitting=2;
+ s.chairs[2]={x:20,z:48,occupied:'NPC0'};s.players.NPC1.npcSpotHide={spotId:'B'};
+ assert.equal(npcUpdateReturnHide(s,'NPC0',p,1000),false);
+ delete s.chairs[1];delete s.players.NPC1.npcSpotHide;
+ assert(npcUpdateReturnHide(s,'NPC0',p,3000));assert.equal(p.carrying,2);
+`));
+test('gathering NPC can hide an unclaimed nearby chair even after standing up',()=>setup()(`
+ const s=game(),p=s.players.NPC0;s.phase='return';p.x=20;p.z=48;
+ s.chairs={2:{x:21,z:48,y:0}};
+ assert(npcUpdateReturnHide(s,'NPC0',p,1000));assert.equal(p.carrying,2);
+`));
