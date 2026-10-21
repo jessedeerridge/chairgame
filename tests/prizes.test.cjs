@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
 const cut=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
-function run(code){vm.runInNewContext(`const assert=globalThis.assert;let worldReady=true;const SEARCH_MS=90000,RETURN_MS=40000;`+cut('function prizeCoinCount','function paintPrizeMedals')+cut('function advanceState(s,now)','let advancing=false;')+code,{assert});}
+function run(code){vm.runInNewContext(`const assert=globalThis.assert;let worldReady=true;const SEARCH_MS=90000,RETURN_MS=40000,VOTE_INTRO_MS=7000,VOTE_MS=30000,VOTE_X=0,VOTE_Z=-7;function insideBlackBuilding(){return false}function prepareSoloNPCVotes(){};`+cut('function prizeCoinCount','function paintPrizeMedals')+cut('function advanceState(s,now)','let advancing=false;')+`function finishAfterAnnouncement(s){advanceState(s,1);assert.equal(s.phase,'return');assert.equal(s.winner,undefined);advanceState(s,s.deadline);assert.equal(s.phase,'voteIntro');const end=s.deadline;advanceState(s,end-1);assert.equal(s.phase,'voteIntro');advanceState(s,end);}`+code,{assert});}
 test('prizes count only coins issued by the last surviving winner',()=>run(`
  const s={winner:'last',players:{last:{}}};assert.equal(prizeCoinCount(s,{wallet:{last:3,other:100,older:200}}),3);
  assert.equal(prizeCoinCount(s,{wallet:{other:100}}),0);assert.equal(prizeCoinCount(s,{}),0);
@@ -9,12 +9,12 @@ test('prizes count only coins issued by the last surviving winner',()=>run(`
 `));
 test('no survivors produce no champion, first-place rank, or prize',()=>run(`
  const s={phase:'search',round:2,deadline:0,players:{a:{alive:true,sitting:0,wallet:{a:23,b:23}},b:{alive:true,sitting:0,wallet:{a:23,b:23}}}};
- advanceState(s,1);assert.equal(s.phase,'finished');assert.equal(s.winner,null);
+ finishAfterAnnouncement(s);assert.equal(s.phase,'finished');assert.equal(s.winner,null);
  assert(!Object.values(s.finalRanks).includes(1));for(const p of Object.values(s.players))assert.equal(prizeCoinCount(s,p),0);
 `));
 test('final prize ranks follow the surviving issuer coin counts',()=>run(`
  const s={phase:'search',round:2,deadline:0,players:{a:{initial:true,alive:true,sitting:1,wallet:{a:7,b:16}},b:{initial:true,alive:true,sitting:0,wallet:{a:4,b:50}}}};
- advanceState(s,1);assert.equal(s.winner,'a');assert.equal(s.finalRanks.a,1);assert.equal(s.finalRanks.b,2);
+ finishAfterAnnouncement(s);assert.equal(s.winner,'a');assert.equal(s.finalRanks.a,1);assert.equal(s.finalRanks.b,2);
  assert.equal(prizeCoinCount(s,s.players.a),7);assert.equal(prizeCoinCount(s,s.players.b),4);
 `));
 test('zero-prize players fall smoothly once around the ankle pivot and reset next game',()=>run(`
@@ -34,11 +34,18 @@ test('zero prize draws only a silver zero even when the stored rank is first',()
 });
 test('a zero-prize seated finalist releases their seat so they can move while lying down',()=>run(`
  const s={phase:'search',round:2,deadline:0,players:{a:{initial:true,alive:true,sitting:1,wallet:{a:0}},b:{initial:true,alive:true,sitting:0,wallet:{a:2}}},chairs:{1:{occupied:'a'}}};
- advanceState(s,1);assert.equal(s.winner,'a');assert.equal(s.players.a.sitting,0);assert.equal(s.chairs[1].occupied,null);assert(zeroPrizePlayer(s,s.players.a));assert(!zeroPrizePlayer(s,s.players.b));
+ finishAfterAnnouncement(s);assert.equal(s.winner,'a');assert.equal(s.players.a.sitting,0);assert.equal(s.chairs[1].occupied,null);assert(zeroPrizePlayer(s,s.players.a));assert(!zeroPrizePlayer(s,s.players.b));
 `));
 
 test('coin ranks depend only on prize coins, regardless of sitting, survival, or elimination order',()=>run(`
  const s={winner:'survivor',players:{survivor:{initial:true,alive:true,sitting:1,wallet:{survivor:2}},a:{initial:true,alive:false,sitting:0,wallet:{survivor:8}},b:{initial:true,alive:false,sitting:4,wallet:{survivor:8}},zero:{initial:true,alive:true,sitting:5,wallet:{other:100}},spectator:{initial:false,wallet:{survivor:99}}}};
  const ranks=coinPrizeRanks(s);assert.equal(ranks.a,1);assert.equal(ranks.b,1);assert.equal(ranks.survivor,3);assert.equal(ranks.zero,undefined);assert.equal(ranks.spectator,undefined);
  for(const p of Object.values(s.players)){p.sitting=p.sitting?0:7;p.alive=!p.alive;}assert.deepEqual(coinPrizeRanks(s),ranks);
+`));
+
+test('multiple survivors still go to voting after return and the elimination announcement',()=>run(`
+ const s={phase:'search',round:2,deadline:0,players:{a:{alive:true,sitting:1},b:{alive:true,sitting:2},c:{alive:true,sitting:0,name:'Out'}}};
+ advanceState(s,1);assert.equal(s.phase,'return');assert.equal(s.eliminatedNames[0],'Out');assert.equal(s.winner,undefined);
+ advanceState(s,s.deadline);assert.equal(s.phase,'voteIntro');advanceState(s,s.deadline-1);assert.equal(s.phase,'voteIntro');
+ advanceState(s,s.deadline);assert.equal(s.phase,'vote');assert.equal(s.winner,undefined);
 `));
