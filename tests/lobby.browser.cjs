@@ -27,7 +27,7 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   const errors=[];
   for(const name of ['Host','Guest']){
-   const page=await browser.newPage();pages.push(page);page.on('pageerror',e=>errors.push(e.message));
+   const page=await browser.newPage(name==='Guest'?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{});pages.push(page);page.on('pageerror',e=>errors.push(e.message));
    await page.exposeBinding('testRead',(_,key)=>({value:clone(read(key)),revision}));
    await page.exposeBinding('testCommit',(_,key,next,expected)=>{
     if(revision!==expected)return{ok:false};const before=JSON.stringify(read(key));if(before!==JSON.stringify(next)){write(key,next);revision++;notify();}return{ok:true,value:clone(next)};
@@ -48,13 +48,17 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   }
   assert.deepEqual(Object.values(read('rooms/TEST/players')).filter(p=>!p.npc).map(p=>p.name).sort(),['Guest','Host']);
   for(const page of pages){await page.waitForFunction(()=>document.body.classList.contains('in-lobby')&&document.querySelectorAll('.lobby-player').length===2);assert(await page.locator('#lobbyScreen').isVisible());assert.equal(await page.locator('body>canvas').isVisible(),false);const cols=await page.locator('#lobbyParticipants').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length);assert.equal(cols,2);}
-  await pages[0].screenshot({path:'/tmp/lobby-desktop.png'});await pages[1].setViewportSize({width:390,height:844});await pages[1].screenshot({path:'/tmp/lobby-mobile.png'});
+  if(process.env.CAPTURE_LOBBY){await pages[0].screenshot({path:'/tmp/lobby-desktop.png'});await pages[1].screenshot({path:'/tmp/lobby-mobile.png'});}
   assert.equal(read('rooms/TEST/phase'),'lobby');
   for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.worldReady()&&Object.values(window.lobbyTest.getState().players).filter(p=>!p.npc&&p.online!==false).every(p=>p.worldReady),{timeout:60000});
   assert.equal(positionWritesInLobby,0,'waiting clients overwrote spawn coordinates');assert.equal(read('rooms/TEST/phase'),'lobby','loading automatically started the game');
   assert.equal(await pages[0].locator('#start').isEnabled(),true);assert.equal(await pages[1].locator('#start').isEnabled(),false);
   await pages[0].click('#start');
   for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.getState().phase==='instructions'&&document.body.classList.contains('playing'),{timeout:10000});
+  for(const page of pages){await page.waitForFunction(()=>{const c=document.querySelector('body>canvas');return c.width===innerWidth&&c.height===innerHeight;});assert.equal(await page.evaluate(()=>visualViewport.scale),1);}
+  await pages[1].setViewportSize({width:844,height:390});
+  await pages[1].waitForFunction(()=>{const c=document.querySelector('body>canvas');return c.width===844&&c.height===390;});
+  await pages[1].setViewportSize({width:390,height:844});
   const players=Object.values(read('rooms/TEST/players')).filter(p=>p.online!==false);assert.equal(players.length,20);
   for(let i=0;i<players.length;i++)for(let j=i+1;j<players.length;j++)assert(Math.hypot(players[i].x-players[j].x,players[i].z-players[j].z)>=2.2,'overlapping initial positions');
   for(const page of pages){const p=await page.evaluate(()=>{const t=window.lobbyTest,me=t.getMe(),spawn=t.getState().players[t.getId()].spawn;return{distance:Math.hypot(me.x-spawn.x,me.z-spawn.z),spawn};});assert.equal(p.distance,0,'client did not apply its assigned spawn');}

@@ -1,0 +1,13 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+const code=html.slice(html.indexOf('let roomFocusSession='),html.indexOf('let stackIdle=null;'));
+function check(source){const ctx=vm.createContext({assert});vm.runInContext(`let state={phase:'instructions',round:1},me={x:0,z:12},playerHeight=0,yaw=1,pitch=.5;const voteWallZ=-18,buildingSites=[{},{},{},{d:44}];const insideBlackBuilding=(x,z)=>Math.abs(x)<23.8&&Math.abs(z)<20.8;`+code+source,ctx);}
+test('screen guidance applies only inside the black room and keeps movement state untouched',()=>check(`
+ for(const phase of ['instructions','voteIntro','vote','results','erase','eraseReveal','finished']){state.phase=phase;assert.equal(guideRoomView(100),'screen');assert.equal(yaw,Math.PI);assert.equal(pitch,0);assert.equal(me.z,12);}
+ for(const phase of ['lobby','search','return']){state.phase=phase;assert.equal(guideRoomView(100),null);}
+ state.phase='instructions';me.z=50;assert.equal(guideRoomView(100),null);me.z=12;playerHeight=9;assert.equal(guideRoomView(100),null);
+`));
+test('seating announcement stays visible before guidance turns to the door each round',()=>check(`
+ state.phase='sitIntro';assert.equal(roomCameraFocus(100),'screen');assert.equal(roomCameraFocus(999),'screen');assert.equal(guideRoomView(1000),'door');assert.equal(yaw,0);
+ state.phase='search';assert.equal(roomCameraFocus(1100),null);state.round=2;state.phase='sitIntro';assert.equal(roomCameraFocus(5000),'screen');assert.equal(roomCameraFocus(5900),'door');
+`));
