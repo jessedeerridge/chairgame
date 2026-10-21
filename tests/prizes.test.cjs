@@ -17,3 +17,22 @@ test('a sole survivor remains first and their issuer determines every player pri
  advanceState(s,1);assert.equal(s.winner,'a');assert.equal(s.finalRanks.a,1);assert.equal(s.finalRanks.b,2);
  assert.equal(prizeCoinCount(s,s.players.a),7);assert.equal(prizeCoinCount(s,s.players.b),4);
 `));
+test('zero-prize players fall smoothly once around the ankle pivot and reset next game',()=>run(`
+ const s={phase:'finished',started:10,winner:'last',players:{last:{}}},p={initial:true,wallet:{other:100}},label={position:{set(x,y,z){this.x=x;this.y=y;this.z=z}}},avatar={userData:{pose:{position:{y:.62},rotation:{x:0}},prizeSprite:label}};
+ assert.equal(updateFinishedPose(avatar,s,p,0),0);const halfway=updateFinishedPose(avatar,s,p,550);assert(Math.abs(halfway-Math.PI/4)<1e-6);updateFinishedPose(avatar,s,p,1100);
+ assert.equal(avatar.userData.pose.rotation.x,-Math.PI/2);assert.equal(avatar.userData.pose.position.y,.62);assert.equal(label.position.y,2.62);assert.equal(label.position.z,-2.13);
+ updateFinishedPose(avatar,s,p,3000);assert.equal(avatar.userData.pose.rotation.x,-Math.PI/2);s.phase='instructions';updateFinishedPose(avatar,s,p,4000);assert.equal(avatar.userData.pose.rotation.x,0);
+`));
+test('zero prize movement uses the carried-chair slowdown, without stacking it twice',()=>run(`
+ const s={phase:'finished',winner:'last',players:{last:{}}},p={initial:true,wallet:{last:0}};
+ assert.equal(playerSpeedFactor(s,p),.5);p.carrying=1;assert.equal(playerSpeedFactor(s,p),.5);p.wallet.last=4;assert.equal(playerSpeedFactor(s,p),.5);p.carrying=0;assert.equal(playerSpeedFactor(s,p),1);s.phase='search';p.wallet.last=0;assert.equal(playerSpeedFactor(s,p),1);
+`));
+test('zero prize draws only a silver zero even when the stored rank is first',()=>{
+ const output=[],ctx=new Proxy({fillText(text){output.push([text,this.fillStyle])},strokeText(){},clearRect(){},save(){},restore(){}},{get:(o,k)=>o[k]||(()=>{})});
+ vm.runInNewContext(cut('function paintPrizeMedals','let walletViewKey')+`paintPrizeMedals(canvas,1,0);`,{canvas:{width:512,height:160,getContext:()=>ctx},drawMedalCanvas:()=>{throw Error('zero prize must not draw a gold medal')}});
+ assert.deepEqual(output,[['0','#c8d2dc']]);
+});
+test('a zero-prize seated finalist releases their seat so they can move while lying down',()=>run(`
+ const s={phase:'search',round:2,deadline:0,players:{a:{initial:true,alive:true,sitting:1,wallet:{a:0}},b:{initial:true,alive:true,sitting:0,wallet:{a:2}}},chairs:{1:{occupied:'a'}}};
+ advanceState(s,1);assert.equal(s.winner,'a');assert.equal(s.players.a.sitting,0);assert.equal(s.chairs[1].occupied,null);assert(zeroPrizePlayer(s,s.players.a));assert(!zeroPrizePlayer(s,s.players.b));
+`));

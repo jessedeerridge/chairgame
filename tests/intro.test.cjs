@@ -16,7 +16,7 @@ function setup(){
  const SEARCH_MS=90000,RETURN_MS=40000,VOTE_MS=30000,VOTE_INTRO_MS=7000,RESULTS_MS=7000;
  const voteWallTexture={needsUpdate:false},texts=[];
  const voteWallCtx=new Proxy({createLinearGradient:()=>({addColorStop(){}}),fillText:text=>texts.push(String(text))},{get:(o,k)=>k in o?o[k]:()=>{}});
- `+html.slice(start,end)+html.slice(roundStart,roundEnd)+html.slice(advanceStart,advanceEnd)+`
+ `+html.slice(start,end)+html.slice(html.indexOf('function prizeCoinCount'),html.indexOf('function paintPrizeMedals'))+html.slice(roundStart,roundEnd)+html.slice(advanceStart,advanceEnd)+`
  function game(){state={phase:'instructions',introStarted:12345,deadline:66345,round:1,players:{human:{name:'me',online:true,initial:true,alive:true}},chairs:{}};return state;}
  function present(s,time,ready=true){tickIntroPlayback(s,time,true,ready);paintVoteWall();markIntroFramePresented(s,time);return introPlayback;}
  `,context);

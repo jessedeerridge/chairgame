@@ -1298,7 +1298,10 @@ function character(color){let g=new THREE.Group();let body=new THREE.Mesh(new TH
  const glassCanvas=document.createElement('canvas');glassCanvas.width=128;glassCanvas.height=128;
  const gc=glassCanvas.getContext('2d');gc.strokeStyle='#ffffff';gc.lineWidth=14;gc.beginPath();gc.arc(51,46,27,0,Math.PI*2);gc.stroke();gc.strokeStyle='#315d76';gc.lineWidth=10;gc.beginPath();gc.arc(51,46,27,0,Math.PI*2);gc.stroke();gc.strokeStyle='#805332';gc.lineWidth=15;gc.lineCap='round';gc.beginPath();gc.moveTo(71,67);gc.lineTo(104,104);gc.stroke();
  const glassTex=new THREE.CanvasTexture(glassCanvas);const glass=new THREE.Sprite(new THREE.SpriteMaterial({map:glassTex,transparent:true,depthTest:false}));glass.position.set(0,4.05,0);glass.scale.set(1.15,1.15,1);glass.visible=false;g.add(glass);g.userData.searchGlass=glass;
- g.userData.accessoryHead=head;g.userData.legs=g.children.filter(o=>o.geometry?.type==='CylinderGeometry');g.userData.torso=body;g.userData.head=head;scene.add(g);return g}// Shared collectible wardrobe: ten hats, two regular glasses, two sunglasses.
+ const pose=new THREE.Group();pose.position.y=.62;
+ for(const part of [...g.children])if(part!==prizeSprite&&part!==glass){part.position.y-=.62;pose.add(part);}
+ g.add(pose);g.userData.pose=pose;
+ g.userData.accessoryHead=head;g.userData.legs=pose.children.filter(o=>o.geometry?.type==='CylinderGeometry');g.userData.torso=body;g.userData.head=head;scene.add(g);return g}// Shared collectible wardrobe: ten hats, two regular glasses, two sunglasses.
 const accessoryCatalog=[
  ['hat','redcap','赤いキャップ','🧢'],['hat','bluecap','青いキャップ','🧢'],
  ['hat','straw','麦わら帽子','👒'],['hat','tophat','シルクハット','🎩'],
@@ -1763,8 +1766,20 @@ function prizeCoinCount(s,p){
  if(!s?.winner||!s.players?.[s.winner])return 0;
  return Math.max(0,Math.floor(Number(p?.wallet?.[s.winner])||0));
 }
+function zeroPrizePlayer(s,p){return s?.phase==='finished'&&p?.initial===true&&prizeCoinCount(s,p)===0;}
+function playerSpeedFactor(s,p){return p?.carrying||zeroPrizePlayer(s,p)?0.5:1;}
+function updateFinishedPose(avatar,s,p,now){
+ const data=avatar.userData,zero=zeroPrizePlayer(s,p),key=zero?String(s.started||s.introStarted||0):null;
+ if(key!==data.fallSession){data.fallSession=key;data.fallStarted=now;}
+ const progress=zero?Math.max(0,Math.min(1,(now-data.fallStarted)/1100)):0;
+ const angle=Math.PI/2*progress*progress*(3-2*progress);
+ data.pose.rotation.x=angle?-angle:0;
+ if(data.prizeSprite)data.prizeSprite.position.set(0,.62+2.13*Math.cos(angle)+2,-2.13*Math.sin(angle));
+ return angle;
+}
 function paintPrizeMedals(canvas,rank,coins){
  const ctx=canvas.getContext('2d');ctx.clearRect(0,0,canvas.width,canvas.height);
+ if(coins===0){ctx.save();ctx.font='bold 65px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=10;ctx.strokeStyle='#303943';ctx.fillStyle='#c8d2dc';ctx.strokeText('0',canvas.width/2,80);ctx.fillText('0',canvas.width/2,80);ctx.restore();return;}
  const gold=rank!==null&&rank<=3,font=gold?79:65,icon=gold?76:64;
  const rankText=gold?rank+'位':'',amount=String(coins),gap=16;
  ctx.save();ctx.font='bold '+font+'px sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineWidth=12;ctx.lineJoin='round';
@@ -1995,7 +2010,9 @@ else if(phase==='search'){for(const p of Object.values(s.players)){p.wasAliveBef
   const ranks={};if(s.winner)ranks[s.winner]=1;
   const eliminated=s.eliminationOrder||[];
   for(const [k,p] of Object.entries(s.players))if(!p.alive){const i=eliminated.indexOf(k);if(i>=0){const later=eliminated.filter(other=>(s.players[other]?.eliminatedRound??-1)>(p.eliminatedRound??-1));ranks[k]=2+later.length;}}
-  s.finalRanks=ranks;return} s.phase='return';s.deadline=now+RETURN_MS}
+  s.finalRanks=ranks;
+  for(const [k,p] of Object.entries(s.players))if(zeroPrizePlayer(s,p)){const chair=s.chairs?.[p.sitting];if(chair?.occupied===k)chair.occupied=null;p.sitting=0;}
+  return} s.phase='return';s.deadline=now+RETURN_MS}
 else if(phase==='return'){for(const p of Object.values(s.players))p.returned=Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)<11;s.phase='voteIntro';s.deadline=now+VOTE_INTRO_MS;s.votes={};s.voteEligible={}}
 else if(phase==='voteIntro'){s.voteEligible={};for(const [k,p] of Object.entries(s.players||{})){if(insideBlackBuilding(Number(p.x),Number(p.z)))s.voteEligible[k]=true;}s.phase='vote';s.deadline=now+VOTE_MS}
 else if(phase==='vote'){const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+6000;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
@@ -2650,7 +2667,7 @@ $('stackButton').onclick=async event=>{
   applyAssignedSpawn(state);resetStackIdle(performance.now());
  }finally{relocating=false;$('stackButton').disabled=false;}
 };
-let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(isOnlineLobby()){pauseIntroPlayback();previous=t;return;}syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;if(player()?.carrying)speed*=0.5;let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
+let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(isOnlineLobby()){pauseIntroPlayback();previous=t;return;}syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
  // Never step off the rooftop slab, including the stair-side entrance corner.
  // A descent is permitted only onto a real stair flight or its bridge.
  if(current>2.5 && playerHeight>2.5){
@@ -2670,8 +2687,8 @@ if(window.__blackIntroDoor){const closed=phase()==='instructions';for(const leaf
 let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSync=t;if(soloMode){p.x=me.x;p.y=playerHeight;p.z=me.z;p.rot=me.rot;p.spawnApplied=lastAppliedSpawn;if(mapUnlocked)p.mapUnlockedFor=mapVisitKey;}else update(ref(database(),`rooms/${room}/players/${id}`),{x:Math.round(me.x*100)/100,y:Math.round(playerHeight*100)/100,z:Math.round(me.z*100)/100,rot:me.rot,...(mapUnlocked?{mapUnlockedFor:mapVisitKey}:{}),...(lastAppliedSpawn?{spawnApplied:lastAppliedSpawn}:{})}).then(()=>{if(p.carrying)prepareDisconnectChair({...p,x:me.x,z:me.z,y:playerHeight})}).catch(console.warn)}for(let [k,v] of players()){if(!avatars[k])avatars[k]=character(k===id?0xe8b24d:0x4c9ec2);let a=avatars[k];syncWearable(a,v);if(a.userData.labelName!==v.name){a.userData.labelName=v.name;const c=a.userData.nameCanvas,ctx=c.getContext('2d');ctx.clearRect(0,0,512,160);ctx.fillStyle='#fff9e7';ctx.beginPath();ctx.roundRect(8,8,496,144,25);ctx.fill();ctx.strokeStyle='#8a5c3d';ctx.lineWidth=10;ctx.stroke();ctx.fillStyle='#302a28';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 76px sans-serif';ctx.fillText(String(v.name||'NPC'),256,82,450);a.userData.nameTag.material.map.needsUpdate=true;}a.visible=v.online!==false&&(phase()!=='lobby'||!v.npc);
   const prize=a.userData.prizeSprite;
   if(prize){prize.visible=state.phase==='finished'&&v.initial===true;
-   if(prize.visible){const rank=state.finalRanks?.[k]===1&&!state.winner?null:state.finalRanks?.[k]||null;
-    const coins=prizeCoinCount(state,v);
+   if(prize.visible){const coins=prizeCoinCount(state,v);
+    const rank=coins===0||state.finalRanks?.[k]===1&&!state.winner?null:state.finalRanks?.[k]||null;
     const text=String(rank)+':'+coins;
     if(prize.userData.lastText!==text){prize.userData.lastText=text;
      paintPrizeMedals(a.userData.prizeCanvas,rank,coins);
@@ -2679,7 +2696,7 @@ let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSyn
     }
     prize.scale.set(rank&&rank<=3?3.7:2.9,rank&&rank<=3?1.15:.9,1);
    }
-  }let seatChair=v.sitting&&state.chairs?.[v.sitting];let seated=!!(seatChair&&!seatChair.removed);if(seated){a.position.set(seatChair.x,seatChair.y||0,seatChair.z+.12);a.rotation.y=0;a.userData.smoothReady=false;}else{
+  }updateFinishedPose(a,state,v,t);let seatChair=v.sitting&&state.chairs?.[v.sitting];let seated=!!(seatChair&&!seatChair.removed);if(seated){a.position.set(seatChair.x,seatChair.y||0,seatChair.z+.12);a.rotation.y=0;a.userData.smoothReady=false;}else{
  const tx=k===id?me.x:(v.x||0),ty=k===id?playerHeight:(v.y||0),tz=k===id?me.z:(v.z||0),tr=k===id?me.rot:(v.rot||0);
  if(k===id){a.position.set(tx,ty,tz);a.rotation.y=tr;}
  else if(!a.userData.smoothReady||Math.hypot(tx-a.position.x,tz-a.position.z)>28){a.position.set(tx,ty,tz);a.rotation.y=tr;a.userData.smoothReady=true;}
@@ -2728,7 +2745,7 @@ let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSyn
    a.rotation.y+=diff*blend;
   }
  }
-}const isSearching=(k===id&&!!spotAction)||(k!==id&&v.npcSpotSearch?.stage==='searching');const actionShake=isSearching?Math.sin(t*.0038)*.18:0;a.userData.torso.position.y=(seated?1.95:1.6)+actionShake;if(a.userData.lanyard)a.userData.lanyard.position.y=(seated?.35:0)+actionShake;a.userData.head.position.y=(seated?3.05:2.75)+actionShake;a.rotation.z=isSearching?Math.sin(t*.0038)*.16:0;if(a.userData.searchGlass){a.userData.searchGlass.visible=(k===id&&spotAction?.kind==='reveal')||(k!==id&&v.npcSpotSearch?.stage==='searching');a.userData.searchGlass.position.y=4.05+Math.sin(t*.0038)*.10;}for(const leg of a.userData.legs||[]){leg.rotation.x=seated?-Math.PI/2:0;leg.position.y=seated?1.30:.55;leg.position.z=seated?.95:0;}}for(let k of Object.keys(avatars))if(!state?.players?.[k]){scene.remove(avatars[k]);avatars[k].userData.prizeTexture?.dispose();delete avatars[k]}for(let [k,v] of Object.entries(state?.chairs||{})){if(!chairs[k])chairs[k]=chairObj({...v,number:k});let c=chairs[k];c.visible=!v.removed&&!v.hiddenAt;let carrier=v.carrier&&state.players?.[v.carrier];if(carrier){const av=avatars[v.carrier];const angle=v.carrier===id?me.rot:(av?av.rotation.y:(carrier.rot||0));const px=v.carrier===id?me.x:(av?av.position.x:(carrier.x||0));const pz=v.carrier===id?me.z:(av?av.position.z:(carrier.z||0));const carryOffset=carriedChairBlocked(px,pz,angle,v.carrier===id?playerHeight:(carrier.y||0))?.25:.82;const targetX=px+Math.sin(angle)*carryOffset,targetZ=pz+Math.cos(angle)*carryOffset;const targetY=(v.carrier===id?playerHeight:(av?av.position.y:(carrier.y||0)))+1.48;if(!c.userData.wasCarried){c.position.set(targetX,targetY,targetZ);c.userData.wasCarried=true;}else{const alpha=1-Math.exp(-18*dt);c.position.x+=(targetX-c.position.x)*alpha;c.position.y+=(targetY-c.position.y)*alpha;c.position.z+=(targetZ-c.position.z)*alpha;}c.rotation.order='YXZ';c.rotation.set(Math.PI/2,angle,0);}else{c.userData.wasCarried=false;c.position.set(v.x,v.y||0,v.z);c.rotation.set(0,0,0)}}// Keep all ceilings and rooftop fences fully opaque, including while indoors.
+}const isSearching=(k===id&&!!spotAction)||(k!==id&&v.npcSpotSearch?.stage==='searching');const actionShake=isSearching?Math.sin(t*.0038)*.18:0;a.userData.torso.position.y=(seated?1.95:1.6)-.62+actionShake;if(a.userData.lanyard)a.userData.lanyard.position.y=(seated?.35:0)-.62+actionShake;a.userData.head.position.y=(seated?3.05:2.75)-.62+actionShake;a.rotation.z=isSearching?Math.sin(t*.0038)*.16:0;if(a.userData.searchGlass){a.userData.searchGlass.visible=(k===id&&spotAction?.kind==='reveal')||(k!==id&&v.npcSpotSearch?.stage==='searching');a.userData.searchGlass.position.y=4.05+Math.sin(t*.0038)*.10;}for(const leg of a.userData.legs||[]){leg.rotation.x=seated?-Math.PI/2:0;leg.position.y=(seated?1.30:.55)-.62;leg.position.z=seated?.95:0;}}for(let k of Object.keys(avatars))if(!state?.players?.[k]){scene.remove(avatars[k]);avatars[k].userData.prizeTexture?.dispose();delete avatars[k]}for(let [k,v] of Object.entries(state?.chairs||{})){if(!chairs[k])chairs[k]=chairObj({...v,number:k});let c=chairs[k];c.visible=!v.removed&&!v.hiddenAt;let carrier=v.carrier&&state.players?.[v.carrier];if(carrier){const av=avatars[v.carrier];const angle=v.carrier===id?me.rot:(av?av.rotation.y:(carrier.rot||0));const px=v.carrier===id?me.x:(av?av.position.x:(carrier.x||0));const pz=v.carrier===id?me.z:(av?av.position.z:(carrier.z||0));const carryOffset=carriedChairBlocked(px,pz,angle,v.carrier===id?playerHeight:(carrier.y||0))?.25:.82;const targetX=px+Math.sin(angle)*carryOffset,targetZ=pz+Math.cos(angle)*carryOffset;const targetY=(v.carrier===id?playerHeight:(av?av.position.y:(carrier.y||0)))+1.48;if(!c.userData.wasCarried){c.position.set(targetX,targetY,targetZ);c.userData.wasCarried=true;}else{const alpha=1-Math.exp(-18*dt);c.position.x+=(targetX-c.position.x)*alpha;c.position.y+=(targetY-c.position.y)*alpha;c.position.z+=(targetZ-c.position.z)*alpha;}c.rotation.order='YXZ';c.rotation.set(Math.PI/2,angle,0);}else{c.userData.wasCarried=false;c.position.set(v.x,v.y||0,v.z);c.rotation.set(0,0,0)}}// Keep all ceilings and rooftop fences fully opaque, including while indoors.
 // Roofs remain opaque during both free and guided third-person views.
 // These roofs and rails are static: configure once, not every rendered frame.
 if(!_opaqueRoofConfigured){
