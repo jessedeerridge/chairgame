@@ -1172,7 +1172,7 @@ function voteResultLayout(s){
 }
 function paintVoteWall(){
  const s=state,playback=introPlaybackFor(s);
- const data=s?JSON.stringify([playback?.page,s.phase==='instructions'?[s.worldPreparing,Object.values(s.players||{}).filter(p=>p.initial&&p.alive).length,Object.values(s.chairs||{}).filter(c=>!c.removed).length]:null,s.phase,s.round,s.voteCounts,s.lastRemoved,s.parent,s.eliminatedNames,s.introStarted,s.selectedEraseChair,s.winner,s.finalRanks,Math.max(0,Math.ceil(((s.deadline||0)-Date.now())/1000)),s.players&&Object.fromEntries(Object.entries(s.players).map(([k,v])=>[k,v.name]))]):'waiting';
+ const data=s?JSON.stringify([playback?.page,s.phase==='instructions'?[s.worldPreparing,Object.values(s.players||{}).filter(p=>p.initial&&p.alive).length,Object.values(s.chairs||{}).filter(c=>!c.removed).length]:null,s.phase,s.round,s.voteCounts,s.lastRemoved,s.noChairErased,s.parent,s.eliminatedNames,s.introStarted,s.selectedEraseChair,s.winner,s.finalRanks,Math.max(0,Math.ceil(((s.deadline||0)-Date.now())/1000)),s.players&&Object.fromEntries(Object.entries(s.players).map(([k,v])=>[k,v.name]))]):'waiting';
  if(data===voteWallStateKey)return;voteWallStateKey=data;
  const c=voteWallCtx,W=1200,H=720;
  const bg=c.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#101f35');bg.addColorStop(1,'#080f20');c.fillStyle=bg;c.fillRect(0,0,W,H);
@@ -1190,6 +1190,8 @@ function paintVoteWall(){
    c.fillText(String(s.players?.[key]?.name||key),left+20,y+height/2,width-170);
    c.textAlign='right';c.fillStyle='#ffdf87';c.fillText(n+'票',left+width-20,y+height/2);
   }c.textAlign='center';
+ }else if(s.phase==='eraseReveal'&&s.noChairErased){
+  c.fillStyle='#f4f9ff';c.font='bold 62px sans-serif';c.fillText('椅子は除外されませんでした',W/2,H/2,W-85);
  }else if(s.phase==='eraseReveal'&&s.lastRemoved){
   c.fillStyle='#f4f9ff';c.font='bold 69px sans-serif';c.textAlign='center';
   c.fillText(String(s.lastRemoved)+' 🪑 の椅子が除外されました。',W/2,H/2,W-85);
@@ -1610,8 +1612,10 @@ function updateMapVisibility(){
  document.body.classList.toggle('map-locked',!key||!mapUnlocked);
  if(!mapUnlocked&&miniExpanded)setMiniExpanded(false);
 }
-function setMiniExpanded(v){if(v&&!mapUnlocked)return;hideMapSelection();miniExpanded=v;if(!v)pinShareTarget=null;miniPanel.classList.toggle('expanded',v);miniBackdrop.classList.toggle('active',v);miniCanvas.width=miniCanvas.height=v?768:320;drawMiniMap()}
-miniBackdrop.addEventListener('pointerdown',e=>{e.stopPropagation();setMiniExpanded(false)});
+let miniReopenAfter=0;
+function setMiniExpanded(v){if(v&&(!mapUnlocked||performance.now()<miniReopenAfter))return;if(!v&&miniExpanded)miniReopenAfter=performance.now()+400;hideMapSelection();miniExpanded=v;if(!v)pinShareTarget=null;miniPanel.classList.toggle('expanded',v);miniBackdrop.classList.toggle('active',v);miniCanvas.width=miniCanvas.height=v?768:320;drawMiniMap()}
+miniBackdrop.addEventListener('pointerdown',e=>e.stopPropagation());
+miniBackdrop.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();setMiniExpanded(false)});
 function drawMiniMap(){if(!worldReady)return;
  if(!document.body.classList.contains('playing'))return;
  recordExploration();const p=miniParams(),c=miniCtx,W=p.W,H=p.H,k=p.scale;
@@ -1831,7 +1835,7 @@ const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=40000, VOTE_MS=30000, ERASE_M
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
 const randBetween=(a,b)=>a+Math.random()*(b-a);
 function announce(message){const el=$('gameNotice');el.textContent=message;el.style.display='block';clearTimeout(announce.timer);announce.timer=setTimeout(()=>el.style.display='none',3600)}
-function initRound(s){s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=Date.now()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const p of Object.values(s.players)){p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
+function initRound(s){s.noChairErased=false;s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=Date.now()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const p of Object.values(s.players)){p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
 function indoorSpawn(i){const b=buildingSites[3];return {x:b.x+((i%5)-2)*7,z:b.z+3+Math.floor(i/5)*4.2};}
 function indoorPositionFree(s,k,point,occupied=[]){
  const b=buildingSites[3];
@@ -1946,7 +1950,7 @@ function updateSpotAction(t){
 $('moveChair').onclick=()=>mutate(s=>{let p=s.players[id];if(!p||s.phase==='finished')return;if(p.carrying){let c=s.chairs[p.carrying];if(c){{const x=p.x+Math.sin(p.rot)*1.8,z=p.z+Math.cos(p.rot)*1.8;const level=p.y??playerHeight;if(carriedChairBlocked(p.x,p.z,p.rot,level)||carriedChairBlocked(x,z,p.rot,level))return;const floor=chairFloorAt(x,z,level);if(Math.abs(floor-level)>1.05||!validChairPosition(x,z,p.carrying))return;c.carrier=null;c.x=x;c.z=z;c.y=floor}}p.carrying=0;return}for(let [n,c] of Object.entries(s.chairs)){if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.hypot(c.x-p.x,c.z-p.z)<3){c.carrier=id;p.carrying=Number(n);break}}});
 $('send').onclick=()=>{};
 $('vote').onclick=()=>{if(Math.hypot(me.x-VOTE_X,me.z-VOTE_Z)>=11)return;const target=$('voteTarget').value;mutate(s=>{const p=s.players[id];if(!canCastVote(s,id)||!p||Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)>=11||s.votes?.[id]||!s.players[target]?.alive)return;s.votes??={};if(s.votes[id])return;s.votes[id]=target;p.voted=true})};
-function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=true;c.carrier=null;c.occupied=null;s.lastRemoved=n;s.selectedEraseChair=n;s.phase='eraseReveal';s.deadline=Date.now()+7000}
+function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=true;c.carrier=null;c.occupied=null;s.noChairErased=false;s.lastRemoved=n;s.selectedEraseChair=n;s.phase='eraseReveal';s.deadline=Date.now()+7000}
 $('erase').onclick=()=>{const n=$('chairNumber').value;mutate(s=>{if(s.phase!=='erase'||s.parent!==id)return;finishErase(s,n)})};
 function chooseNPCVote(s,k){const p=s.players[k],candidates=Object.entries(s.players).filter(([_,v])=>v.alive);if(!candidates.length)return null;let best=null,score=-Infinity;for(const [key,c] of candidates){let value=Math.random()*2.4+(p.trust?.[key]||0)*3+(key===k?(p.personality==='積極型'?2:0):0);if(p.personality==='追従型')value+=(p.trust?.[key]||0)*3;if(p.personality==='独立型'&&key===k)value+=1.8;if(p.personality==='戦略型')value+=(s.lastVoteCounts?.[key]||0)*.2;if(p.personality==='気まぐれ型')value+=Math.random()*3;if(value>score){score=value;best=key}}return best}
 function chooseErase(s,k){const p=s.players[k],available=Object.entries(s.chairs).filter(([_,c])=>!c.removed);if(!available.length)return null;const scored=available.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
@@ -1970,8 +1974,8 @@ else if(phase==='search'){for(const p of Object.values(s.players)){p.wasAliveBef
   s.finalRanks=ranks;return} s.phase='return';s.deadline=now+RETURN_MS}
 else if(phase==='return'){for(const p of Object.values(s.players))p.returned=Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)<11;s.phase='voteIntro';s.deadline=now+VOTE_INTRO_MS;s.votes={};s.voteEligible={}}
 else if(phase==='voteIntro'){s.voteEligible={};for(const [k,p] of Object.entries(s.players||{})){if(insideBlackBuilding(Number(p.x),Number(p.z)))s.voteEligible[k]=true;}s.phase='vote';s.deadline=now+VOTE_MS}
-else if(phase==='vote'){const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+RESULTS_MS;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
-else if(phase==='results'){if(s.tieNoErase){s.tieNoErase=false;initRound(s)}else{s.phase='erase';s.deadline=now+86400000}}
+else if(phase==='vote'){const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+6000;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
+else if(phase==='results'){if(s.tieNoErase){s.tieNoErase=false;s.noChairErased=true;s.lastRemoved=null;s.selectedEraseChair=null;s.phase='eraseReveal';s.deadline=now+6000;}else{s.phase='erase';s.deadline=now+86400000}}
 else if(phase==='eraseReveal'){initRound(s)}}
 let advancing=false;
 async function advance(){

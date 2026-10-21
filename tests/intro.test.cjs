@@ -8,6 +8,7 @@ function setup(){
  const start=html.indexOf('const INTRO_PAGE_MS='),end=html.indexOf('function character',start);
  assert(start>=0&&end>start);
  const advanceStart=html.indexOf('function advanceState(s,now)'),advanceEnd=html.indexOf('let advancing=false;',advanceStart);
+ const roundStart=html.indexOf('function initRound(s)'),roundEnd=html.indexOf('function indoorSpawn',roundStart);
  vm.runInContext(`
  const listeners={},document={addEventListener:(name,fn)=>listeners[name]=fn};
  let room='TEST',id='human',soloMode=true,state=null,worldReady=true;
@@ -15,7 +16,7 @@ function setup(){
  const SEARCH_MS=90000,RETURN_MS=40000,VOTE_MS=30000,VOTE_INTRO_MS=7000,RESULTS_MS=7000;
  const voteWallTexture={needsUpdate:false},texts=[];
  const voteWallCtx=new Proxy({createLinearGradient:()=>({addColorStop(){}}),fillText:text=>texts.push(String(text))},{get:(o,k)=>k in o?o[k]:()=>{}});
- `+html.slice(start,end)+html.slice(advanceStart,advanceEnd)+`
+ `+html.slice(start,end)+html.slice(roundStart,roundEnd)+html.slice(advanceStart,advanceEnd)+`
  function game(){state={phase:'instructions',introStarted:12345,deadline:66345,round:1,players:{human:{name:'me',online:true,initial:true,alive:true}},chairs:{}};return state;}
  function present(s,time,ready=true){tickIntroPlayback(s,time,true,ready);paintVoteWall();markIntroFramePresented(s,time);return introPlayback;}
  `,context);
@@ -70,3 +71,10 @@ test('completion is sent once per session, after the last displayed page',async(
   s.players.human.introSeen=writes[0].value.introSeen;await syncIntroCompletion(60000);assert.equal(writes.length,1);
  })()`);
 });
+
+test('tied vote shows no-removal announcement after six seconds without removing a chair',()=>setup()(`
+ const s=game();s.phase='vote';s.deadline=100;s.players.a={alive:true,name:'A'};s.players.b={alive:true,name:'B'};s.votes={human:'a',a:'b'};s.chairs={1:{removed:false}};
+ advanceState(s,100);assert.equal(s.phase,'results');assert.equal(s.deadline,6100);
+ advanceState(s,6099);assert.equal(s.phase,'results');advanceState(s,6100);assert.equal(s.phase,'eraseReveal');assert(s.noChairErased);assert.equal(s.lastRemoved,null);assert.equal(s.chairs[1].removed,false);
+ paintVoteWall();assert(texts.includes('椅子は除外されませんでした'));advanceState(s,12099);assert.equal(s.phase,'eraseReveal');advanceState(s,12100);assert.equal(s.phase,'sitIntro');assert.equal(s.noChairErased,false);assert.equal(s.chairs[1].removed,false);
+`));
