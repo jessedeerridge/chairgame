@@ -1,0 +1,23 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+function extract(a,b){return html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));}
+function setup(){const ctx=vm.createContext({assert});vm.runInContext(`let state,playerHeight=0,id='me',me={x:0,z:0};function players(){return Object.entries(state.players)};`+extract('function giftsAllowed','async function shareChairPin')+extract('function voteResultLayout','function paintVoteWall'),ctx);return s=>vm.runInContext(s,ctx);}
+test('gifts begin at first seating and accept small height differences, not stacked floors',()=>setup()(`
+ const a={x:0,z:0,y:5},b={x:1,z:1,y:5.8};
+ for(const phase of ['lobby','instructions','finished'])assert.equal(canGiveTo({phase},a,b),false);
+ for(const phase of ['sitIntro','search','return','vote','results','erase'])assert.equal(canGiveTo({phase},a,b),true);
+ assert.equal(canGiveTo({phase:'search'},a,{...b,y:0}),false);
+ assert.equal(canGiveTo({phase:'search'},a,{...b,y:6.5}),true);
+ assert.equal(canGiveTo({phase:'search'},a,{...b,y:6.51}),false);
+ assert.equal(canGiveTo({phase:'search'},a,{...b,x:5}),false);
+ state={phase:'search',players:{below:{x:0,z:.1,y:0},near:{...b,name:'near'}}};playerHeight=5;
+ assert.equal(nearestPartner().id,'near');state.phase='instructions';assert.equal(nearestPartner(),null);
+`));
+test('all tied leaders enlarge within reserved rows, including a full 20-person result',()=>setup()(`
+ for(const count of [1,7,8,20])for(const tied of [1,3,20]){
+  const voteCounts=Object.fromEntries(Array.from({length:count},(_,i)=>['p'+i,i<tied?5:1]));
+  const boxes=voteResultLayout({voteCounts});assert.equal(boxes.length,count);
+  assert.equal(boxes.filter(b=>b.leader).length,Math.min(tied,count));
+  for(const a of boxes){assert(a.y>=154&&a.y+a.height<=684.001);for(const b of boxes){if(a===b)continue;assert(a.left+a.width<b.left||b.left+b.width<a.left||a.y+a.height<b.y||b.y+b.height<a.y);}}
+ }
+`));

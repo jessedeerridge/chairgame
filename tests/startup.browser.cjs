@@ -21,7 +21,7 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    document.addEventListener('click',event=>{if(event.target.closest('#solo')&&!window.bootClick)window.bootClick=performance.now();},{capture:true});
    const code=document.querySelector('#deferredGameCode');
-   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.bootTest={status:()=>({ready:worldReady,outdoorVisible:outdoorWorld.visible,outdoorMeshes:outdoorWorld.children.length,obstacles:obstacles.length,hidingSpots:hidingSpots.length,stairs:stairways.length,clearingClean:hidingSpots.every(p=>!nearBlackBuildingVegetation(p.x,p.z))&&obstacles.every(o=>![.85,1.65,.65].includes(o.r)||!nearBlackBuildingVegetation(o.x,o.z))}),getState:()=>state,advanceState,pauseHostForTest:()=>{host=false;},introPage:()=>introPlaybackFor(state)?.page,completeIntroForTest:async()=>{introPlayback=null;let now=performance.now();for(let i=0;i<=9;i++){tickIntroPlayback(state,now+i*6001,true,true);paintVoteWall();renderer.render(scene,camera);markIntroFramePresented(state,now+i*6001);}await syncIntroCompletion(performance.now());},npcSimulate,npcWorldBlocked,screenReady:()=>voteWall.material.map===voteWallTexture,door:()=>window.__blackIntroDoor,scene,outdoorWorld};performance.mark("island-room-ready");`);
+   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.bootTest={status:()=>({ready:worldReady,outdoorVisible:outdoorWorld.visible,outdoorMeshes:outdoorWorld.children.length,obstacles:obstacles.length,hidingSpots:hidingSpots.length,stairs:stairways.length,clearingClean:hidingSpots.every(p=>!nearBlackBuildingVegetation(p.x,p.z))&&obstacles.every(o=>![.85,1.65,.65].includes(o.r)||!nearBlackBuildingVegetation(o.x,o.z))}),getState:()=>state,advanceState,pauseHostForTest:()=>{host=false;},introPage:()=>introPlaybackFor(state)?.page,completeIntroForTest:async()=>{introPlayback=null;let now=performance.now();for(let i=0;i<=9;i++){tickIntroPlayback(state,now+i*6001,true,true);paintVoteWall();renderer.render(scene,camera);markIntroFramePresented(state,now+i*6001);}await syncIntroCompletion(performance.now());},npcSimulate,npcWorldBlocked,renderUI,renderWallet,paintVoteWall,voteResultLayout,wallCanvas:()=>voteWallCtx.canvas,screenReady:()=>voteWall.material.map===voteWallTexture,door:()=>window.__blackIntroDoor,scene,outdoorWorld};performance.mark("island-room-ready");`);
    window.addEventListener('islandGameModuleReady',()=>{window.firstRoom=window.bootTest.status();window.roomReadyMs=performance.now()-window.bootClick;});
   });
   await page.click('#solo');await page.waitForFunction(()=>window.__islandGameReady,{timeout:60000});
@@ -41,6 +41,17 @@ const {chromium}=require('playwright');
    return {before,after,search,npcs:Object.values(s.players).filter(p=>p.npc).length,collisions:Object.values(s.players).filter(p=>p.npc&&t.npcWorldBlocked(s,p.x,p.z,.65)).length};
   });
   assert.equal(transitions.before,'instructions');assert.equal(transitions.after,'sitIntro');assert.equal(transitions.search,'search');assert.equal(transitions.npcs,19);assert.equal(transitions.collisions,0);assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({initial,loaded,transitions,errors},null,2));
+  const display=await page.evaluate(()=>{
+   const t=window.bootTest,s=t.getState(),p=Object.values(s.players).find(p=>!p.npc);t.renderWallet(p);
+   const wallet=document.querySelector('#wallet'),first=wallet.firstChild;
+   for(let i=0;i<30;i++)t.renderUI();const unchanged=wallet.firstChild===first;
+   s.voteCounts=Object.fromEntries(Object.keys(s.players).map((k,i)=>[k,i<3?5:1]));s.phase='results';t.paintVoteWall();
+   const before=t.wallCanvas().toDataURL();s.phase='erase';t.paintVoteWall();const sameScreen=before===t.wallCanvas().toDataURL();
+   const preview=document.createElement('img');preview.src=t.wallCanvas().toDataURL();Object.assign(preview.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',objectFit:'contain',zIndex:100,background:'#080f20'});document.body.append(preview);
+   return {unchanged,sameScreen,leaders:t.voteResultLayout(s).filter(b=>b.leader).length};
+  });
+  assert(display.unchanged,'wallet rebuilt on position-only snapshots');assert(display.sameScreen,'results changed during chair selection');assert.equal(display.leaders,3);
+  await page.screenshot({path:'/tmp/vote-results.png'});
+  console.log(JSON.stringify({initial,loaded,transitions,display,errors},null,2));
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

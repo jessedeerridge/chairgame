@@ -56,7 +56,7 @@ body.playing #miniMapBackdrop.active{display:block}
 #eraseNumberKeys button{position:relative;isolation:isolate;overflow:hidden;background:#38454a;color:#fff;font-size:23px;height:48px;padding:4px;font-weight:900;text-shadow:0 1px 3px #000}
 #eraseNumberKeys button:last-child{grid-column:3}
 #hud{max-width:min(520px,calc(100vw - 340px));}
-#wallet{max-width:100%;}
+#wallet{max-width:100%;transform:translateZ(0);backface-visibility:hidden;}
 #clock{max-width:min(46vw,440px);justify-content:flex-end;gap:10px;z-index:6;}
 #phaseInstruction{white-space:nowrap;}
 @media(max-width:760px){
@@ -1147,6 +1147,17 @@ async function syncIntroCompletion(now){
 }
 let voteWallStateKey='';
 const formatCountdown=seconds=>{const n=Math.max(0,Math.ceil(seconds));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')};
+function voteResultLayout(s){
+ const entries=Object.entries(s.voteCounts||{}).filter(([_,n])=>n>=1).sort((a,b)=>b[1]-a[1]);
+ const top=entries[0]?.[1],cols=entries.length>7?2:1,rows=Math.ceil(entries.length/cols),width=cols===2?520:700,gap=30;
+ const columns=Array.from({length:cols},(_,col)=>entries.slice(col*rows,(col+1)*rows));
+ const units=Math.max(1,...columns.map(list=>list.reduce((sum,[_,n])=>sum+(n===top?1.12:1),0)));
+ const step=Math.min(72,(530-Math.max(0,rows-1)*8)/units),boxes=[];
+ columns.forEach((list,col)=>{let y=154;for(const [key,n] of list){const leader=n===top,height=step*(leader?1.12:1),extra=leader?12:0;
+  boxes.push({key,n,leader,left:(1200-(cols*width+(cols-1)*gap))/2+col*(width+gap)-extra/2,y,width:width+extra,height,fontSize:Math.min(leader?50:45,height*.62)});
+  y+=height+8;
+ }});return boxes;
+}
 function paintVoteWall(){
  const s=state,playback=introPlaybackFor(s);
  const data=s?JSON.stringify([playback?.page,s.phase==='instructions'?[s.worldPreparing,Object.values(s.players||{}).filter(p=>p.initial&&p.alive).length,Object.values(s.chairs||{}).filter(c=>!c.removed).length]:null,s.phase,s.round,s.voteCounts,s.lastRemoved,s.parent,s.eliminatedNames,s.introStarted,s.selectedEraseChair,s.winner,s.finalRanks,Math.max(0,Math.ceil(((s.deadline||0)-Date.now())/1000)),s.players&&Object.fromEntries(Object.entries(s.players).map(([k,v])=>[k,v.name]))]):'waiting';
@@ -1157,20 +1168,16 @@ function paintVoteWall(){
  c.textAlign='center';c.textBaseline='middle';
  const headline=(title,sub)=>{c.fillStyle='#d5f5ff';c.font='bold 78px sans-serif';c.fillText(title,W/2,145);if(sub){c.fillStyle='#ffe2a2';c.font='bold 56px sans-serif';c.fillText(sub,W/2,400,W-90)}};
  if(!s||s.phase==='lobby')headline('ISLAND CHAIR GAME','投票・イス消去 結果表示');
- else if(s.phase==='results'&&s.voteCounts){
+ else if((s.phase==='results'||s.phase==='erase')&&s.voteCounts){
   c.fillStyle='#e8faff';c.font='bold 76px sans-serif';c.fillText('投票結果',W/2,92);
-  const entries=Object.entries(s.voteCounts).filter(([_,n])=>n>=1).sort((a,b)=>b[1]-a[1]);
-  const cols=entries.length>7?2:1,rows=Math.ceil(entries.length/cols),rh=Math.min(72,530/Math.max(1,rows));
-  const fs=Math.min(47,Math.max(24,rh*.58));
-  entries.forEach(([k,n],i)=>{const col=cols===2?Math.floor(i/rows):0,row=cols===2?i%rows:i;const boxWidth=cols===2?520:700,gap=30,totalWidth=cols*boxWidth+(cols-1)*gap;const left=(W-totalWidth)/2+col*(boxWidth+gap),y=154+row*rh;
-   c.fillStyle=row%2?'#22364c':'#1a2b41';c.fillRect(left,y,boxWidth,rh-5);
-   c.fillStyle='#fff';c.font=`bold ${fs}px sans-serif`;c.textAlign='left';const nm=String(s.players?.[k]?.name||k);c.fillText(nm,left+20,y+rh/2,boxWidth-170);
-   c.textAlign='right';c.fillStyle='#ffdf87';c.fillText(n+'票',left+boxWidth-20,y+rh/2);
-  });c.textAlign='center';
- }else if(s.phase==='erase'){
-  // 投票結果の後に『今回の親は…』画面を表示しない。
-  // 親によるイス選択操作は従来どおり維持する。
-  headline('ISLAND CHAIR GAME','');
+  for(const box of voteResultLayout(s)){
+   const {key,n,left,y,width,height,leader}=box;
+   c.fillStyle=leader?'#354664':'#1a2b41';c.fillRect(left,y,width,height);
+   if(leader){c.strokeStyle='#ffdf87';c.lineWidth=3;c.strokeRect(left,y,width,height);}
+   c.fillStyle='#fff';c.font=`bold ${box.fontSize}px sans-serif`;c.textAlign='left';
+   c.fillText(String(s.players?.[key]?.name||key),left+20,y+height/2,width-170);
+   c.textAlign='right';c.fillStyle='#ffdf87';c.fillText(n+'票',left+width-20,y+height/2);
+  }c.textAlign='center';
  }else if(s.phase==='eraseReveal'&&s.lastRemoved){
   c.fillStyle='#f4f9ff';c.font='bold 69px sans-serif';c.textAlign='center';
   c.fillText(String(s.lastRemoved)+' 🪑 の椅子が除外されました。',W/2,H/2,W-85);
@@ -1664,48 +1671,7 @@ function seedChairs(){
 }
 function log(s){$('log').innerHTML=`<div>${new Date().toLocaleTimeString()} ${s.replaceAll('<','&lt;')}</div>`+$('log').innerHTML}
 function player(){return state?.players?.[id]}function phase(){return state?.phase||'lobby'}function players(){return Object.entries(state?.players||{})}function options(el,entries){let v=el.value;el.replaceChildren(...entries.map(([value,label])=>{let o=document.createElement('option');o.value=value;o.textContent=label;return o}));if(entries.some(e=>e[0]===v))el.value=v}
-let voteResultRoundShown=null,voteResultParentTimer=null,voteResultParentHidden=false;
-function syncVoteResultPopup(){
- paintVoteWall();
- const popup=$('voteResultsPopup');if(popup)popup.style.display='none';return;
- if(!popup||!state)return;
- // Results persist throughout chair selection; only selecting a chair clears them for everyone.
- if(state.phase!=='erase'||!state.voteCounts||!Object.values(state.voteCounts).some(n=>n>=1)){
-  popup.style.display='none';voteResultRoundShown=null;voteResultParentHidden=false;
-  clearTimeout(voteResultParentTimer);voteResultParentTimer=null;return;
- }
- const key=String(state.round)+'|'+String(state.parent);
- if(voteResultRoundShown!==key){
-  voteResultRoundShown=key;voteResultParentHidden=false;
-  clearTimeout(voteResultParentTimer);
-  const rows=$('voteResultsRows');rows.replaceChildren();
-  const results=Object.entries(state.voteCounts).filter(([_,n])=>n>=1).sort((a,b)=>b[1]-a[1]);
-  const twoCols=results.length>7;
-  const narrow=window.innerWidth<520;
-  // Explicit column widths and contained rows prevent long names from overlapping.
-  const columnWidth=narrow?Math.max(112,Math.floor((window.innerWidth-82)/2)):190;
-  rows.style.gridTemplateColumns=twoCols?`repeat(2,minmax(0,${columnWidth}px))`:'minmax(0,240px)';
-  rows.style.justifyContent='center';
-  rows.style.fontSize=results.length>14?'16px':results.length>9?'18px':'20px';
-  rows.style.columnGap=narrow?'10px':'18px';
-  rows.style.rowGap=results.length>12?'5px':'9px';
-  popup.style.padding=narrow?'16px 12px':'20px 22px';
-  results.forEach(([who,n])=>{
-   const line=document.createElement('div');
-   Object.assign(line.style,{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',minWidth:'0',maxWidth:'100%',boxSizing:'border-box',padding:'6px 9px',borderRadius:'9px',background:'rgba(255,255,255,.08)',textAlign:'left'});
-   const name=document.createElement('span');
-   name.textContent=state.players?.[who]?.name||who;
-   Object.assign(name.style,{minWidth:'0',flex:'1 1 auto',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'});
-   name.title=name.textContent;
-   const count=document.createElement('span');
-   count.textContent=n+'票';
-   Object.assign(count.style,{flex:'0 0 auto',whiteSpace:'nowrap',color:'#ffe6a3',fontVariantNumeric:'tabular-nums'});
-   line.append(name,count);rows.appendChild(line);
-  });
-  voteResultParentTimer=setTimeout(()=>{voteResultParentHidden=true;if(state?.phase==='erase'&&state?.parent===id)popup.style.display='none'},3000);
- }
- popup.style.display=(state.parent===id&&voteResultParentHidden)?'none':'block';
-}
+function syncVoteResultPopup(){paintVoteWall();const popup=$('voteResultsPopup');if(popup)popup.style.display='none';}
 function isOnlineLobby(){return !soloMode&&state?.phase==='lobby';}
 function lobbyParticipants(s){return Object.entries(s.players||{}).filter(([_,p])=>!p.npc&&p.online!==false);}
 function lobbyPlayersReady(s){const players=lobbyParticipants(s);return players.length>0&&players.every(([_,p])=>p.worldReady===true);}
@@ -1778,7 +1744,13 @@ function paintPrizeMedals(canvas,rank,coins){
  if(rankText){ctx.strokeText(rankText,x,0);ctx.fillText(rankText,x,0);x+=rankWidth;}
  drawMedalCanvas(ctx,x,-icon/2,icon);x+=icon+gap;ctx.strokeText(amount,x,0);ctx.fillText(amount,x,0);ctx.restore();
 }
-function renderUI(){if(!state)return;renderLobby();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));$('wallet').replaceChildren();if(p){for(const [issuer,count] of Object.entries(p.wallet||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])){const cell=document.createElement('span');cell.className='coin-entry';cell.classList.toggle('is-eliminated',state.players?.[issuer]?.initial===true&&state.players[issuer].alive===false);const nm=document.createElement('span');nm.className='coin-name';nm.textContent=(state.players?.[issuer]?.name||'不明')+' ×';const stack=document.createElement('span');stack.className='coin-stack';const icon=walletMedalIcon();const number=document.createElement('span');number.className='coin-stack-number';number.textContent=String(count);stack.append(icon,number);cell.append(nm,stack);$('wallet').appendChild(cell)}}const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
+let walletViewKey=null;
+function renderWallet(p){
+ const key=JSON.stringify(Object.entries(p?.wallet||{}).filter(([_,n])=>n>0).sort((a,b)=>b[1]-a[1]).map(([k,n])=>[k,n,state.players?.[k]?.name,state.players?.[k]?.initial===true&&state.players[k].alive===false]));
+ if(key===walletViewKey)return;walletViewKey=key;
+ const cells=[];if(p){for(const [issuer,count] of Object.entries(p.wallet||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])){const cell=document.createElement('span');cell.className='coin-entry';cell.classList.toggle('is-eliminated',state.players?.[issuer]?.initial===true&&state.players[issuer].alive===false);const nm=document.createElement('span');nm.className='coin-name';nm.textContent=(state.players?.[issuer]?.name||'不明')+' ×';const stack=document.createElement('span');stack.className='coin-stack';const icon=walletMedalIcon();const number=document.createElement('span');number.className='coin-stack-number';number.textContent=String(count);stack.append(icon,number);cell.append(nm,stack);cells.push(cell)}}$('wallet').replaceChildren(...cells);
+}
+function renderUI(){if(!state)return;renderLobby();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));renderWallet(p);const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
 開票：${Object.entries(state.voteCounts||{}).map(([k,n])=>(state.players[k]?.name||k)+' '+n+'票').join(' / ')||'未開票'}`;if(renderUI.oldPhase!==state.phase&&state.phase){const notices={instructions:'',sitIntro:insideBlackBuilding(me.x,me.z)?'':'着席！',search:'',return:'TIME UP!\n投票に戻れ！',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:'',finished:'ゲーム終了！'};if(renderUI.oldPhase!==undefined&&notices[state.phase])announce(notices[state.phase]);else if(!notices[state.phase]){$('gameNotice').style.display='none';clearTimeout(announce.timer)}renderUI.oldPhase=state.phase}if(renderUI.oldRemoved!==state.lastRemoved&&state.lastRemoved){renderUI.oldRemoved=state.lastRemoved}if(state.phase==='sitIntro'&&insideBlackBuilding(me.x,me.z)){$('gameNotice').style.display='none';clearTimeout(announce.timer)}refreshActions();receiveSharedPin()}
 async function mutate(fn){if(soloMode){if(!state)return;fn(state);renderUI();return;}if(!room)return;let result=await runTransaction(ref(database(),`rooms/${room}`),s=>{if(!s)return;fn(s);return s},{applyLocally:false});if(!result.committed)log('操作できませんでした')}
@@ -2457,7 +2429,10 @@ function drawCoinDrops(){
  }
  for(const k of Object.keys(coinMeshes))if(!drops[k]){scene.remove(coinMeshes[k]);coinMeshes[k].userData.texture.dispose();coinMeshes[k].userData.label.material.dispose();delete coinMeshes[k];}
 }
-function nearestPartner(){let best=null,dist=4;for(let [k,p] of players()){if(k===id||p.online===false)continue;let d=Math.hypot(me.x-p.x,me.z-p.z);if(d<dist){best={id:k,name:p.name,npc:!!p.npc};dist=d}}return best}
+function giftsAllowed(s=state){return !!s&&['sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(s.phase);}
+const GIFT_HEIGHT_TOLERANCE=1.5;
+function canGiveTo(s,a,b){return giftsAllowed(s)&&!!a&&!!b&&b.online!==false&&Math.abs((a.y||0)-(b.y||0))<=GIFT_HEIGHT_TOLERANCE&&Math.hypot(a.x-b.x,a.z-b.z)<4;}
+function nearestPartner(){if(!giftsAllowed())return null;let best=null,dist=4;for(let [k,p] of players()){if(k===id||!canGiveTo(state,{...me,y:playerHeight},p))continue;let d=Math.hypot(me.x-p.x,me.z-p.z);if(d<dist){best={id:k,name:p.name,npc:!!p.npc};dist=d}}return best}
 async function shareChairPin(recipient,number,x,z){
  if(!state||!state.players?.[recipient])return;
  const partner=nearestPartner();
@@ -2465,10 +2440,11 @@ async function shareChairPin(recipient,number,x,z){
  if(soloMode){log(partner.name+'にイス'+number+'の場所を共有（NPC）');return;}
  const stamp=Date.now();
  try{
-  await runTransaction(ref(database(),`rooms/${room}/players/${recipient}/pinInbox`),v=>{
-   if(v&&v.stamp>=stamp)return;
-   return {number,x,z,from:id,stamp};
-  },{applyLocally:false});
+  await mutate(s=>{
+   const sender=s.players?.[id],target=s.players?.[recipient];
+   if(!canGiveTo(s,sender,target)||target.pinInbox?.stamp>=stamp)return;
+   target.pinInbox={number,x,z,from:id,stamp};
+  });
   log(partner.name+'にイス'+number+'の場所を共有');
  }catch(err){alert('位置の共有に失敗しました：'+(err.message||err));}
 }
@@ -2552,7 +2528,7 @@ $('modalConfirm').onclick=async()=>{if(modalMode==='voteButtons'){
  }catch(e){alert('投票の通信に失敗しました：'+(e.message||e));}
  finally{confirm.disabled=false;}
  return;
- }if(modalMode==='trade'){const n=Math.floor(Number($('tradeAmount').value)),issuer=$('tradeIssuer').value,partner=tradePartner;if(!partner||!Number.isInteger(n)||n<1||nearestPartner()?.id!==partner.id){alert('相手の近くで操作してください');return;}await mutate(s=>{const a=s.players[id],b=s.players[partner.id];if(!a||!b||!(a.wallet?.[issuer]>=n)||Math.hypot(a.x-b.x,a.z-b.z)>4)return;a.wallet[issuer]-=n;s.coinDrops??={};const dropId='coin_'+id+'_'+Date.now()+'_'+Math.floor(Math.random()*1e7);const baseX=a.x+Math.sin(a.rot||0)*1.1,baseZ=a.z+Math.cos(a.rot||0)*1.1;
+ }if(modalMode==='trade'){const n=Math.floor(Number($('tradeAmount').value)),issuer=$('tradeIssuer').value,partner=tradePartner;if(!partner||!Number.isInteger(n)||n<1||nearestPartner()?.id!==partner.id){alert('相手の近くで操作してください');return;}await mutate(s=>{const a=s.players[id],b=s.players[partner.id];if(!canGiveTo(s,a,b)||!(a.wallet?.[issuer]>=n))return;a.wallet[issuer]-=n;s.coinDrops??={};const dropId='coin_'+id+'_'+Date.now()+'_'+Math.floor(Math.random()*1e7);const baseX=a.x+Math.sin(a.rot||0)*1.1,baseZ=a.z+Math.cos(a.rot||0)*1.1;
 const existing=Object.values(s.coinDrops).filter(d=>d.count>0);
 let dropX=baseX,dropZ=baseZ;
 // Place repeated drops in a small spiral so separate coins stay visible and collectible.
