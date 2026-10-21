@@ -191,7 +191,13 @@ async function update(target,values){
 }
 function releaseRoomWrites(){if(!roomTransactions)for(const resolve of roomWriteWaiters.splice(0))resolve();}
 function reconcileRoomPositions(s){
- for(const p of Object.values(s?.players||{})){
+ for(const [key,p] of Object.entries(s?.players||{})){
+  const live=motionChannelReady&&liveMotionPackets.get(key);
+  if(!p.npc&&!p.sitting&&p.online!==false&&live&&live.owner===key&&live.game===(s.started||0)&&live.spawn===(p.spawn?.version||'')&&!live.seat&&
+   (!p.spawn||live.ack===p.spawn.version)&&live.at>(p.positionAt||0)&&live.at<=roomNow()+1000&&roomNow()-live.at<1200){
+   p.x=live.x;p.y=live.y||0;p.z=live.z;p.rot=live.rot||0;p.positionAt=live.at;p.moving=live.moving;
+   if(p.spawn)p.spawnApplied=live.ack;
+  }
   const spawn=p.spawn,chair=p.sitting&&s.chairs?.[p.sitting];
   if(!p.npc&&chair&&!chair.removed&&!chair.carrier&&!chair.hiddenAt){p.x=chair.x;p.z=chair.z;p.y=chair.y||0;continue;}
   // An older position packet must not override a newly assigned start/relocation.
@@ -201,7 +207,7 @@ function reconcileRoomPositions(s){
 }
 let lastPositionPacket='',lastPositionSent=0,positionWriteBusy=false;
 function publishPlayerPosition(t,moving=false){
- const p=player();if(!p||joiningRoom||relocating||state.phase==='lobby'||t-lastSync<80)return;
+ const p=player();if(!p||joiningRoom||relocating||state.phase==='lobby'||t-lastSync<(!soloMode&&motionChannelReady?350:80))return;
  const packet={x:Math.round(me.x*100)/100,y:Math.round(playerHeight*100)/100,z:Math.round(me.z*100)/100,rot:Math.round(me.rot*1000)/1000,moving:!!moving,
   ...(mapUnlocked?{mapUnlockedFor:mapVisitKey}:{}),...(lastAppliedSpawn?{spawnApplied:lastAppliedSpawn}:{})};
  if(soloMode){lastSync=t;Object.assign(p,packet);return;}
@@ -212,53 +218,127 @@ function publishPlayerPosition(t,moving=false){
   if(room===packetRoom&&id===packetId){lastPositionPacket=signature;lastPositionSent=t;if(p.carrying)prepareDisconnectChair({...p,...packet});}
  }).catch(console.warn).finally(()=>{positionWriteBusy=false;});
 }
-// Network rendering runs at frame rate without increasing Firebase write frequency.
-const remoteMotionHistory=new Map();
+// Small motion packets use a sibling of the transactional room. Position traffic
+// must not wait for (or retry) NPC decisions, votes and other room transactions.
+let motionSubscription=null,motionChannelRoom='',motionChannelReady=false,motionWriteBusy=false,lastMotionFlush=0,motionWriteGeneration=0,motionChannelFailed=false;
+const liveMotionPackets=new Map(),sentMotionPackets=new Map(),remoteMotionHistory=new Map();
+function stopMotionChannel(){
+ motionSubscription?.();motionSubscription=null;motionChannelRoom='';motionChannelReady=false;
+ liveMotionPackets.clear();sentMotionPackets.clear();lastMotionFlush=0;motionWriteBusy=false;motionWriteGeneration++;motionChannelFailed=false;
+}
+function startMotionChannel(){
+ if(soloMode||!room||motionChannelRoom===room)return;
+ stopMotionChannel();const channelRoom=room;motionChannelRoom=channelRoom;
+ motionSubscription=onValue(ref(database(),`roomMotion/${channelRoom}`),snap=>{
+  if(room!==channelRoom||motionChannelRoom!==channelRoom||motionChannelFailed)return;
+  motionChannelReady=true;
+  for(const [key,packet] of Object.entries(snap.val()||{})){
+   if(!state?.players?.[key]||key===id||!packet||!['x','y','z','rot','at','vx','vy','vz'].every(field=>Number.isFinite(packet[field])))continue;
+   const previous=liveMotionPackets.get(key);if(!previous||packet.at>previous.at)liveMotionPackets.set(key,packet);
+  }
+  if(state){reconcileRoomPositions(state);captureRemoteMotion(state);}
+ },error=>{if(motionChannelRoom===channelRoom){motionChannelReady=false;motionChannelFailed=true;motionSubscription?.();liveMotionPackets.clear();console.warn('位置配信は通常同期を使用します',error);}});
+}
+function flushMotionPackets(t){
+ if(soloMode||joiningRoom||!motionChannelReady||motionChannelRoom!==room||!state||state.phase==='lobby'||motionWriteBusy||t-lastMotionFlush<65)return;
+ const now=roomNow(),values={};lastMotionFlush=t;
+ for(const [key,p] of Object.entries(state.players||{})){
+  if(p.online===false||key!==id&&(!host||!p.npc))continue;
+  const avatar=avatars[key];if(key!==id&&!avatar)continue;
+  const x=key===id?me.x:avatar.position.x,y=key===id?playerHeight:avatar.position.y,z=key===id?me.z:avatar.position.z,rot=key===id?me.rot:avatar.rotation.y;
+  const life=[state.started||0,p.spawn?.version||'',p.sitting||0].join(':');
+  const old=sentMotionPackets.get(key),elapsed=old?.life===life&&now-old.at<2000?Math.max(.02,(now-old.at)/1000):0;
+  const vx=elapsed?(x-old.x)/elapsed:0,vz=elapsed?(z-old.z)/elapsed:0,vy=elapsed?(y-old.y)/elapsed:0;
+  const round=n=>Math.round(n*100)/100;
+  const packet={x:round(x),y:round(y),z:round(z),rot:Math.round(rot*1000)/1000,vx:round(vx),vy:round(vy),vz:round(vz),moving:Math.hypot(vx,vz,vy)>.05,
+   game:state.started||0,spawn:p.spawn?.version||'',ack:key===id?lastAppliedSpawn||'':p.spawnApplied||'',seat:p.sitting||0,owner:id};
+  const signature=JSON.stringify(packet);
+  // Derivatives are based on every sample, including stationary samples.
+  sentMotionPackets.set(key,{x,y,z,at:now,life,signature,lastWrite:old?.lastWrite||0});
+  if(old?.signature===signature&&now-(old.lastWrite||0)<1500)continue;
+  packet.at=now;values[key]=packet;sentMotionPackets.get(key).lastWrite=now;
+ }
+ if(!Object.keys(values).length)return;
+ const channelRoom=room,generation=motionWriteGeneration;motionWriteBusy=true;
+ // Do not put this write in roomUpdateFlights: it cannot conflict with rooms/.
+ firebaseUpdate(ref(database(),`roomMotion/${channelRoom}`),values).catch(error=>{
+  if(motionChannelRoom===channelRoom&&generation===motionWriteGeneration){motionChannelReady=false;motionChannelFailed=true;motionSubscription?.();liveMotionPackets.clear();console.warn('位置配信は通常同期を使用します',error);}
+ }).finally(()=>{if(generation===motionWriteGeneration)motionWriteBusy=false;});
+}
 function captureRemoteMotion(s,now=roomNow()){
  for(const [key,p] of Object.entries(s.players||{})){
   if(key===id)continue;
-  const version=[s.started||0,p.spawn?.version||'',p.sitting||0,p.online!==false].join(':');
-  let track=remoteMotionHistory.get(key),last=track?.samples.at(-1);
-  if(!track||track.version!==version||last&&Math.hypot(p.x-last.x,p.z-last.z)>28){track={version,samples:[],period:p.npc?420:100,lag:0,jitter:0,renderAt:null};remoteMotionHistory.set(key,track);last=null;}
-  const at=Number(p.npc?s.npcFrameAt:p.positionAt)||now,changed=!last||p.x!==last.x||p.z!==last.z||(p.y||0)!==last.y||p.rot!==last.rot;
-  if(last&&at<=last.at&&!changed)continue;
-  const stamp=last&&at<=last.at?now:at;if(last&&stamp<=last.at)continue;
-  const lag=Math.max(0,Math.min(2000,now-stamp));track.lag=Math.max(lag,track.lag*.95);
-  const sample={x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0,at:stamp,moving:p.npc?p.motionMoving:p.moving,trip:p.npcRoofTrip?.active?p.npcRoofTrip:null};
-  if(last){
-   const gap=stamp-last.at;
-   if(gap>20&&gap<1200)track.jitter=Math.max(Math.abs(gap-track.period),track.jitter*.9);
-   // A long idle period is not the duration of the first walking step.
-   if(sample.moving===true&&gap>(p.npc?650:250)){
-    track.samples.push({...last,at:stamp-Math.min(gap,p.npc?420:100)});
-   }else if(gap>20&&gap<1200)track.period=track.period*.8+gap*.2;
+  const live=liveMotionPackets.get(key);
+  const useLive=motionChannelReady&&live&&p.online!==false&&!(p.npc&&s.host===id)&&live.owner===(p.npc?s.host:key)&&
+   live.game===(s.started||0)&&live.spawn===(p.spawn?.version||'')&&Number(live.seat||0)===Number(p.sitting||0)&&now-live.at<1200&&live.at<=now+1000;
+  const source=useLive?live:p;
+  const version=[s.started||0,p.npc?s.host:'',p.spawn?.version||'',p.sitting||0,p.online!==false,useLive?'stream':'room'].join(':');
+  let track=remoteMotionHistory.get(key);
+  if(!track||track.version!==version){track={version,last:null,previous:null,vx:0,vy:0,vz:0};remoteMotionHistory.set(key,track);}
+  const at=Number(useLive?live.at:p.npc?s.npcFrameAt:p.positionAt)||0,last=track.last;
+  // An old room snapshot is not a new position, even if its coordinates differ.
+  if(last&&at<=last.at)continue;
+  const sample={x:source.x||0,y:source.y||0,z:source.z||0,rot:source.rot||0,at:at||now,
+   moving:useLive?live.moving:p.npc?p.motionMoving:p.moving,trip:p.npcRoofTrip?.active?p.npcRoofTrip:null,stream:!!useLive};
+  const elapsed=last?Math.max(.02,(sample.at-last.at)/1000):0;
+  let vx=useLive?Number(live.vx)||0:elapsed?(sample.x-last.x)/elapsed:0;
+  let vy=useLive?Number(live.vy)||0:elapsed?(sample.y-last.y)/elapsed:0;
+  let vz=useLive?Number(live.vz)||0:elapsed?(sample.z-last.z)/elapsed:0;
+  if(!useLive&&p.npc&&sample.moving===true&&(!last||last.moving===false||elapsed>1.2)&&p.waypoint&&!sample.trip){
+   const dx=p.waypoint.x-sample.x,dz=p.waypoint.z-sample.z,length=Math.hypot(dx,dz);
+   const base=((s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run||9:p.walk||5)*(p.carrying?.5:1);
+   if(length>.15){vx=dx/length*base;vz=dz/length*base;}
   }
-  track.samples.push(sample);while(track.samples.length>8)track.samples.shift();
+  const limit=p.npc?Math.max(p.walk||5,p.run||9):13,speed=Math.hypot(vx,vz);
+  if(speed>limit*1.25){vx*=limit*1.25/speed;vz*=limit*1.25/speed;}
+  if(sample.moving===false||p.online===false){vx=0;vy=0;vz=0;}
+  track.previous=last;track.last=sample;track.vx=vx;track.vy=Math.max(-16,Math.min(16,vy));track.vz=vz;
  }
  for(const key of remoteMotionHistory.keys())if(!s.players?.[key])remoteMotionHistory.delete(key);
+ for(const key of liveMotionPackets.keys())if(!s.players?.[key])liveMotionPackets.delete(key);
 }
 function remoteMotionPose(key,p,now=roomNow()){
- const track=remoteMotionHistory.get(key),samples=track?.samples,last=samples?.at(-1);
- if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0};
- const delay=p.npc?Math.max(300,Math.min(420,track.period*.75+50)):Math.max(80,Math.min(150,track.period*.8));
- const adaptiveDelay=Math.min(1500,delay+(track.lag||0)+Math.min(250,(track.jitter||0)*.5));
- // Growing the buffer may slow the visual clock, never move it backwards.
- const time=track.renderAt=Math.max(track.renderAt??-Infinity,now-adaptiveDelay);
- if(time<=samples[0].at)return samples[0];
- for(let i=1;i<samples.length;i++)if(time<=samples[i].at){
-  const a=samples[i-1],b=samples[i],f=Math.max(0,Math.min(1,(time-a.at)/(b.at-a.at))),turn=Math.atan2(Math.sin(b.rot-a.rot),Math.cos(b.rot-a.rot));
-  if(a.trip&&b.trip&&a.trip.building===b.trip.building&&!!a.trip.descending===!!b.trip.descending){const point=npcRoofVisualPoint(b.trip,a.trip.travel+(b.trip.travel-a.trip.travel)*f);return {...point,rot:a.rot+turn*f};}
-  return {x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,z:a.z+(b.z-a.z)*f,rot:a.rot+turn*f};
+ const track=remoteMotionHistory.get(key),last=track?.last;
+ if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0,vx:0,vy:0,vz:0,moving:false};
+ const horizon=last.stream ? .35 : p.npc ? .75 : .35,age=Math.max(0,Math.min(horizon,(now-last.at)/1000));
+ const moving=last.moving!==false&&p.online!==false&&(now-last.at)<(last.stream?650:p.npc?1100:650);
+ const vx=moving?track.vx:0,vy=moving?track.vy:0,vz=moving?track.vz:0;
+ let x=last.x+vx*age,z=last.z+vz*age,y=last.y+vy*age;
+ if(last.trip&&!last.stream&&track.previous?.trip){
+  const previous=track.previous,elapsed=Math.max(.02,(last.at-previous.at)/1000);
+  if(previous.trip.building===last.trip.building&&!!previous.trip.descending===!!last.trip.descending){
+   const point=npcRoofVisualPoint(last.trip,last.trip.travel+(last.trip.travel-previous.trip.travel)*age/elapsed);x=point.x;y=point.y;z=point.z;
+  }
+ }else if(p.npc&&!last.stream&&p.waypoint){
+  const dx=p.waypoint.x-last.x,dz=p.waypoint.z-last.z,distance=Math.hypot(dx,dz),prediction=Math.hypot(x-last.x,z-last.z);
+  if(prediction>Math.max(0,distance-.15)){const ratio=Math.max(0,distance-.15)/Math.max(.001,prediction);x=last.x+(x-last.x)*ratio;z=last.z+(z-last.z)*ratio;}
  }
- // Bounded extrapolation bridges normal packet spacing; an explicit stop never drifts.
- const previous=samples.at(-2);if(!previous||last.moving!==true)return last;
- const age=Math.max(0,Math.min(p.npc?180:120,time-last.at)),elapsed=Math.max(30,last.at-previous.at);
- const factor=age/elapsed,dx=(last.x-previous.x)*factor,dz=(last.z-previous.z)*factor,dy=(last.y-previous.y)*factor;
- if(Math.hypot(dx,dz)>3)return last;
- if(previous.trip&&last.trip&&previous.trip.building===last.trip.building&&!!previous.trip.descending===!!last.trip.descending){
-  const point=npcRoofVisualPoint(last.trip,last.trip.travel+(last.trip.travel-previous.trip.travel)*factor);return {...point,rot:last.rot};
+ return {x,y,z,rot:last.rot,vx,vy,vz,moving,version:track.version};
+}
+function moveRemoteAvatar(avatar,key,p,dt,now){
+ const pose=remoteMotionPose(key,p,now),memory=avatar.userData;
+ const errorX=pose.x-avatar.position.x,errorZ=pose.z-avatar.position.z;
+ const life=[state.started||0,p.spawn?.version||'',p.online!==false].join(':');
+ if(memory.motionLife!==life||!memory.smoothReady||Math.hypot(errorX,errorZ)>24){avatar.position.set(pose.x,pose.y,pose.z);memory.remoteDirection=null;}
+ else{
+  const speed=Math.hypot(pose.vx,pose.vz),direction=speed>.05?{x:pose.vx/speed,z:pose.vz/speed}:memory.remoteDirection;
+  let dx=pose.vx*dt+errorX*Math.min(1,dt*7),dz=pose.vz*dt+errorZ*Math.min(1,dt*7);
+  // Being a little ahead is corrected by slowing down, never by walking backwards.
+  // A real reversal changes direction with the next velocity packet.
+  if(direction){const forward=dx*direction.x+dz*direction.z;if(forward<0){dx-=forward*direction.x;dz-=forward*direction.z;}}
+  const distance=Math.hypot(dx,dz),maxStep=Math.max(speed,direction?memory.remoteSpeed||2:7)*dt*1.35;
+  if(distance>maxStep&&distance>.0001){dx*=maxStep/distance;dz*=maxStep/distance;}
+  const nextX=avatar.position.x+dx,nextZ=avatar.position.z+dz;
+  // Only the host resolves NPC visual terrain. Guests follow that same motion stream.
+  const hostGround=p.npc&&host&&!p.npcRoofTrip?.active&&(p.y||0)<1.5;
+  if(!hostGround||npcStaticClearPath(state,avatar.position.x,avatar.position.z,nextX,nextZ)&&!characterMovementBlocked(state,key,avatar.position.x,avatar.position.z,nextX,nextZ,pose.y,true)){
+   avatar.position.x=nextX;avatar.position.z=nextZ;
+  }
+  avatar.position.y+=(pose.y-avatar.position.y)*Math.min(1,dt*12);
+  if(speed>.05){memory.remoteDirection=direction;memory.remoteSpeed=speed;}
  }
- return {x:last.x+dx,y:last.y+dy,z:last.z+dz,rot:last.rot};
+ const turn=Math.atan2(Math.sin(pose.rot-avatar.rotation.y),Math.cos(pose.rot-avatar.rotation.y));avatar.rotation.y+=turn*Math.min(1,dt*14);
+ memory.smoothReady=true;memory.motionLife=life;
 }
 const threeSources=['https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js','https://unpkg.com/three@0.164.1/build/three.module.js','https://esm.sh/three@0.164.1'];
 for(const url of threeSources){try{THREE=await import(url);break}catch(e){console.warn('3D library failed:',url,e)}}
@@ -1925,7 +2005,7 @@ async function mutate(fn){
  const pending=roomMutationQueue.then(task,task);roomMutationQueue=pending.catch(()=>{});return pending;
 }
 let roomSubscription=null,joiningRoom=false,roomJoinSequence=0;
-$('join').onclick=async()=>{if(joiningRoom)return;const joinSequence=++roomJoinSequence;joiningRoom=true;try{$('join').disabled=true;await ensureFirebase();await syncRoomClock();$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');roomSubscription?.();roomSubscription=null;state=null;host=false;room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;pendingShirtChoice=null;remoteMotionHistory.clear();
+$('join').onclick=async()=>{if(joiningRoom)return;const joinSequence=++roomJoinSequence;joiningRoom=true;try{$('join').disabled=true;await ensureFirebase();await syncRoomClock();$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');roomSubscription?.();roomSubscription=null;stopMotionChannel();state=null;host=false;room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;pendingShirtChoice=null;remoteMotionHistory.clear();
 // Same room + same exact name always resolves to the same Firebase player record.
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
 id='U'+Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -1957,7 +2037,7 @@ await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{if(joi
 if(state?.players?.[id]){applyAssignedSpawn(state);prepareDisconnectChair(state.players[id]);}
 if(state?.phase==='instructions'&&oldPhase!=='instructions'&&state.players?.[id]&&!state.players[id].spawn){
  const p=state.players[id];me.x=p.x;me.z=p.z;playerHeight=0;me.rot=p.rot||Math.PI;yaw=me.rot;
-}scheduleRoomUI(oldPhase!==state.phase||state.phase==='lobby');$('entry').hidden=true;document.getElementById('runtimeError').textContent='';resolve();},reject);});log('部屋 '+room+' に参加（保存データを復元）')}catch(e){console.error('参加失敗',e);alert('部屋に参加できません：'+(e?.message||e))}finally{joiningRoom=false;if(state?.players?.[id]){syncRoomPresence();recoverRoomHost();}$('join').disabled=false;$('join').textContent='あそぶ ➜'}};
+}scheduleRoomUI(oldPhase!==state.phase||state.phase==='lobby');$('entry').hidden=true;document.getElementById('runtimeError').textContent='';resolve();},reject);});log('部屋 '+room+' に参加（保存データを復元）')}catch(e){console.error('参加失敗',e);alert('部屋に参加できません：'+(e?.message||e))}finally{joiningRoom=false;if(state?.players?.[id]){startMotionChannel();syncRoomPresence();recoverRoomHost();}$('join').disabled=false;$('join').textContent='あそぶ ➜'}};
 // Server-side disconnect actions work even when the browser is abruptly closed.
 // Re-arm only when the carried chair or last recorded drop position changes.
 let disconnectChairId=null,disconnectChairPos='',disconnectChairBusy=false;
@@ -1986,7 +2066,7 @@ async function prepareDisconnectChair(p){
  }catch(e){console.warn('切断時のイス配置予約に失敗',e)}
  finally{disconnectChairBusy=false;}
 }
-function launchSolo(){lastAppliedSpawn=null;document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:roomNow(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
+function launchSolo(){stopMotionChannel();lastAppliedSpawn=null;document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:roomNow(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
 $('solo').onclick=()=>launchSolo();
 const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=60000, VOTE_MS=30000, ERASE_MS=20000, VOTE_INTRO_MS=7000, RESULTS_MS=7000;
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
@@ -3067,12 +3147,7 @@ publishPlayerPosition(t,Math.hypot(me.x-frameX,me.z-frameZ)>.001);const finalPri
   }updateFinishedPose(a,state,v,t);let seatChair=v.sitting&&state.chairs?.[v.sitting];let seated=!!(v.online!==false&&seatChair&&!seatChair.removed&&!seatChair.carrier&&!seatChair.hiddenAt&&(!seatChair.occupied||seatChair.occupied===k));if(seated){a.position.set(seatChair.x,seatChair.y||0,seatChair.z+.12);a.rotation.y=0;a.userData.smoothReady=false;}else{
  const tx=k===id?me.x:(v.x||0),ty=k===id?playerHeight:(v.y||0),tz=k===id?me.z:(v.z||0),tr=k===id?me.rot:(v.rot||0);
  if(k===id){a.position.set(tx,ty,tz);a.rotation.y=tr;}
- else if(!soloMode){
- const pose=remoteMotionPose(k,v,roomNow());
- const blend=1-Math.exp(-20*dt);if(Math.hypot(pose.x-a.position.x,pose.z-a.position.z)>12||!a.userData.smoothReady)a.position.set(pose.x,pose.y,pose.z);
- else{a.position.x+=(pose.x-a.position.x)*blend;a.position.y+=(pose.y-a.position.y)*blend;a.position.z+=(pose.z-a.position.z)*blend;}
- const diff=Math.atan2(Math.sin(pose.rot-a.rotation.y),Math.cos(pose.rot-a.rotation.y));a.rotation.y+=diff*blend;a.userData.smoothReady=true;
- }
+ else if(!soloMode){moveRemoteAvatar(a,k,v,dt,roomNow());}
  else if(v.npcRoofTrip?.active){
  const trip=v.npcRoofTrip,key=trip.building+':'+trip.descending+':'+JSON.stringify(trip.points[0]);
  if(a.userData.roofVisualKey!==key){a.userData.roofVisualKey=key;a.userData.roofTravel=0;}
@@ -3175,7 +3250,7 @@ if(roomFocus==='screen'){
 if((roomFocus!=='screen'&&camera.fov!==65)||Math.abs(camera.fov-viewFov)>.05){camera.fov=viewFov;camera.updateProjectionMatrix();}
 if(t-lastAccessoryUpdate>90){lastAccessoryUpdate=t;drawCoinDrops();renderGroundAccessories();}updateStackButton(performance.now());
 tickIntroPlayback(state,performance.now(),true,worldReady&&!state?.worldPreparing);
-paintVoteWall();renderer.render(scene,camera);
+flushMotionPackets(t);paintVoteWall();renderer.render(scene,camera);
 markIntroFramePresented(state,performance.now());syncIntroCompletion(performance.now());
 }requestAnimationFrame(frame);
 performance.mark("island-room-ready");
