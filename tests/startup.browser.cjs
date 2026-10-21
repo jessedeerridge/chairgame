@@ -27,7 +27,7 @@ const {chromium}=require('playwright');
   });
   await page.click('#solo');await page.waitForFunction(()=>window.__islandGameReady,{timeout:60000});
   const initial=await page.evaluate(()=>({first:window.firstRoom,phase:window.bootTest.getState().phase,screen:window.bootTest.screenReady(),door:!!window.bootTest.door(),prompt:!!document.querySelector('#soloIntroPrompt'),readyMs:Math.round(window.roomReadyMs)}));
-  assert.equal(initial.first.ready,false);assert.equal(initial.first.outdoorMeshes,0);assert.equal(initial.first.obstacles,5);assert.equal(initial.first.hidingSpots,0);assert.equal(initial.first.stairs,0);
+  assert.equal(initial.first.ready,false);assert.equal(initial.first.outdoorMeshes,0);assert.equal(initial.first.obstacles,6);assert.equal(initial.first.hidingSpots,0);assert.equal(initial.first.stairs,0);
   assert.equal(initial.phase,'instructions');assert(initial.screen&&initial.door);assert.equal(initial.prompt,false);
   const gate=await page.evaluate(()=>{const s=window.bootTest.getState();window.bootTest.advanceState(s,s.introStarted+54001);return s.phase;});
   assert.equal(gate,'instructions','game advanced while outdoor geometry was incomplete');
@@ -58,6 +58,12 @@ const {chromium}=require('playwright');
    }
   }
   await page.setViewportSize({width:1280,height:720});
+  await page.evaluate(()=>{const t=window.bootTest;t.setMe(0,-14);t.keys.KeyW=true;});
+  await page.waitForFunction(()=>window.bootTest.me.z<-14.1);
+  await page.waitForTimeout(400);
+  const screenLimit=await page.evaluate(()=>{const t=window.bootTest;t.keys.KeyW=false;return t.me.z;});assert(screenLimit>=-15.8001,'player walked behind the screen boundary');
+  await page.evaluate(()=>window.bootTest.setMe(0,-20));await page.waitForFunction(()=>window.bootTest.me.z>=-15.7001);
+  await page.evaluate(()=>window.bootTest.setMe(14,15.6));
   const pageBefore=await page.evaluate(()=>{window.bootTest.pauseHostForTest();return window.bootTest.introPage();});
   if(pageBefore<8)await page.waitForFunction(previous=>window.bootTest.introPage()===previous+1,pageBefore,{timeout:10000});
   const transitions=await page.evaluate(async()=>{

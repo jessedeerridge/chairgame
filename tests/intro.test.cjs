@@ -59,7 +59,7 @@ test('a new game resets the presentation and ignores old completion receipts',()
  const s=game();for(let i=0;i<=9;i++)present(s,i*6000);s.players.human.introSeen=introSessionKey(s);assert(introParticipantsReady(s));
  s.introStarted++;present(s,100000);assert.equal(introPlayback.page,0);assert.equal(introPlayback.complete,false);assert.equal(introParticipantsReady(s),false);
 `));
-test('host waits for every online human and world preparation, but not NPCs or disconnected players',()=>setup()(`
+test('frame-driven solo intro waits for completion receipts and world preparation',()=>setup()(`
  const s=game();s.players.remote={online:true};s.players.bot={npc:true,online:true};s.players.gone={online:false};
  advanceState(s,999999);assert.equal(s.phase,'instructions');s.players.human.introSeen=introSessionKey(s);advanceState(s,999999);assert.equal(s.phase,'instructions');
  s.players.remote.introSeen=introSessionKey(s);worldReady=false;advanceState(s,999999);assert.equal(s.phase,'instructions');worldReady=true;s.worldPreparing=true;advanceState(s,999999);assert.equal(s.phase,'instructions');
@@ -67,8 +67,8 @@ test('host waits for every online human and world preparation, but not NPCs or d
 `));
 test('completion is sent once per session, after the last displayed page',async()=>{
  const run=setup();await run(`(async()=>{
-  const s=game();soloMode=false;present(s,0);await syncIntroCompletion(0);assert.equal(writes.length,0);
-  for(let i=1;i<=9;i++)present(s,i*6000);await syncIntroCompletion(54000);assert.equal(writes.length,1);assert.equal(writes[0].value.introSeen,introSessionKey(s));
+  const s=game();soloMode=false;let clock=s.introStarted;Date.now=()=>clock;present(s,0);await syncIntroCompletion(0);assert.equal(writes.length,0);
+  for(let i=1;i<=9;i++){clock=s.introStarted+i*6000;present(s,i*6000);}await syncIntroCompletion(54000);assert.equal(writes.length,1);assert.equal(writes[0].value.introSeen,introSessionKey(s));
   s.players.human.introSeen=writes[0].value.introSeen;await syncIntroCompletion(60000);assert.equal(writes.length,1);
  })()`);
 });
@@ -80,7 +80,7 @@ test('tied vote shows no-removal announcement after six seconds without removing
  paintVoteWall();assert(texts.includes('椅子は除外されませんでした'));advanceState(s,12099);assert.equal(s.phase,'eraseReveal');advanceState(s,12100);assert.equal(s.phase,'sitIntro');assert.equal(s.noChairErased,false);assert.equal(s.chairs[1].removed,false);
 `));
 
-test('reload resumes the same intro page and elapsed display time',()=>setup()(`
+test('solo playback restores the same intro page and elapsed display time',()=>setup()(`
  const s=game();present(s,0);present(s,6000);present(s,9000);
  assert.equal(introPlayback.page,1);introPlayback=null;
  const resumed=present(s,100000);assert.equal(resumed.page,1);assert.equal(resumed.elapsed,3000);
@@ -89,4 +89,18 @@ test('reload resumes the same intro page and elapsed display time',()=>setup()(`
 test('server acknowledgement keeps a completed intro completed on another session',()=>setup()(`
  const s=game();s.players.human.introSeen=introSessionKey(s);
  const p=present(s,0);assert.equal(p.page,8);assert.equal(p.complete,true);
+`));
+
+test('online reentry ignores cached personal playback and follows the current room time',()=>setup()(`
+ const s=game();soloMode=false;let clock=s.introStarted+27000;Date.now=()=>clock;
+ stored.set('island-intro:'+room+':'+id,JSON.stringify({key:introSessionKey(s),page:0,elapsed:1000}));
+ let p=present(s,0);assert.equal(p.page,4);assert.equal(p.elapsed,3000);
+ introPlayback=null;clock+=12000;p=present(s,100);assert.equal(p.page,6);assert.equal(p.elapsed,3000);
+ listeners.visibilitychange();clock+=6000;p=tickIntroPlayback(s,1000,false);assert.equal(p.page,7);
+`));
+test('online final count waits for shared world readiness; rejoining does not block the room',()=>setup()(`
+ const s=game();soloMode=false;let clock=s.introStarted+90000;Date.now=()=>clock;s.worldPreparing=true;
+ assert.equal(introPlaybackFor(s).complete,false);s.worldPreparing=false;s.introReadyAt=clock;
+ clock+=5999;assert.equal(introParticipantsReady(s),false);clock++;assert(introParticipantsReady(s));
+ s.players.rejoined={online:true};assert(introParticipantsReady(s),'rejoining restarted or blocked the intro');
 `));

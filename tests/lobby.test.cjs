@@ -63,3 +63,9 @@ test('first start uses the preloaded shared seed; a later game chooses a fresh s
  s.phase='lobby';Math.random=()=>.25;beginGame(s);
  assert.equal(s.worldSeed,1073741824);assert.equal(generatedSeed,s.worldSeed);assert.equal(s.worldPreparing,true);
 `));
+
+test('screen-side barrier stops ground movement but leaves the rooftop accessible',()=>setup()(`
+ const barrier=screenBarrierShape();assert(staticBlocked(20,-18,.7,[barrier]));assert(!staticBlocked(20,-15,.7,[barrier]));
+ assert.equal(screenSafeZ(20,-19,0),-15.7);assert.equal(screenSafeZ(20,-19,16),-19);assert.equal(screenSafeZ(40,-19,0),-19);
+ playerHeight=16.2;assert(!staticBlocked(20,-18,.7,[barrier]));
+`));

@@ -118,3 +118,9 @@ test('a seated NPC hides its chair during gathering and then reaches its indoor 
  simulate(s,220);assert(s.chairs[2].hiddenAt,'NPC did not hide its chair');assert.equal(s.chairs[2].carrier,null);assert.equal(p.carrying,0);
  assert(p.returned,'NPC did not finish returning after hiding');assert(!s.spotSearchHistory,'hiding created a search history');
 `));
+
+test('screen-side boundary blocks both ground navigation and swept NPC movement',()=>setup()(`
+ obstacles.push(screenBarrierShape());const s=game();
+ assert(!npcWorldBlocked(s,20,-15,.7));assert(npcWorldBlocked(s,20,-18,.7));
+ assert(!npcStaticClearPath(s,20,-15,20,-20,.7));
+`));

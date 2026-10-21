@@ -131,11 +131,12 @@ body.playing #actions{left:calc((100vw - 205px)/2);width:min(620px,calc(100vw - 
 #actions button .action-icon{display:block;width:36px;height:36px;min-width:36px;flex:none;margin-top:12px;pointer-events:none}
 body.playing{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}body.playing input,body.playing textarea,body.playing [contenteditable="true"]{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
 #modalTitle .medal-icon{width:26px;height:26px;vertical-align:-4px;margin-right:7px}#tradeCoinChoices button{display:flex;align-items:center;justify-content:center;gap:7px}#tradeCoinChoices .medal-icon{width:23px;height:23px;flex:none}
-#lobbyScreen{position:fixed;inset:0;z-index:15;background:rgba(11,27,32,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);color:#314c44;display:grid;place-items:center;padding:18px;overflow:auto}#lobbyScreen[hidden]{display:none}.lobby-panel{position:relative;width:min(94vw,760px);padding:27px 26px 30px;text-align:center;border:3px solid #fff;border-radius:30px;background:#fff9eb;box-shadow:0 15px 0 #182b2d33,0 24px 70px #08191d75}.lobby-panel:before{content:'';position:absolute;inset:0 25px auto;height:5px;background:#e7bd76;border-radius:0 0 8px 8px}.lobby-room-tag{display:inline-block;margin:17px 0 0;font-size:13px;line-height:1.4;font-weight:700;letter-spacing:.12em;color:#927658}.lobby-roster{position:relative;min-height:130px;display:grid;align-items:center;margin:27px 0 0}#lobbyParticipants{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 138px}.lobby-player{position:relative;border:2px solid #e8e3d7;border-radius:16px;background:#fff;padding:17px 10px;min-height:64px;display:flex;align-items:center;justify-content:center;min-width:0}.lobby-player strong{font-size:16px;font-weight:700;line-height:1.45;min-width:0;overflow-wrap:anywhere}.lobby-player.is-self{background:#e6f3db;border-color:#b8d5aa}.lobby-host{position:absolute;width:20px;height:20px;top:-11px;left:12px}#lobbyScreen #start{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:112px;min-height:58px;border:0;border-radius:15px;background:#dcb374;color:#44341f;font-size:20px;font-weight:900;box-shadow:0 4px 0 #ae824b}#lobbyScreen #start:disabled{opacity:1;background:#ece4d5;color:#a99d89;box-shadow:0 4px 0 #d5c9b6;cursor:default}#lobbyScreen #start:enabled:active{transform:translate(-50%,calc(-50% + 3px));box-shadow:0 1px 0 #ae824b}#lobbyScreen #start[hidden]{display:none}
+#lobbyScreen{position:fixed;inset:0;z-index:15;background:rgba(11,27,32,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);color:#314c44;display:grid;place-items:center;padding:18px;overflow:auto}#lobbyScreen[hidden]{display:none}.lobby-panel{position:relative;width:min(94vw,760px);padding:27px 26px 30px;text-align:center;border:3px solid #fff;border-radius:30px;background:#fff9eb;box-shadow:0 15px 0 #182b2d33,0 24px 70px #08191d75}.lobby-panel:before{content:'';position:absolute;inset:0 25px auto;height:5px;background:#e7bd76;border-radius:0 0 8px 8px}.lobby-room-tag{display:inline-block;margin:17px 0 0;font-size:13px;line-height:1.4;font-weight:700;letter-spacing:.12em;color:#927658}.lobby-roster{position:relative;min-height:130px;display:grid;align-items:center;margin:27px 0 0}#lobbyParticipants{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 14px}.lobby-player{position:relative;border:2px solid #e8e3d7;border-radius:16px;background:#fff;padding:17px 10px;min-height:64px;display:flex;align-items:center;justify-content:center;min-width:0}.lobby-player strong{font-size:16px;font-weight:700;line-height:1.45;min-width:0;overflow-wrap:anywhere}.lobby-player.is-self{background:#e6f3db;border-color:#b8d5aa}.lobby-host{position:absolute;width:20px;height:20px;top:-11px;left:12px}#lobbyScreen #start{position:static;display:block;margin:22px auto 0;transform:none;width:140px;min-height:58px;border:0;border-radius:15px;background:#dcb374;color:#44341f;font-size:20px;font-weight:900;box-shadow:0 4px 0 #ae824b}#lobbyScreen #start:disabled{opacity:1;background:#ece4d5;color:#a99d89;box-shadow:0 4px 0 #d5c9b6;cursor:default}#lobbyScreen #start:enabled:active{transform:translateY(3px);box-shadow:0 1px 0 #ae824b}#lobbyScreen #start[hidden]{display:none}
+#lobbyColors{display:grid;grid-template-columns:repeat(6,42px);justify-content:center;gap:9px;margin:23px auto 0}.shirt-color{display:grid;place-items:center;width:42px;height:44px;padding:4px;background:#fff;border:2px solid #e8e3d7;border-radius:12px;box-shadow:0 2px 0 #ded2bf}.shirt-color svg{display:block;width:31px;height:31px}.shirt-color:disabled{opacity:.22;box-shadow:none;cursor:default}.shirt-color.is-selected{border-color:#33815e;background:#e6f3db;box-shadow:0 0 0 2px #b8d5aa}.lobby-player{gap:8px}.lobby-player>svg:not(.lobby-host){width:25px;height:25px;flex:none}
 body.map-locked #miniMapPanel,body.map-locked #miniMapBackdrop{display:none!important}
-body.in-lobby>canvas,body.in-lobby #hud,body.in-lobby #actions,body.in-lobby #clock,body.in-lobby #stickBase,body.in-lobby #miniMapPanel,body.in-lobby #gameNotice{display:none!important}#stackButton{position:absolute;top:5px;right:5px;z-index:27;padding:6px 9px;background:#fff0bf;color:#4a3827;border:1px solid #d0aa64;font-size:12px}#stackButton[hidden]{display:none}#miniMapPanel.expanded #stackButton{top:50px}@media(max-width:600px){#lobbyScreen{padding:12px}.lobby-panel{width:100%;padding:22px 12px 25px;border-radius:28px}#lobbyParticipants{column-gap:86px;row-gap:12px}.lobby-player{padding:13px 7px;min-height:62px;border-radius:15px}.lobby-player strong{font-size:14px}#lobbyScreen #start{width:74px;min-height:54px;font-size:17px}.lobby-room-tag{font-size:12px}.lobby-roster{margin-top:24px;min-height:116px}}
+body.in-lobby>canvas,body.in-lobby #hud,body.in-lobby #actions,body.in-lobby #clock,body.in-lobby #stickBase,body.in-lobby #miniMapPanel,body.in-lobby #gameNotice{display:none!important}#stackButton{position:absolute;top:5px;right:5px;z-index:27;padding:6px 9px;background:#fff0bf;color:#4a3827;border:1px solid #d0aa64;font-size:12px}#stackButton[hidden]{display:none}#miniMapPanel.expanded #stackButton{top:50px}@media(max-width:600px){#lobbyScreen{padding:12px}.lobby-panel{width:100%;padding:22px 12px 25px;border-radius:28px}#lobbyParticipants{column-gap:12px;row-gap:12px}.lobby-player{padding:13px 7px;min-height:62px;border-radius:15px}.lobby-player strong{font-size:14px}#lobbyScreen #start{width:130px;min-height:54px;font-size:17px}.lobby-room-tag{font-size:12px}.lobby-roster{margin-top:24px;min-height:116px}}
 
-</style><div id="runtimeError" style="position:fixed;top:0;left:0;z-index:30;color:#fff;background:#8a2323;padding:8px;max-width:100%;pointer-events:none"></div><div id="stickBase"><div id="stickKnob"></div></div><div id="entry"><div class="panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><div class="entry-eyebrow">LET’S PLAY!</div><h1>ISLAND<br><span>CHAIR GAME</span></h1><div class="entry-form"><input id="name" placeholder="なまえ" maxlength="16" aria-label="プレイヤー名"><input id="room" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="ルームコード" maxlength="16" aria-label="ルームコード"><button id="join">あそぶ <span aria-hidden="true">➜</span></button><button id="solo">ひとりでおためし</button></div></div></div><section id="lobbyScreen" hidden aria-label="開始前の待機画面"><div class="lobby-panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><p id="lobbyRoom" class="lobby-room-tag"></p><div class="lobby-roster"><div id="lobbyParticipants"></div><button id="start" hidden>開始</button></div></div></section><div id="hud"><div id="status">未接続</div><div id="players"></div><div id="wallet"></div><div id="log"></div></div><div id="clock" hidden><span id="phaseInstruction"></span><span id="clockSeconds"></span></div><div id="gameNotice" style="white-space:pre-line;position:fixed;top:24%;left:50%;transform:translateX(-50%);background:#10242aee;color:white;padding:18px 26px;border-radius:15px;font-size:22px;font-weight:800;text-align:center;pointer-events:none;display:none;z-index:8"></div><div id="voteResultsPopup" style="display:none;position:fixed;z-index:16;top:22%;left:50%;transform:translateX(-50%);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 24px);max-height:85vh;overflow:hidden;background:rgba(16,36,42,.96);color:white;border:2px solid #e6d39d;border-radius:18px;padding:20px 25px;box-shadow:0 10px 35px #0007;text-align:center;pointer-events:none;font-size:22px;font-weight:800"><div style="font-size:24px;margin-bottom:12px">投票結果</div><div id="voteResultsRows" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;width:100%;box-sizing:border-box"></div></div><div id="gameStats" style="position:fixed;right:12px;top:85px;background:#10242acc;padding:10px;border-radius:10px;font-size:12px;max-width:250px;pointer-events:none"></div><div id="miniMapBackdrop"></div><div id="miniMapPanel"><button id="stackButton" hidden title="空いている位置へ移動" aria-label="黒い建物内の空いている位置へ移動">stack</button><canvas id="miniMapCanvas" width="768" height="768"></canvas><button id="miniEraser" title="この椅子マークを削除" aria-label="消しゴム">🧽</button><div id="mapNumberEditor" hidden><button id="mapNumberCancel" title="閉じる" aria-label="閉じる">×</button><div id="mapNumberDisplay">?</div><div id="mapNumberKeys"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="?">?</button><button data-key="0">0</button><button data-key="back">⌫</button></div><div class="map-editor-actions"><button id="mapNumberSave">✓</button></div></div></div><div id="actions" hidden><button id="touch" data-action-label="とうひょう" hidden title="親を投票" aria-label="親を投票"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#7298ab" d="m5 21 15-7 15 7v15H5Z"/><path d="M13 23h14"/><path fill="#fff3d7" d="m14 3 15 5-6 17-15-5Z"/><path d="m14 13 3 4 7-6"/></svg></button><button id="sit" data-action-label="すわる" hidden title="座る" aria-label="座る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></svg></button><button id="markChair" data-action-label="おぼえる" hidden title="地図に記録" aria-label="地図に記録"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></svg></button><button id="moveChair" data-action-label="はこぶ" hidden title="イスを持ち上げる" aria-label="イスを持ち上げる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(9 -2) scale(.65)"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="hideChair" data-action-label="かくす" hidden title="イスを隠す" aria-label="イスを隠す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#52864b" d="M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z"/><path fill="#9b663a" d="M17 24h6v13h-6z"/></svg></button><button id="revealChair" data-action-label="さがす" hidden title="隠したイスを取り出す" aria-label="隠したイスを取り出す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m24 24 9 9" stroke-width="6"/><circle cx="16" cy="16" r="11" fill="#aad7e0"/><path d="M10 15a6 6 0 0 1 6-6" stroke="#fff"/></svg></button><button id="trade" data-action-label="わたす" hidden title="コインをあげる" aria-label="コインをあげる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(6 -3) scale(.7)"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="givePin" data-action-label="おしえる" hidden title="椅子の位置を共有" aria-label="椅子の位置を共有"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8 -1) scale(.6)"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="pickupShirt" data-action-label="きる" hidden title="Tシャツを着る" aria-label="Tシャツを着る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#699ec8" d="m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z"/></svg></button><button id="pickupAccessory" data-action-label="かぶる" hidden title="帽子をかぶる・眼鏡をつける" aria-label="帽子をかぶる・眼鏡をつける"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#805b9d" d="m11 7 3-3 12 3 3 23H11Z"/><path fill="#d5a861" d="M11 23h18v6H11z"/><ellipse cx="20" cy="31" rx="17" ry="5" fill="#805b9d"/></svg></button><button id="pickupCoin" data-action-label="ひろう" hidden title="コインを拾う" aria-label="コインを拾う"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/><path d="M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4"/></svg></button><button id="voteOpen" hidden>親を投票</button><button id="eraseOpen" hidden>イスを消去</button></div><div id="modal"><div class="panel"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="buttons"><button id="modalCancel">閉じる</button><button id="modalConfirm">決定</button></div></div></div><select id="target" hidden></select><select id="issuer" hidden></select><input id="amount" type="number" value="1" hidden><select id="voteTarget" hidden></select><select id="chairNumber" hidden></select><button id="send" hidden></button><button id="vote" hidden></button><button id="erase" hidden></button>
+</style><div id="runtimeError" style="position:fixed;top:0;left:0;z-index:30;color:#fff;background:#8a2323;padding:8px;max-width:100%;pointer-events:none"></div><div id="stickBase"><div id="stickKnob"></div></div><div id="entry"><div class="panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><div class="entry-eyebrow">LET’S PLAY!</div><h1>ISLAND<br><span>CHAIR GAME</span></h1><div class="entry-form"><input id="name" placeholder="なまえ" maxlength="16" aria-label="プレイヤー名"><input id="room" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="ルームコード" maxlength="16" aria-label="ルームコード"><button id="join">あそぶ <span aria-hidden="true">➜</span></button><button id="solo">ひとりでおためし</button></div></div></div><section id="lobbyScreen" hidden aria-label="開始前の待機画面"><div class="lobby-panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><p id="lobbyRoom" class="lobby-room-tag"></p><div class="lobby-roster"><div id="lobbyParticipants"></div></div><div id="lobbyColors" role="group" aria-label="ふくのいろ"></div><button id="start" hidden>開始</button></div></section><div id="hud"><div id="status">未接続</div><div id="players"></div><div id="wallet"></div><div id="log"></div></div><div id="clock" hidden><span id="phaseInstruction"></span><span id="clockSeconds"></span></div><div id="gameNotice" style="white-space:pre-line;position:fixed;top:24%;left:50%;transform:translateX(-50%);background:#10242aee;color:white;padding:18px 26px;border-radius:15px;font-size:22px;font-weight:800;text-align:center;pointer-events:none;display:none;z-index:8"></div><div id="voteResultsPopup" style="display:none;position:fixed;z-index:16;top:22%;left:50%;transform:translateX(-50%);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 24px);max-height:85vh;overflow:hidden;background:rgba(16,36,42,.96);color:white;border:2px solid #e6d39d;border-radius:18px;padding:20px 25px;box-shadow:0 10px 35px #0007;text-align:center;pointer-events:none;font-size:22px;font-weight:800"><div style="font-size:24px;margin-bottom:12px">投票結果</div><div id="voteResultsRows" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;width:100%;box-sizing:border-box"></div></div><div id="gameStats" style="position:fixed;right:12px;top:85px;background:#10242acc;padding:10px;border-radius:10px;font-size:12px;max-width:250px;pointer-events:none"></div><div id="miniMapBackdrop"></div><div id="miniMapPanel"><button id="stackButton" hidden title="空いている位置へ移動" aria-label="黒い建物内の空いている位置へ移動">stack</button><canvas id="miniMapCanvas" width="768" height="768"></canvas><button id="miniEraser" title="この椅子マークを削除" aria-label="消しゴム">🧽</button><div id="mapNumberEditor" hidden><button id="mapNumberCancel" title="閉じる" aria-label="閉じる">×</button><div id="mapNumberDisplay">?</div><div id="mapNumberKeys"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="?">?</button><button data-key="0">0</button><button data-key="back">⌫</button></div><div class="map-editor-actions"><button id="mapNumberSave">✓</button></div></div></div><div id="actions" hidden><button id="touch" data-action-label="とうひょう" hidden title="親を投票" aria-label="親を投票"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#7298ab" d="m5 21 15-7 15 7v15H5Z"/><path d="M13 23h14"/><path fill="#fff3d7" d="m14 3 15 5-6 17-15-5Z"/><path d="m14 13 3 4 7-6"/></svg></button><button id="sit" data-action-label="すわる" hidden title="座る" aria-label="座る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></svg></button><button id="markChair" data-action-label="おぼえる" hidden title="地図に記録" aria-label="地図に記録"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></svg></button><button id="moveChair" data-action-label="はこぶ" hidden title="イスを持ち上げる" aria-label="イスを持ち上げる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(9 -2) scale(.65)"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="hideChair" data-action-label="かくす" hidden title="イスを隠す" aria-label="イスを隠す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#52864b" d="M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z"/><path fill="#9b663a" d="M17 24h6v13h-6z"/></svg></button><button id="revealChair" data-action-label="さがす" hidden title="隠したイスを取り出す" aria-label="隠したイスを取り出す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m24 24 9 9" stroke-width="6"/><circle cx="16" cy="16" r="11" fill="#aad7e0"/><path d="M10 15a6 6 0 0 1 6-6" stroke="#fff"/></svg></button><button id="trade" data-action-label="わたす" hidden title="コインをあげる" aria-label="コインをあげる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(6 -3) scale(.7)"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="givePin" data-action-label="おしえる" hidden title="椅子の位置を共有" aria-label="椅子の位置を共有"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8 -1) scale(.6)"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="pickupShirt" data-action-label="きる" hidden title="Tシャツを着る" aria-label="Tシャツを着る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#699ec8" d="m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z"/></svg></button><button id="pickupAccessory" data-action-label="かぶる" hidden title="帽子をかぶる・眼鏡をつける" aria-label="帽子をかぶる・眼鏡をつける"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#805b9d" d="m11 7 3-3 12 3 3 23H11Z"/><path fill="#d5a861" d="M11 23h18v6H11z"/><ellipse cx="20" cy="31" rx="17" ry="5" fill="#805b9d"/></svg></button><button id="pickupCoin" data-action-label="ひろう" hidden title="コインを拾う" aria-label="コインを拾う"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/><path d="M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4"/></svg></button><button id="voteOpen" hidden>親を投票</button><button id="eraseOpen" hidden>イスを消去</button></div><div id="modal"><div class="panel"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="buttons"><button id="modalCancel">閉じる</button><button id="modalConfirm">決定</button></div></div></div><select id="target" hidden></select><select id="issuer" hidden></select><input id="amount" type="number" value="1" hidden><select id="voteTarget" hidden></select><select id="chairNumber" hidden></select><button id="send" hidden></button><button id="vote" hidden></button><button id="erase" hidden></button>
 <script type="text/plain" id="deferredGameCode">
 let THREE;
 let firebaseModules=null;
@@ -606,6 +607,7 @@ function buildBuilding(i,interiorOnly=false){
  finishExterior();
 }
 const finishBlackExterior=buildBuilding(3,true);
+obstacles.push(screenBarrierShape());
 const indoorMetadata={obstacles:obstacles.length,roofs:interiorRoofs.length,rails:interiorRoofRails.length,walls:roofRoomWalls.length};
 const hidingSpots=[];
 function* buildOutdoorWorld(){
@@ -710,9 +712,29 @@ for(const c of worldLayout.signs){yield;
 }
 }
 
+let worldPreparationBusy=false;
+async function syncWorldPrepared(wantedSeed){
+ if(worldPreparationBusy)return;worldPreparationBusy=true;
+ try{
+  if(state&&host&&Number(state.worldSeed||1)===wantedSeed&&(state.worldPreparing||state.worldLayoutVersion!==WORLD_LAYOUT_VERSION||state.screenBoundaryVersion!==1))await mutate(s=>{
+   if(s.host!==id||Number(s.worldSeed||1)!==wantedSeed)return;
+   // Upgrade old rooms without restarting their round or losing carried/seated chairs.
+   if(s.worldLayoutVersion!==WORLD_LAYOUT_VERSION){
+    if(!Object.keys(s.chairs||{}).length)s.chairs=structuredClone(worldLayout.chairs);
+    else for(const [n,c] of Object.entries(s.chairs||{})){
+     if(c.removed||c.carrier||c.occupied)continue;
+     const replacement=worldLayout.chairs[n];if(replacement)Object.assign(c,{x:replacement.x,y:0,z:replacement.z,hiddenAt:replacement.hiddenAt});
+    }
+   }
+   for(const p of Object.values(s.players||{}))p.z=screenSafeZ(p.x,p.z,p.y||0);
+   for(const c of Object.values(s.chairs||{}))if(!c.hiddenAt&&!c.carrier)c.z=screenSafeZ(c.x,c.z,c.y||0);
+   s.screenBoundaryVersion=1;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;if(s.worldPreparing)s.introReadyAt=Date.now();s.worldPreparing=false;
+  });
+ }finally{worldPreparationBusy=false;}
+}
 function startWorldLoading(){
  const wantedSeed=Number(state?.worldSeed)||1;
- if(worldReady&&loadedWorldSeed===wantedSeed)return Promise.resolve(true);
+ if(worldReady&&loadedWorldSeed===wantedSeed)return syncWorldPrepared(wantedSeed).then(()=>true);
  if(worldLoadPromise)return worldLoadPromise.then(ok=>!ok?false:loadedWorldSeed===wantedSeed?true:startWorldLoading());
  worldLoadPromise=(async()=>{
   worldReady=false;outdoorWorld.visible=false;
@@ -738,18 +760,7 @@ function startWorldLoading(){
   await compiling;
   npcCollisionIndex=null;npcTerrainGrid=null;npcGroundStairs=null;npcNavigation.clear();_opaqueRoofConfigured=false;
   loadedWorldSeed=wantedSeed;worldReady=true;performance.mark('island-world-ready');
-  if(state&&host&&Number(state.worldSeed||1)===wantedSeed&&(state.worldPreparing||state.worldLayoutVersion!==WORLD_LAYOUT_VERSION))await mutate(s=>{
-   if(s.host!==id||Number(s.worldSeed||1)!==wantedSeed)return;
-   // Upgrade old rooms without restarting their round or losing carried/seated chairs.
-   if(s.worldLayoutVersion!==WORLD_LAYOUT_VERSION){
-    if(!Object.keys(s.chairs||{}).length)s.chairs=structuredClone(worldLayout.chairs);
-    else for(const [n,c] of Object.entries(s.chairs||{})){
-     if(c.removed||c.carrier||c.occupied)continue;
-     const replacement=worldLayout.chairs[n];if(replacement)Object.assign(c,{x:replacement.x,y:0,z:replacement.z,hiddenAt:replacement.hiddenAt});
-    }
-   }
-   s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=false;
-  });
+  await syncWorldPrepared(wantedSeed);
   return true;
  })().catch(error=>{
   worldTarget=scene;outdoorWorld.visible=false;
@@ -777,6 +788,13 @@ function roofEdgeBlocked(x,z,r=.7){
   if(!bridgeOpen)return true;
  }
  return false;
+}
+function screenBarrierShape(){
+ const b=buildingSites[3];return{x:b.x,z:b.z-b.d/2+2.75,halfX:b.w/2-.55,halfZ:2.75,screenBarrier:true};
+}
+function screenSafeZ(x,z,y=0){
+ const b=buildingSites[3],back=b.z-b.d/2,limit=back+6.3;
+ return y<3&&Math.abs(x-b.x)<b.w/2-.55&&z>back&&z<limit?limit:z;
 }
 function staticBlocked(x,z,r=.7,solids=obstacles){
  if(roofEdgeBlocked(x,z,r))return true;
@@ -811,6 +829,7 @@ function staticBlocked(x,z,r=.7,solids=obstacles){
    }
   }
  for(const o of solids){
+  if(o.screenBarrier&&playerHeight>=3)continue;
   if(o.halfX!==undefined){
    const dx=Math.max(Math.abs(x-o.x)-o.halfX,0),dz=Math.max(Math.abs(z-o.z)-o.halfZ,0);
    if(dx*dx+dz*dz<r*r){
@@ -955,13 +974,22 @@ cube(23.2,12.8,.42,mat(0x080c13),VOTE_X,8.1,voteWallZ-.28);
 cube(22.6,12.2,.15,new THREE.MeshStandardMaterial({color:0x9aadb7,metalness:.8,roughness:.25}),VOTE_X,8.1,voteWallZ-.02);
 const voteWall=new THREE.Mesh(new THREE.PlaneGeometry(22.05,11.65),new THREE.MeshBasicMaterial({map:voteWallTexture,side:THREE.DoubleSide}));
 voteWall.position.set(VOTE_X,8.1,voteWallZ+.09);scene.add(voteWall);
-// Advance from frames that actually presented a page, not database callbacks or
-// an absolute wall clock. A delayed frame may advance ONE page, never catch up.
+// Solo slides use presented frames. Online slides follow the shared room clock,
+// including after reconnecting or returning from a suspended tab.
 const INTRO_PAGE_MS=6000,INTRO_PAGE_COUNT=9;
 let introPlayback=null;
 function introSessionKey(s){return room+':'+(s.introStarted||s.started||0);}
+function onlineIntroProgress(s,now=Date.now()){
+ const started=Number(s.introStarted||s.started||now),age=Math.max(0,now-started);
+ const page=Math.min(INTRO_PAGE_COUNT-1,Math.floor(age/INTRO_PAGE_MS));
+ const lastStart=Math.max(started+(INTRO_PAGE_COUNT-1)*INTRO_PAGE_MS,Number(s.introReadyAt)||0);
+ const waiting=page===INTRO_PAGE_COUNT-1&&!!s.worldPreparing;
+ const elapsed=waiting?0:Math.max(0,Math.min(INTRO_PAGE_MS,now-(page===INTRO_PAGE_COUNT-1?lastStart:started+page*INTRO_PAGE_MS)));
+ return {key:introSessionKey(s),page,elapsed,lastFrameAt:null,presented:true,complete:!waiting&&page===INTRO_PAGE_COUNT-1&&elapsed>=INTRO_PAGE_MS,waitingForWorld:waiting};
+}
 function introPlaybackFor(s){
  if(s?.phase!=='instructions')return null;
+ if(!soloMode){introPlayback=onlineIntroProgress(s);return introPlayback;}
  const key=introSessionKey(s);
  if(!introPlayback||introPlayback.key!==key){
   let saved=null;
@@ -974,7 +1002,7 @@ function introPlaybackFor(s){
  return introPlayback;
 }
 function tickIntroPlayback(s,now,visible=true,contentReady=true){
- const playback=introPlaybackFor(s);if(!playback)return null;
+ const playback=introPlaybackFor(s);if(!playback)return null;if(!soloMode)return playback;
  if(!visible){playback.lastFrameAt=null;return playback;}
  // The final player/chair count must also get its full display duration once
  // background construction has produced the actual chairs.
@@ -997,7 +1025,7 @@ function markIntroFramePresented(s,now){
 }
 let introSavedValue='';
 function saveIntroPlayback(){
- if(!introPlayback)return;
+ if(!soloMode||!introPlayback)return;
  const p=introPlayback,value=JSON.stringify({key:p.key,page:p.page,elapsed:Math.floor(p.elapsed/1000)*1000,complete:p.complete});
  const storageKey='island-intro:'+room+':'+id;
  if(introSavedValue===storageKey+value)return;
@@ -1007,6 +1035,7 @@ function pauseIntroPlayback(){if(introPlayback){saveIntroPlayback();introPlaybac
 
 document.addEventListener('visibilitychange',pauseIntroPlayback);
 function introParticipantsReady(s){
+ if(!soloMode)return onlineIntroProgress(s).complete;
  const humans=Object.values(s.players||{}).filter(p=>!p.npc&&p.online!==false);
  return humans.length>0&&humans.every(p=>p.introSeen===introSessionKey(s));
 }
@@ -1108,7 +1137,7 @@ function paintVoteWall(){
       ['ルール ②','同じイスに続けて座ることはできない','イスの番号を覚えておくとよい'],
       ['ルール ③','終了後40秒以内にここへ戻らなければ、','親投票が棄権となる'],
       ['ルール ④','投票で親を1人決める','親はイスを1つ除外する'],
-      ['ルール ⑤','脱落した人も親投票に参加できる','黒い建物に戻って投票しよう'],
+      ['ルール ⑤','脱落した人も親投票に参加できる','戻ると、投票できる'],
       ['ルール ⑥','優勝者のメダルはゲーム終了時に','1億円に換金される']
     ];
     const [title,line1,line2]=pages[slide-2];
@@ -1368,12 +1397,12 @@ function accessoryModel(kind,style){
  }
  return g;
 }
-function syncWearable(a,p){const h=a.userData.accessoryHead;if(!h)return;const worn=p?.worn||{};const signature=JSON.stringify(worn);if(a.userData.wornSignature===signature)return;a.userData.wornSignature=signature;
+function syncWearable(a,p){const h=a.userData.accessoryHead;if(!h)return;const worn=p?.worn||{};const signature=JSON.stringify([worn,p?.shirtColor]);if(a.userData.wornSignature===signature)return;a.userData.wornSignature=signature;
  for(const old of (a.userData.wearables||[]))h.remove(old);a.userData.wearables=[];
  // Each avatar owns its torso material: changing one shirt must never recolor other players.
  // Clothing changes the avatar's existing torso, never adds a second shirt model.
  if(a.userData.shirtWear){a.userData.torso.remove(a.userData.shirtWear);a.userData.shirtWear.geometry.dispose();a.userData.shirtWear.material.dispose();a.userData.shirtWear=null;}
- if(a.userData.originalTorsoColor===undefined)a.userData.originalTorsoColor=a.userData.torso.material.color.getHex();
+ if(a.userData.defaultTorsoColor===undefined)a.userData.defaultTorsoColor=a.userData.torso.material.color.getHex();a.userData.originalTorsoColor=SHIRT_COLORS.find(c=>c.id===p?.shirtColor)?.hex??a.userData.defaultTorsoColor;
  if(worn.shirt){
    const [shirtColor]=shirtDesigns[worn.shirt]||shirtDesigns.star;
    a.userData.torso.material.color.setHex(shirtColor);
@@ -1552,6 +1581,46 @@ function player(){return state?.players?.[id]}function phase(){return state?.pha
 function syncVoteResultPopup(){paintVoteWall();const popup=$('voteResultsPopup');if(popup)popup.style.display='none';}
 function isOnlineLobby(){return !soloMode&&state?.phase==='lobby';}
 function lobbyParticipants(s){return Object.entries(s.players||{}).filter(([_,p])=>!p.npc&&p.online!==false);}
+const SHIRT_COLORS=[
+ {id:'red',hex:0xe66b70,name:'あか'},{id:'orange',hex:0xee9a54,name:'オレンジ'},
+ {id:'yellow',hex:0xe9c84d,name:'きいろ'},{id:'lime',hex:0xabc85b,name:'きみどり'},
+ {id:'green',hex:0x4eaa78,name:'みどり'},{id:'teal',hex:0x43aaa6,name:'あおみどり'},
+ {id:'sky',hex:0x71b9df,name:'みずいろ'},{id:'blue',hex:0x527bc5,name:'あお'},
+ {id:'purple',hex:0x9575c3,name:'むらさき'},{id:'pink',hex:0xdc91bd,name:'ピンク'},
+ {id:'cream',hex:0xe4d8bd,name:'クリーム'},{id:'brown',hex:0x9a7563,name:'ちゃいろ'}
+];
+function availableShirtColor(s,k,preferred){
+ const used=new Set(Object.entries(s.players||{}).filter(([other,p])=>other!==k&&!p.npc&&(p.online!==false||s.phase!=='lobby'&&p.initial===true)).map(([_,p])=>p.shirtColor));
+ return SHIRT_COLORS.find(c=>c.id===preferred&&!used.has(c.id))?.id||SHIRT_COLORS.find(c=>!used.has(c.id))?.id||null;
+}
+function chooseShirtColor(s,k,color){
+ const p=s.players?.[k];if(s.phase!=='lobby'||!p||p.npc||!SHIRT_COLORS.some(c=>c.id===color)||availableShirtColor(s,k,color)!==color)return false;
+ p.shirtColor=color;if(p.worn?.shirt)delete p.worn.shirt;return true;
+}
+function shirtColorIcon(color){
+ const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 40 40');icon.setAttribute('aria-hidden','true');
+ icon.innerHTML='<path d="m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z" fill="currentColor" stroke="#554b40" stroke-width="1.8" stroke-linejoin="round"/>';
+ icon.style.color='#'+color.hex.toString(16).padStart(6,'0');return icon;
+}
+function renderShirtColors(){
+ const list=$('lobbyColors'),p=player();list.replaceChildren();
+ for(const color of SHIRT_COLORS){
+  const button=document.createElement('button');button.type='button';button.className='shirt-color';button.dataset.color=color.id;
+  const selected=p?.shirtColor===color.id;button.disabled=availableShirtColor(state,id,color.id)!==color.id;
+  button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));button.setAttribute('aria-label',color.name);button.title=color.name;
+  button.append(shirtColorIcon(color));button.onclick=()=>mutate(s=>chooseShirtColor(s,id,color.id));list.append(button);
+ }
+}
+function claimRoomHost(s){
+ if(s.players?.[s.host]?.online!==false&&s.players?.[s.host])return false;
+ const humans=lobbyParticipants(s).sort(([a,p],[b,q])=>(p.joined||0)-(q.joined||0)||a.localeCompare(b));
+ if(!humans.length)return false;const [key,p]=humans[0];s.host=key;s.hostName=p.name;return true;
+}
+let hostRecoveryBusy=false;
+async function recoverRoomHost(){
+ if(soloMode||!state||hostRecoveryBusy||state.players?.[state.host]?.online!==false&&state.players?.[state.host])return;
+ hostRecoveryBusy=true;try{await mutate(claimRoomHost);}catch(error){console.warn('進行役の引き継ぎを再試行します',error);}finally{hostRecoveryBusy=false;}
+}
 let playerPreloadTask=null;
 function preloadRoomPlayer(){
  if(soloMode||!room||!state?.players?.[id]||playerPreloadTask)return;
@@ -1576,9 +1645,9 @@ function renderLobby(){
   const card=document.createElement('div');card.className='lobby-player';card.classList.toggle('is-self',key===id);
   const name=document.createElement('strong');name.textContent=p.name;
   if(key===state.host){const badge=document.createElementNS('http://www.w3.org/2000/svg','svg');badge.setAttribute('class','lobby-host');badge.setAttribute('viewBox','0 0 24 24');badge.setAttribute('role','img');badge.setAttribute('aria-label','ホスト');badge.innerHTML='<path d="m3 6 5 4 4-7 4 7 5-4-2 13H5Z" fill="#efbd72" stroke="#b58b51" stroke-width="1.5" stroke-linejoin="round"/>';card.append(badge);}
-  card.append(name);list.appendChild(card);
+  const color=SHIRT_COLORS.find(c=>c.id===p.shirtColor);if(color)card.append(shirtColorIcon(color));card.append(name);list.appendChild(card);
  }
-
+ renderShirtColors();
 }
 let lastAppliedSpawn=null,relocating=false;
 function applyAssignedSpawn(s){
@@ -1656,15 +1725,18 @@ $('join').onclick=async()=>{if(joiningRoom)return;joiningRoom=true;try{$('join')
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
 id='U'+Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
 let root=ref(database(),`rooms/${room}`);await runTransaction(root,s=>s||{host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{},votes:{}},{applyLocally:false});
-const playerPath=ref(database(),`rooms/${room}/players/${id}`);
-const joined=await runTransaction(playerPath,p=>p?{...p,name,online:true,worldReady:false}:{name,worldReady:false,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true},{applyLocally:false});
-const saved=joined.snapshot.val();lastAppliedSpawn=saved?.spawn?.version||null;me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
+const joined=await runTransaction(root,s=>{
+ if(!s||lobbyParticipants(s).filter(([key])=>key!==id).length>=12)return;const old=s.players?.[id],shirtColor=availableShirtColor(s,id,old?.shirtColor);if(!shirtColor)return;
+ s.players??={};s.players[id]=old?{...old,name,online:true,worldReady:false,shirtColor}:{name,shirtColor,worldReady:false,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true};return s;
+},{applyLocally:false});
+if(!joined.committed)throw new Error('この部屋は満員です（最大12人）');
+const saved=joined.snapshot.val().players[id];lastAppliedSpawn=saved?.spawn?.version||null;me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
 await onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(false);
 // Chair state belongs to the shared room. Preserve sitting and the occupied chair
 // across reconnects; only a chair being carried is dropped on disconnection.
 await prepareDisconnectChair(saved);
 roomSubscription?.();
-await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=incoming;host=state.host===id;
+await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=incoming;host=state.host===id;recoverRoomHost();if(host&&worldReady&&state.worldPreparing)syncWorldPrepared(loadedWorldSeed).catch(console.warn);
 if(state?.players?.[id]){applyAssignedSpawn(state);prepareDisconnectChair(state.players[id]);}
 if(state?.phase==='instructions'&&oldPhase!=='instructions'&&state.players?.[id]&&!state.players[id].spawn){
  const p=state.players[id];me.x=p.x;me.z=p.z;playerHeight=0;me.rot=p.rot||Math.PI;yaw=me.rot;
@@ -1742,13 +1814,14 @@ function beginGame(s){
  for(let i=0;i<npcCount;i++){const key='NPC'+i;s.players[key]=createNPC(s,key,i,positions[i]);s.players[key].spawn={...positions[i],rot:Math.PI,version};}
  for(let j=0;j<humans.length;j++){
   const [key,p]=humans[j],position=positions[npcCount+j];
+  if(!soloMode){p.shirtColor=availableShirtColor(s,key,p.shirtColor);if(p.worn?.shirt)delete p.worn.shirt;}
   Object.assign(p,position,{y:0,rot:Math.PI,initial:true,alive:true,wallet:{[key]:23},previous:0,touched:true,sitting:0,returned:false,carrying:0});
   p.spawn={...position,rot:Math.PI,version};
  }
  for(let i=0;i<npcCount;i++)for(let j=i+1;j<npcCount;j++)if(Math.random()<.12){const a=s.players['NPC'+i],b=s.players['NPC'+j];a.trust['NPC'+j]=randBetween(.2,.8);b.trust['NPC'+i]=a.trust['NPC'+j];}
  if(s.started||!s.worldSeed)s.worldSeed=Math.floor(Math.random()*4294967295)+1;
- s.spotSearchHistory={};s.started=Date.now();s.chairs=makeWorldLayout(s.worldSeed).chairs;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
- initRound(s);s.phase='instructions';s.introStarted=Date.now();s.deadline=s.introStarted+54000;
+ s.screenBoundaryVersion=1;s.spotSearchHistory={};s.started=Date.now();s.chairs=makeWorldLayout(s.worldSeed).chairs;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
+ initRound(s);s.phase='instructions';s.introReadyAt=!s.worldPreparing?Date.now():null;s.introStarted=Date.now();s.deadline=s.introStarted+54000;
 }
 function createNPC(s,k,i,pt=indoorSpawn(i)){const angle=Math.PI;return {name:'NPC '+(i+1),npc:true,online:true,joined:Date.now(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:randBetween(3.5,6),run:randBetween(8,12),caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
 $('start').onclick=async()=>{await mutate(beginGame);applyAssignedSpawn(state);};
@@ -1884,7 +1957,19 @@ async function advance(){
   if(!worldReady||state.worldPreparing||!introParticipantsReady(state))return;
  }else if(Date.now()<state.deadline)return;
  advancing=true;
- try{await mutate(s=>{if(s.phase==='instructions'||s.deadline<=Date.now())advanceState(s,Date.now());});}
+ try{await mutate(s=>{
+  const now=Date.now();
+  for(let i=0;i<8;i++){
+   if(s.phase==='lobby'||s.phase==='finished')break;
+   const before=s.phase;
+   if(before==='instructions'){
+    if(!worldReady||s.worldPreparing||!introParticipantsReady(s))break;
+    const end=Math.max((s.introStarted||s.started)+54000,(s.introReadyAt||0)+6000);
+    advanceState(s,soloMode?now:Math.min(now,end));
+   }else if(s.deadline<=now)advanceState(s,soloMode?now:s.deadline);else break;
+   if(soloMode||s.phase===before)break;
+  }
+ });}
  finally{advancing=false;}
 }
 setInterval(advance,700);
@@ -2299,6 +2384,7 @@ function npcSimulate(s,dt,now){
  const entries=npcActors.filter(([_,p])=>p.npc),offset=npcNavOrder++%Math.max(1,entries.length);
  const npcEntries=entries.slice(offset).concat(entries.slice(0,offset));
  for(const [k,p] of npcEntries){
+ p.z=screenSafeZ(p.x,p.z,p.y||0);
  if(s.phase==='search')npcTryCostume(s,k,p);if(s.phase==='search'&&p.alive&&p.sitting)continue;if(!soloMode&&s.phase==='vote'&&insideBlackBuilding(p.x,p.z)){if(canCastVote(s,k)&&!s.votes?.[k]&&now>s.deadline-VOTE_MS+randBetween(2500,15000)){const choice=chooseNPCVote(s,k);if(choice){s.votes[k]=choice;p.voted=true}}}if(s.phase==='finished')continue;// A chair-search intention is independent of alive/sitting status. Only willing NPCs exit.
 if(s.phase==='search'&&p.searchIntentRound!==s.round){
  p.searchIntentRound=s.round;p.searchIntent=true;p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
@@ -2581,7 +2667,7 @@ $('stackButton').onclick=async event=>{
   applyAssignedSpawn(state);resetStackIdle(performance.now());
  }finally{relocating=false;$('stackButton').disabled=false;}
 };
-let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(!state||isOnlineLobby()){pauseIntroPlayback();previous=t;return;}syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
+let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(!state||isOnlineLobby()){pauseIntroPlayback();previous=t;return;}me.z=screenSafeZ(me.x,me.z,playerHeight);syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
  // Never step off the rooftop slab, including the stair-side entrance corner.
  // A descent is permitted only onto a real stair flight or its bridge.
  if(current>2.5 && playerHeight>2.5){
