@@ -1189,8 +1189,8 @@ function paintVoteWall(){
     const pages=[
       ['ルール ①','90秒以内にイスを探して座らなければいけない','座れなかった人は脱落'],
       ['ルール ②','同じイスに続けて座ることはできない','イスの番号を覚えておくとよい'],
-      ['ルール ③','終了後60秒以内にここへ戻らなければ、','親投票が棄権となる'],
-      ['ルール ④','投票で親を1人決める','親はイスを1つ除外する'],
+      ['ルール ③','着席終了後、投票で親を1人決める','親はイスを1つ除外する'],
+      ['ルール ④','着席終了後、60秒以内にここへ戻らなければ、','親投票が棄権となる'],
       ['ルール ⑤','脱落した人も親投票に参加できる','この建物に戻ると、投票できる'],
       ['ルール ⑥','優勝者のメダルはゲーム終了時に','1億円に換金される']
     ];
@@ -1811,7 +1811,7 @@ function renderWallet(p){
  if(key===walletViewKey)return;walletViewKey=key;
  const cells=[];if(p){for(const [issuer,count] of Object.entries(p.wallet||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])){const cell=document.createElement('span');cell.className='coin-entry';cell.classList.toggle('is-eliminated',state.players?.[issuer]?.initial===true&&state.players[issuer].alive===false);const nm=document.createElement('span');nm.className='coin-name';nm.textContent=(state.players?.[issuer]?.name||'不明')+' ×';const stack=document.createElement('span');stack.className='coin-stack';const icon=walletMedalIcon();const number=document.createElement('span');number.className='coin-stack-number';number.textContent=String(count);stack.append(icon,number);cell.append(nm,stack);cells.push(cell)}}$('wallet').replaceChildren(...cells);
 }
-function renderUI(){if(!state)return;if(worldReady&&loadedWorldSeed!==Number(state.worldSeed||1))playerPreloadTask=null;renderLobby();updateMapVisibility();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));renderWallet(p);const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
+function renderUI(){if(!state)return;normalizeNPCNames(state);if(worldReady&&loadedWorldSeed!==Number(state.worldSeed||1))playerPreloadTask=null;renderLobby();updateMapVisibility();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));renderWallet(p);const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
 開票：${Object.entries(state.voteCounts||{}).map(([k,n])=>(state.players[k]?.name||k)+' '+n+'票').join(' / ')||'未開票'}`;if(renderUI.oldPhase!==state.phase&&state.phase){const notices={instructions:'',sitIntro:insideBlackBuilding(me.x,me.z)?'':'着席！',search:'',return:'TIME UP!\n投票に戻れ！',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:'',finished:'ゲーム終了！'};if(renderUI.oldPhase!==undefined&&notices[state.phase])announce(notices[state.phase]);else if(!notices[state.phase]){$('gameNotice').style.display='none';clearTimeout(announce.timer)}renderUI.oldPhase=state.phase}if(renderUI.oldRemoved!==state.lastRemoved&&state.lastRemoved){renderUI.oldRemoved=state.lastRemoved}if(state.phase==='sitIntro'&&insideBlackBuilding(me.x,me.z)){$('gameNotice').style.display='none';clearTimeout(announce.timer)}refreshActions();receiveSharedPin()}
 async function mutate(fn){
@@ -1941,7 +1941,12 @@ function beginGame(s){
  initRound(s);s.phase='instructions';s.introReadyAt=!s.worldPreparing?roomNow():null;s.introStarted=roomNow();s.deadline=s.introStarted+54000;
 }
 // Core cast and musical-chairs participants from the manga and Reborn adaptation.
-const NPC_NAMES=['秋山深一','神崎直','フクナガ','ヨコヤ','ハリモト','キムラ','ノブテル','サカイ','イケザワ','ミウラ','ヤスカワ','篠宮優','サルカワ','ツキノ','アカギ','サカマキ','ムラタ','イヌヅカ','サイキ'];
+const NPC_NAMES=['アキヤマ','カンザキ','フクナガ','ヨコヤ','ハリモト','キムラ','ノブテル','サカイ','イケザワ','ミウラ','ヤスカワ','シノミヤ','サルカワ','ツキノ','アカギ','サカマキ','ムラタ','イヌヅカ','サイキ'];
+function normalizeNPCNames(s){
+ for(const [key,p] of Object.entries(s.players||{}))if(p.npc&&/^NPC\d+$/.test(key)){
+  const name=NPC_NAMES[Number(key.slice(3))];if(name)p.name=name;
+ }
+}
 function createNPC(s,k,i,pt=indoorSpawn(i)){const angle=Math.PI;return {name:NPC_NAMES[i%NPC_NAMES.length],npc:true,online:true,joined:roomNow(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:randBetween(3.5,6),run:randBetween(8,12),caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
 $('start').onclick=async()=>{await mutate(beginGame);applyAssignedSpawn(state);};
 $('touch').onclick=()=>mutate(s=>{let p=s.players[id];if(s.phase==='search'&&p?.alive&&Math.hypot(p.x-VOTE_X,p.z-VOTE_Z)<6){p.touched=true;p.sitting=0}});
@@ -2593,6 +2598,7 @@ function npcUpdateSpot(s,k,p,now){
 }
 // Update decisions and local motion on the existing host tick; spread terrain work across ticks.
 function npcSimulate(s,dt,now){
+ if(typeof normalizeNPCNames==='function')normalizeNPCNames(s);
  // Reconcile seat claims before any movement, including legacy stale occupancy flags.
  for(const [n,c] of Object.entries(s.chairs||{})){
   const claims=Object.entries(s.players||{}).filter(([k,v])=>Number(v.sitting)===Number(n)&&!c.removed&&!c.carrier&&!c.hiddenAt);

@@ -19,7 +19,7 @@ const {buildingSites,largeBuildings,stairways,obstacles,hidingSpots,VOTE_X,VOTE_
 }
 test('all humans and NPCs start at distinct clear locations, replacing stale NPCs',()=>setup()(`
  const s=lobby();s.players.NPC99={npc:true,online:true,x:0,z:12};beginGame(s);assert.equal(s.phase,'instructions');assert(!s.players.NPC99);
- const players=Object.values(s.players);assert.equal(players.length,20);const names=players.filter(p=>p.npc).map(p=>p.name);assert.equal(new Set(names).size,names.length);assert.equal(names[0],'秋山深一');assert(names.includes('ハリモト'));assert(names.every(name=>!name.startsWith('NPC ')));for(let i=0;i<players.length;i++){
+ const players=Object.values(s.players);assert.equal(players.length,20);const names=players.filter(p=>p.npc).map(p=>p.name);assert.equal(new Set(names).size,names.length);assert.equal(names[0],'アキヤマ');assert(names.includes('ハリモト'));assert(names.every(name=>!name.startsWith('NPC ')));for(let i=0;i<players.length;i++){
   assert(!staticBlocked(players[i].x,players[i].z,1));assert.equal(players[i].spawn.x,players[i].x);assert.equal(players[i].spawn.z,players[i].z);
   for(let j=i+1;j<players.length;j++)assert(Math.hypot(players[i].x-players[j].x,players[i].z-players[j].z)>=2.2);
  }
@@ -70,4 +70,8 @@ test('screen-side barrier stops ground movement but leaves the rooftop accessibl
  const barrier=screenBarrierShape();assert(staticBlocked(20,-18,.7,[barrier]));assert(!staticBlocked(20,-15,.7,[barrier]));
  assert.equal(screenSafeZ(20,-19,0),-15.7);assert.equal(screenSafeZ(20,-19,16),-19);assert.equal(screenSafeZ(40,-19,0),-19);
  playerHeight=16.2;assert(!staticBlocked(20,-18,.7,[barrier]));
+`));
+
+test('existing NPCs adopt katakana surnames without renaming humans or changing belongings',()=>setup()(`
+ const s=lobby();s.players.NPC0={npc:true,name:'秋山深一',wallet:{NPC0:12}};s.players.local.name='神崎直';normalizeNPCNames(s);assert.equal(s.players.NPC0.name,'アキヤマ');assert.equal(s.players.local.name,'神崎直');assert.equal(s.players.NPC0.wallet.NPC0,12);
 `));
