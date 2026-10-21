@@ -222,6 +222,8 @@ function publishPlayerPosition(t,moving=false){
 // Small motion packets use a sibling of the transactional room. Position traffic
 // must not wait for (or retry) NPC decisions, votes and other room transactions.
 let motionSubscription=null,motionChannelRoom='',motionChannelReady=false,motionWritesInFlight=0,lastMotionFlush=0,motionWriteGeneration=0,motionChannelFailed=false;
+// Bound pending network writes and send NPC snapshots at a lower rate than player movement.
+const MAX_PENDING_MOTION_WRITES=2, NPC_MOTION_INTERVAL_MS=120;
 const localMotionVelocity={x:0,y:0,z:0};let lastLocalMotionMoving=false,lastCarriedDisconnectRefresh=0;
 const liveMotionPackets=new Map(),publishedNpcPackets=new Map(),sentMotionPackets=new Map(),remoteMotionHistory=new Map();
 function stopMotionChannel(){
@@ -243,12 +245,14 @@ function startMotionChannel(){
 }
 function flushMotionPackets(t){
  const localMoving=Math.hypot(localMotionVelocity.x,localMotionVelocity.y,localMotionVelocity.z)>.05;
- if(soloMode||joiningRoom||!roomTransportConnected||!motionChannelReady||motionChannelRoom!==room||!state||state.phase==='lobby'||motionWritesInFlight>=32||localMoving===lastLocalMotionMoving&&t-lastMotionFlush<40)return;
+ if(soloMode||joiningRoom||!roomTransportConnected||!motionChannelReady||motionChannelRoom!==room||!state||state.phase==='lobby'||motionWritesInFlight>=MAX_PENDING_MOTION_WRITES||localMoving===lastLocalMotionMoving&&t-lastMotionFlush<50)return;
  const now=roomNow(),values={};lastMotionFlush=t;lastLocalMotionMoving=localMoving;
  if(player()?.carrying&&t-lastCarriedDisconnectRefresh>=500){lastCarriedDisconnectRefresh=t;prepareDisconnectChair({...player(),x:me.x,y:playerHeight,z:me.z});}
  for(const [key,shared] of Object.entries(state.players||{})){
   const local=shared.npc?npcRuntimePlayer(key):null,p=local||shared;
   if(p.online===false||key!==id&&(!host||!p.npc))continue;
+   // NPC updates are batched at 8 Hz; human movement remains responsive.
+   if(p.npc&&t-(sentMotionPackets.get(key)?.lastWrite||0)<NPC_MOTION_INTERVAL_MS)continue;
   const x=key===id?me.x:p.x,y=key===id?playerHeight:p.y||0,z=key===id?me.z:p.z,rot=key===id?me.rot:p.rot||0;
   const life=[state.started||0,p.spawn?.version||'',p.sitting||0].join(':');
   const old=sentMotionPackets.get(key),elapsed=old?.life===life&&now-old.at<2000?Math.max(.02,(now-old.at)/1000):0;
