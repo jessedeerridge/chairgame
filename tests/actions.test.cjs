@@ -21,3 +21,14 @@ test('all tied leaders enlarge within reserved rows, including a full 20-person 
   for(const a of boxes){assert(a.y>=154&&a.y+a.height<=684.001);for(const b of boxes){if(a===b)continue;assert(a.left+a.width<b.left||b.left+b.width<a.left||a.y+a.height<b.y||b.y+b.height<a.y);}}
  }
 `));
+test('hidden-chair marking requires staying near the hiding position and rechecks on click',()=>{
+ const ctx=vm.createContext({assert});
+ vm.runInContext(`let me={x:0,z:0},playerHeight=0,recentHiddenChair={number:'1',x:5,z:0,anchorX:0,anchorZ:0,y:0,at:Date.now()},state={chairs:{1:{x:5,z:0,hiddenAt:'tree'}}};let marks=0;const button={},$=()=>button;function upsertChairNote(){marks++}function closestBackChair(){return null}function refreshActions(){}`+extract('function nearbyHiddenChairForMark',"$('sit').onclick")+`
+ assert(nearbyHiddenChairForMark());button.onclick();assert.equal(marks,1);
+ me.x=-3;assert.equal(nearbyHiddenChairForMark(),null);button.onclick();assert.equal(marks,1);
+ me.x=0;playerHeight=5;assert.equal(nearbyHiddenChairForMark(),null);playerHeight=0;
+ state.chairs[1].hiddenAt=null;assert.equal(nearbyHiddenChairForMark(),null);
+ state.chairs[1].hiddenAt='tree';state.chairs[1].x=20;assert.equal(nearbyHiddenChairForMark(),null);
+ state.chairs[1].x=5;recentHiddenChair.at-=6000;assert.equal(nearbyHiddenChairForMark(),null);
+ `,ctx);
+});
