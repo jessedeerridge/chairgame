@@ -18,7 +18,7 @@ function setup(){
 }
 test('all humans and NPCs start at distinct clear locations, replacing stale NPCs',()=>setup()(`
  const s=lobby();s.players.NPC99={npc:true,online:true,x:0,z:12};beginGame(s);assert.equal(s.phase,'instructions');assert(!s.players.NPC99);
- const players=Object.values(s.players);assert.equal(players.length,20);for(let i=0;i<players.length;i++){
+ const players=Object.values(s.players);assert.equal(players.length,20);const names=players.filter(p=>p.npc).map(p=>p.name);assert.equal(new Set(names).size,names.length);assert.equal(names[0],'秋山深一');assert(names.includes('ハリモト'));assert(names.every(name=>!name.startsWith('NPC ')));for(let i=0;i<players.length;i++){
   assert(!staticBlocked(players[i].x,players[i].z,1));assert.equal(players[i].spawn.x,players[i].x);assert.equal(players[i].spawn.z,players[i].z);
   for(let j=i+1;j<players.length;j++)assert(Math.hypot(players[i].x-players[j].x,players[i].z-players[j].z)>=2.2);
  }

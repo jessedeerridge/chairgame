@@ -5,10 +5,10 @@ const {chromium}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const databaseModule=`
-const listeners=new Map();
+const listeners=new Map(),transactionCache=new Set();
 window.__emitFakeDatabase=async()=>{for(const [path,fn] of listeners){const snapshot=await window.testRead(path);fn({val:()=>snapshot.value});}};
 export const getDatabase=()=>({});export const ref=(db,path)=>({path});
-export async function runTransaction(ref,fn){for(let i=0;i<100;i++){const old=await window.testRead(ref.path),next=fn(old.value);if(next===undefined)return{committed:false,snapshot:{val:()=>old.value}};const result=await window.testCommit(ref.path,next,old.revision);if(result.ok)return{committed:true,snapshot:{val:()=>result.value}};}throw Error('transaction retry limit');}
+export async function runTransaction(ref,fn){if(!transactionCache.has(ref.path)){const first=fn(null);if(first===undefined)return{committed:false,snapshot:{val:()=>null}};transactionCache.add(ref.path);}for(let i=0;i<100;i++){const old=await window.testRead(ref.path),next=fn(old.value);if(next===undefined)return{committed:false,snapshot:{val:()=>old.value}};const result=await window.testCommit(ref.path,next,old.revision);if(result.ok)return{committed:true,snapshot:{val:()=>result.value}};}throw Error('transaction retry limit');}
 export const update=async(ref,values)=>window.testUpdate(ref.path,values);
 export const set=async(ref,value)=>{const old=await window.testRead(ref.path);return window.testCommit(ref.path,value,old.revision);};
 export const get=async(ref)=>{const old=await window.testRead(ref.path);return{val:()=>old.value};};

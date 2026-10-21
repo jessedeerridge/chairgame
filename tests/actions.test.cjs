@@ -58,3 +58,16 @@ test('sharing a recorded chair prefills its number and exact saved coordinates w
  mapNumberValue='8';saveMapNumber();assert.deepEqual(sent,['friend','8',100.25,-30.75]);assert.equal(miniNotes[0].number,'7');
  `,ctx);
 });
+test('gift dialogs close at the interaction boundary and keep their original nearby recipient',()=>setup()(`
+ let modalMode='trade',tradePartner={id:'other'},pinShareTarget=null,miniExpanded=false;
+ const classes=new Set(),modalClasses=new Set(['open']);
+ const document={body:{classList:{toggle(k,on){on?classes.add(k):classes.delete(k)},remove(k){classes.delete(k)}}}};
+ const modal={classList:{contains:k=>modalClasses.has(k),remove:k=>modalClasses.delete(k)}};
+ function setMiniExpanded(v){miniExpanded=v;if(!v)pinShareTarget=null;}
+ state={phase:'search',players:{other:{x:3.99,z:0,y:0,online:true},closer:{x:1,z:0,y:0}}};
+ assert(syncGiftInteraction());assert(classes.has('gift-overlay'));assert(modalClasses.has('open'),'a nearer third person must not cancel the original recipient');
+ state.players.other.x=4;assert.equal(syncGiftInteraction(),false);assert(!modalClasses.has('open'));assert(!classes.has('gift-overlay'));assert.equal(tradePartner,null);
+ state.players.other.x=2;pinShareTarget='other';miniExpanded=true;assert(syncGiftInteraction());assert(classes.has('gift-overlay'));
+ state.players.other.y=1.51;assert.equal(syncGiftInteraction(),false);assert(!miniExpanded);assert.equal(pinShareTarget,null);assert(!classes.has('gift-overlay'));
+ state.players.other.y=0;pinShareTarget='other';miniExpanded=true;state.players.other.online=false;assert.equal(syncGiftInteraction(),false);assert(!miniExpanded);
+`));
