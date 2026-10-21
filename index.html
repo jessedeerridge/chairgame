@@ -193,14 +193,14 @@ async function update(target,values){
 function releaseRoomWrites(){if(!roomTransactions)for(const resolve of roomWriteWaiters.splice(0))resolve();}
 function reconcileRoomPositions(s){
  for(const [key,p] of Object.entries(s?.players||{})){
-  const live=motionChannelReady&&!(p.npc&&s===state&&npcRuntimePlayer(key))&&liveMotionPackets.get(key);
-  if(!p.sitting&&p.online!==false&&live&&live.owner===(p.npc?s.host:key)&&live.game===(s.started||0)&&live.round===(s.round||0)&&live.spawn===(p.spawn?.version||'')&&!live.seat&&
+  const live=motionChannelReady&&liveMotionPackets.get(key);
+  if(!p.npc&&!p.sitting&&p.online!==false&&live&&live.owner===key&&live.game===(s.started||0)&&live.spawn===(p.spawn?.version||'')&&!live.seat&&
    (!p.spawn||live.ack===p.spawn.version)&&live.at>(p.positionAt||0)&&live.at<=roomNow()+1000&&roomNow()-live.at<1200){
    p.x=live.x;p.y=live.y||0;p.z=live.z;p.rot=live.rot||0;p.positionAt=live.at;p.moving=live.moving;
    if(p.spawn)p.spawnApplied=live.ack;
   }
   const spawn=p.spawn,chair=p.sitting&&s.chairs?.[p.sitting];
-  if(chair&&!chair.removed&&!chair.carrier&&!chair.hiddenAt){p.x=chair.x;p.z=chair.z;p.y=chair.y||0;continue;}
+  if(!p.npc&&chair&&!chair.removed&&!chair.carrier&&!chair.hiddenAt){p.x=chair.x;p.z=chair.z;p.y=chair.y||0;continue;}
   // An older position packet must not override a newly assigned start/relocation.
   if(!p.npc&&spawn&&p.spawnApplied!==spawn.version){p.x=spawn.x;p.z=spawn.z;p.y=spawn.y||0;p.rot=spawn.rot||Math.PI;}
  }
@@ -208,7 +208,7 @@ function reconcileRoomPositions(s){
 }
 let lastPositionPacket='',lastPositionSent=0,positionWriteBusy=false;
 function publishPlayerPosition(t,moving=false){
- const p=player();if(!p||joiningRoom||relocating||state.phase==='lobby'||t-lastSync<(!soloMode&&motionChannelReady?1000:80))return;
+ const p=player();if(!p||joiningRoom||relocating||state.phase==='lobby'||t-lastSync<(!soloMode&&motionChannelReady?350:80))return;
  const packet={x:Math.round(me.x*100)/100,y:Math.round(playerHeight*100)/100,z:Math.round(me.z*100)/100,rot:Math.round(me.rot*1000)/1000,moving:!!moving,
   ...(mapUnlocked?{mapUnlockedFor:mapVisitKey}:{}),...(lastAppliedSpawn?{spawnApplied:lastAppliedSpawn}:{})};
  if(soloMode){lastSync=t;Object.assign(p,packet);return;}
@@ -222,13 +222,11 @@ function publishPlayerPosition(t,moving=false){
 // Small motion packets use a sibling of the transactional room. Position traffic
 // must not wait for (or retry) NPC decisions, votes and other room transactions.
 let motionSubscription=null,motionChannelRoom='',motionChannelReady=false,motionWritesInFlight=0,lastMotionFlush=0,motionWriteGeneration=0,motionChannelFailed=false;
-// Bound pending network writes and send NPC snapshots at a lower rate than player movement.
-const MAX_PENDING_MOTION_WRITES=2, NPC_MOTION_INTERVAL_MS=120;
-const localMotionVelocity={x:0,y:0,z:0};let lastLocalMotionMoving=false,lastCarriedDisconnectRefresh=0;
-const liveMotionPackets=new Map(),publishedNpcPackets=new Map(),sentMotionPackets=new Map(),remoteMotionHistory=new Map();
+const localMotionVelocity={x:0,y:0,z:0};let lastLocalMotionMoving=false;
+const liveMotionPackets=new Map(),sentMotionPackets=new Map(),remoteMotionHistory=new Map();
 function stopMotionChannel(){
  motionSubscription?.();motionSubscription=null;motionChannelRoom='';motionChannelReady=false;
- liveMotionPackets.clear();publishedNpcPackets.clear();sentMotionPackets.clear();lastMotionFlush=0;motionWritesInFlight=0;motionWriteGeneration++;motionChannelFailed=false;
+ liveMotionPackets.clear();sentMotionPackets.clear();lastMotionFlush=0;motionWritesInFlight=0;motionWriteGeneration++;motionChannelFailed=false;
 }
 function startMotionChannel(){
  if(soloMode||!room||motionChannelRoom===room)return;
@@ -245,30 +243,25 @@ function startMotionChannel(){
 }
 function flushMotionPackets(t){
  const localMoving=Math.hypot(localMotionVelocity.x,localMotionVelocity.y,localMotionVelocity.z)>.05;
- if(soloMode||joiningRoom||!roomTransportConnected||!motionChannelReady||motionChannelRoom!==room||!state||state.phase==='lobby'||motionWritesInFlight>=MAX_PENDING_MOTION_WRITES||localMoving===lastLocalMotionMoving&&t-lastMotionFlush<50)return;
+ if(soloMode||joiningRoom||!roomTransportConnected||!motionChannelReady||motionChannelRoom!==room||!state||state.phase==='lobby'||motionWritesInFlight>=32||localMoving===lastLocalMotionMoving&&t-lastMotionFlush<90)return;
  const now=roomNow(),values={};lastMotionFlush=t;lastLocalMotionMoving=localMoving;
- if(player()?.carrying&&t-lastCarriedDisconnectRefresh>=500){lastCarriedDisconnectRefresh=t;prepareDisconnectChair({...player(),x:me.x,y:playerHeight,z:me.z});}
- for(const [key,shared] of Object.entries(state.players||{})){
-  const local=shared.npc?npcRuntimePlayer(key):null,p=local||shared;
+ for(const [key,p] of Object.entries(state.players||{})){
   if(p.online===false||key!==id&&(!host||!p.npc))continue;
-   // NPC updates are batched at 8 Hz; human movement remains responsive.
-   if(p.npc&&t-(sentMotionPackets.get(key)?.lastWrite||0)<NPC_MOTION_INTERVAL_MS)continue;
-  const x=key===id?me.x:p.x,y=key===id?playerHeight:p.y||0,z=key===id?me.z:p.z,rot=key===id?me.rot:p.rot||0;
+  const avatar=avatars[key];if(key!==id&&!avatar)continue;
+  const x=key===id?me.x:avatar.position.x,y=key===id?playerHeight:avatar.position.y,z=key===id?me.z:avatar.position.z,rot=key===id?me.rot:avatar.rotation.y;
   const life=[state.started||0,p.spawn?.version||'',p.sitting||0].join(':');
   const old=sentMotionPackets.get(key),elapsed=old?.life===life&&now-old.at<2000?Math.max(.02,(now-old.at)/1000):0;
-  const velocity=local?npcRuntime.velocities.get(key):null;
-  const vx=key===id?localMotionVelocity.x:local?velocity?.x||0:elapsed?(x-old.x)/elapsed:0,vz=key===id?localMotionVelocity.z:local?velocity?.z||0:elapsed?(z-old.z)/elapsed:0,vy=key===id?localMotionVelocity.y:local?velocity?.y||0:elapsed?(y-old.y)/elapsed:0;
+  const vx=key===id?localMotionVelocity.x:elapsed?(x-old.x)/elapsed:0,vz=key===id?localMotionVelocity.z:elapsed?(z-old.z)/elapsed:0,vy=key===id?localMotionVelocity.y:elapsed?(y-old.y)/elapsed:0;
   const round=n=>Math.round(n*100)/100;
   const packet={x:round(x),y:round(y),z:round(z),rot:Math.round(rot*1000)/1000,vx:round(vx),vy:round(vy),vz:round(vz),moving:Math.hypot(vx,vz,vy)>.05,
-   game:state.started||0,round:state.round||0,spawn:p.spawn?.version||'',ack:key===id?lastAppliedSpawn||'':p.spawnApplied||'',seat:p.sitting||0,owner:id};
+   game:state.started||0,spawn:p.spawn?.version||'',ack:key===id?lastAppliedSpawn||'':p.spawnApplied||'',seat:p.sitting||0,owner:id};
   const signature=JSON.stringify(packet);
   // Derivatives are based on every sample, including stationary samples.
   sentMotionPackets.set(key,{x,y,z,at:now,life,signature,lastWrite:old?.lastWrite||0});
   if(old?.signature===signature&&now-(old.lastWrite||0)<1500)continue;
-  packet.at=local?npcRuntime.lastStepAt:now;values[key]=packet;if(p.npc)publishedNpcPackets.set(key,packet);sentMotionPackets.get(key).lastWrite=now;
+  packet.at=now;values[key]=packet;sentMotionPackets.get(key).lastWrite=now;
  }
  if(!Object.keys(values).length)return;
- captureRemoteMotion(state);
  const channelRoom=room,generation=motionWriteGeneration;motionWritesInFlight++;
  // This sibling path does not overlap the game room transaction.
  firebaseUpdate(ref(database(),`rooms/_motion_${channelRoom}`),values).catch(error=>{
@@ -276,58 +269,79 @@ function flushMotionPackets(t){
  }).finally(()=>{if(generation===motionWriteGeneration)motionWritesInFlight--;});
 }
 function captureRemoteMotion(s,now=roomNow()){
- for(const [key,shared] of Object.entries(s.players||{})){
+ for(const [key,p] of Object.entries(s.players||{})){
   if(key===id)continue;
-  const local=shared.npc?npcRuntimePlayer(key):null,p=local||shared,live=liveMotionPackets.get(key);
-  const useLive=!local&&motionChannelReady&&live&&p.online!==false&&live.owner===(p.npc?s.host:key)&&
-   live.game===(s.started||0)&&live.round===(s.round||0)&&live.spawn===(p.spawn?.version||'')&&Number(live.seat||0)===Number(p.sitting||0)&&now-live.at<1200&&live.at<=now+1000;
-  const published=local&&motionChannelReady?publishedNpcPackets.get(key):null;
-  const localPacket=published&&published.owner===id&&published.game===(s.started||0)&&published.round===(s.round||0)&&published.seat===(p.sitting||0)&&published.at>=npcRuntime.createdAt?published:null;
-  if(local&&motionChannelReady&&!localPacket)continue;
-  const source=localPacket||local||useLive&&live||p;
-  const version=[s.started||0,s.round||0,p.npc?s.host:key,p.spawn?.version||'',p.sitting||0,p.online!==false].join(':');
+  const live=liveMotionPackets.get(key);
+  const useLive=motionChannelReady&&live&&p.online!==false&&!(p.npc&&s.host===id)&&live.owner===(p.npc?s.host:key)&&
+   live.game===(s.started||0)&&live.spawn===(p.spawn?.version||'')&&Number(live.seat||0)===Number(p.sitting||0)&&now-live.at<1200&&live.at<=now+1000;
+  const source=useLive?live:p;
+  const version=[s.started||0,p.npc?s.host:'',p.spawn?.version||'',p.sitting||0,p.online!==false,useLive?'stream':'room'].join(':');
   let track=remoteMotionHistory.get(key);
-  if(!track||track.version!==version){track={version,samples:[],renderAt:0};remoteMotionHistory.set(key,track);}
-  const at=Number(localPacket?localPacket.at:local?npcRuntime.lastStepAt:useLive?live.at:p.positionAt||(p.npc?s.npcFrameAt:0))||now,last=track.samples.at(-1);
+  if(!track||track.version!==version){track={version,last:null,previous:null,vx:0,vy:0,vz:0};remoteMotionHistory.set(key,track);}
+  const at=Number(useLive?live.at:p.npc?s.npcFrameAt:p.positionAt)||0,last=track.last;
+  // An old room snapshot is not a new position, even if its coordinates differ.
   if(last&&at<=last.at)continue;
-  const elapsed=last?Math.max(.02,(at-last.at)/1000):0,velocity=localPacket?{x:localPacket.vx,y:localPacket.vy,z:localPacket.vz}:local?npcRuntime.velocities.get(key):null;
-  let vx=local?velocity?.x||0:useLive?live.vx:elapsed?(source.x-last.x)/elapsed:0;
-  let vy=local?velocity?.y||0:useLive?live.vy:elapsed?((source.y||0)-last.y)/elapsed:0;
-  let vz=local?velocity?.z||0:useLive?live.vz:elapsed?(source.z-last.z)/elapsed:0;
-  const moving=(local?Math.hypot(vx,vy,vz)>.05:useLive?live.moving:p.npc?p.motionMoving:p.moving)&&p.online!==false;
+  const sample={x:source.x||0,y:source.y||0,z:source.z||0,rot:source.rot||0,at:at||now,
+   moving:useLive?live.moving:p.npc?p.motionMoving:p.moving,trip:p.npcRoofTrip?.active?p.npcRoofTrip:null,stream:!!useLive};
+  const elapsed=last?Math.max(.02,(sample.at-last.at)/1000):0;
+  let vx=useLive?Number(live.vx)||0:elapsed?(sample.x-last.x)/elapsed:0;
+  let vy=useLive?Number(live.vy)||0:elapsed?(sample.y-last.y)/elapsed:0;
+  let vz=useLive?Number(live.vz)||0:elapsed?(sample.z-last.z)/elapsed:0;
+  if(!useLive&&p.npc&&sample.moving===true&&(!last||last.moving===false||elapsed>1.2)&&p.waypoint&&!sample.trip){
+   const dx=p.waypoint.x-sample.x,dz=p.waypoint.z-sample.z,length=Math.hypot(dx,dz);
+   const base=((s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run||9:p.walk||5)*(p.carrying?.5:1);
+   if(length>.15){vx=dx/length*base;vz=dz/length*base;}
+  }
   const limit=p.npc?Math.max(p.walk||5,p.run||9):13,speed=Math.hypot(vx,vz);
   if(speed>limit*1.25){vx*=limit*1.25/speed;vz*=limit*1.25/speed;}
-  if(!moving){vx=0;vy=0;vz=0;}
-  track.samples.push({x:source.x||0,y:source.y||0,z:source.z||0,rot:source.rot||0,at,vx,vy:Math.max(-16,Math.min(16,vy)),vz,moving,
-   trip:!local&&!useLive&&p.npcRoofTrip?.active?npcCopy(p.npcRoofTrip):null});
-  while(track.samples.length>24)track.samples.shift();
+  if(sample.moving===false||p.online===false){vx=0;vy=0;vz=0;}
+  track.previous=last;track.last=sample;track.vx=vx;track.vy=Math.max(-16,Math.min(16,vy));track.vz=vz;
  }
  for(const key of remoteMotionHistory.keys())if(!s.players?.[key])remoteMotionHistory.delete(key);
  for(const key of liveMotionPackets.keys())if(!s.players?.[key])liveMotionPackets.delete(key);
 }
 function remoteMotionPose(key,p,now=roomNow()){
- const track=remoteMotionHistory.get(key),samples=track?.samples,last=samples?.at(-1);
- if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0};
- // Every viewer uses the same server-time playback point. There is no separate
- // velocity integrator or correction offset that can leave stopped actors apart.
- const time=track.renderAt=Math.max(track.renderAt,now-90);
- if(time<=samples[0].at)return samples[0];
- for(let i=1;i<samples.length;i++)if(time<=samples[i].at){
-  const a=samples[i-1],b=samples[i],f=Math.max(0,Math.min(1,(time-a.at)/(b.at-a.at)));
-  const turn=Math.atan2(Math.sin(b.rot-a.rot),Math.cos(b.rot-a.rot));
-  if(a.trip&&b.trip&&a.trip.building===b.trip.building&&!!a.trip.descending===!!b.trip.descending){
-   const point=npcRoofVisualPoint(b.trip,a.trip.travel+(b.trip.travel-a.trip.travel)*f);return {...point,rot:a.rot+turn*f};
+ const track=remoteMotionHistory.get(key),last=track?.last;
+ if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0,vx:0,vy:0,vz:0,moving:false};
+ const horizon=last.stream ? .35 : p.npc ? .75 : .35,age=Math.max(0,Math.min(horizon,(now-last.at)/1000));
+ const moving=last.moving!==false&&p.online!==false&&(now-last.at)<(last.stream?650:p.npc?1100:650);
+ const vx=moving?track.vx:0,vy=moving?track.vy:0,vz=moving?track.vz:0;
+ let x=last.x+vx*age,z=last.z+vz*age,y=last.y+vy*age;
+ if(last.trip&&!last.stream&&track.previous?.trip){
+  const previous=track.previous,elapsed=Math.max(.02,(last.at-previous.at)/1000);
+  if(previous.trip.building===last.trip.building&&!!previous.trip.descending===!!last.trip.descending){
+   const point=npcRoofVisualPoint(last.trip,last.trip.travel+(last.trip.travel-previous.trip.travel)*age/elapsed);x=point.x;y=point.y;z=point.z;
   }
-  return {x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,z:a.z+(b.z-a.z)*f,rot:a.rot+turn*f};
+ }else if(p.npc&&!last.stream&&p.waypoint){
+  const dx=p.waypoint.x-last.x,dz=p.waypoint.z-last.z,distance=Math.hypot(dx,dz),prediction=Math.hypot(x-last.x,z-last.z);
+  if(prediction>Math.max(0,distance-.15)){const ratio=Math.max(0,distance-.15)/Math.max(.001,prediction);x=last.x+(x-last.x)*ratio;z=last.z+(z-last.z)*ratio;}
  }
- if(!last.moving||p.online===false)return last;
- const age=Math.max(0,Math.min(p.npc ? .1 : .06,(time-last.at)/1000));
- return {x:last.x+last.vx*age,y:last.y+last.vy*age,z:last.z+last.vz*age,rot:last.rot};
+ return {x,y,z,rot:last.rot,vx,vy,vz,moving,version:track.version};
 }
 function moveRemoteAvatar(avatar,key,p,dt,now){
- const pose=remoteMotionPose(key,p,now);
- // Collision and navigation belong to the owner, never to the viewing client.
- avatar.position.set(pose.x,pose.y,pose.z);avatar.rotation.y=pose.rot;avatar.userData.smoothReady=true;
+ const pose=remoteMotionPose(key,p,now),memory=avatar.userData;
+ const errorX=pose.x-avatar.position.x,errorZ=pose.z-avatar.position.z;
+ const life=[state.started||0,p.spawn?.version||'',p.online!==false].join(':');
+ if(memory.motionLife!==life||!memory.smoothReady||Math.hypot(errorX,errorZ)>24){avatar.position.set(pose.x,pose.y,pose.z);memory.remoteDirection=null;}
+ else{
+  const speed=Math.hypot(pose.vx,pose.vz),direction=speed>.05?{x:pose.vx/speed,z:pose.vz/speed}:memory.remoteDirection;
+  let dx=pose.vx*dt+errorX*Math.min(1,dt*7),dz=pose.vz*dt+errorZ*Math.min(1,dt*7);
+  // Being a little ahead is corrected by slowing down, never by walking backwards.
+  // A real reversal changes direction with the next velocity packet.
+  if(direction){const forward=dx*direction.x+dz*direction.z;if(forward<0){dx-=forward*direction.x;dz-=forward*direction.z;}}
+  const distance=Math.hypot(dx,dz),maxStep=Math.max(speed,direction?memory.remoteSpeed||2:7)*dt*1.35;
+  if(distance>maxStep&&distance>.0001){dx*=maxStep/distance;dz*=maxStep/distance;}
+  const nextX=avatar.position.x+dx,nextZ=avatar.position.z+dz;
+  // Only the host resolves NPC visual terrain. Guests follow that same motion stream.
+  const hostGround=p.npc&&host&&!p.npcRoofTrip?.active&&(p.y||0)<1.5;
+  if(!hostGround||npcStaticClearPath(state,avatar.position.x,avatar.position.z,nextX,nextZ)&&!characterMovementBlocked(state,key,avatar.position.x,avatar.position.z,nextX,nextZ,pose.y,true)){
+   avatar.position.x=nextX;avatar.position.z=nextZ;
+  }
+  avatar.position.y+=(pose.y-avatar.position.y)*Math.min(1,dt*12);
+  if(speed>.05){memory.remoteDirection=direction;memory.remoteSpeed=speed;}
+ }
+ const turn=Math.atan2(Math.sin(pose.rot-avatar.rotation.y),Math.cos(pose.rot-avatar.rotation.y));avatar.rotation.y+=turn*Math.min(1,dt*14);
+ memory.smoothReady=true;memory.motionLife=life;
 }
 const threeSources=['https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js','https://unpkg.com/three@0.164.1/build/three.module.js','https://esm.sh/three@0.164.1'];
 for(const url of threeSources){try{THREE=await import(url);break}catch(e){console.warn('3D library failed:',url,e)}}
@@ -1869,9 +1883,14 @@ async function recoverRoomHost(){
  hostRecoveryBusy=true;try{await mutate(claimRoomHost);}catch(error){console.warn('進行役の引き継ぎを再試行します',error);}finally{hostRecoveryBusy=false;}
 }
 let presenceBusy=false;
+// A small network indicator remains visible even when the status HUD is hidden.
+const networkIndicator=document.createElement('div');
+networkIndicator.id='networkIndicator';networkIndicator.setAttribute('role','status');
+networkIndicator.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:18;background:#8a2323;color:white;border-radius:9px;padding:7px 12px;font:700 13px system-ui;display:none;pointer-events:none';
+networkIndicator.textContent='通信が切れています。再接続中…';document.body.append(networkIndicator);
+setInterval(()=>{networkIndicator.style.display=!soloMode&&room&&state&&!roomTransportConnected?'block':'none';},1000);
 async function syncRoomPresence(){
- if(soloMode||joiningRoom||!room||!state?.players?.[id]||presenceBusy)return;
- if(state.players[id].online!==false&&state.players[id].hostAvailable===!document.hidden&&lastPositionSent&&performance.now()-lastPositionSent<2500)return;
+ if(soloMode||joiningRoom||!room||!roomTransportConnected||!state?.players?.[id]||presenceBusy)return;
  const presenceRoom=room,presenceId=id;presenceBusy=true;
  try{await update(ref(database(),`rooms/${presenceRoom}/players/${presenceId}`),{online:true,lastSeen:roomNow(),hostAvailable:!document.hidden});}
  catch(error){console.warn('接続状態を再確認します',error);}finally{presenceBusy=false;}
@@ -1988,8 +2007,7 @@ async function mutate(fn){
  const task=async()=>{
   try{
    await Promise.allSettled([...roomUpdateFlights]);if(room!==mutationRoom||id!==mutationId||joiningRoom)return;
-   const checkpoint=prepareNpcCheckpoint();
-   const result=await runTransaction(ref(database(),`rooms/${mutationRoom}`),s=>{if(!s)return;reconcileRoomPositions(s);applyNpcCheckpoint(s,checkpoint);fn(s);return s},{applyLocally:false});
+   const result=await runTransaction(ref(database(),`rooms/${mutationRoom}`),s=>{if(!s)return;reconcileRoomPositions(s);fn(s);return s},{applyLocally:false});
    if(!result.committed)log('操作できませんでした');return result;
   }finally{roomTransactions--;releaseRoomWrites();}
  };
@@ -2024,19 +2042,19 @@ await onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(fal
 // across reconnects; only a chair being carried is dropped on disconnection.
 prepareDisconnectChair(saved).catch(console.warn);
 roomSubscription?.();
-await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{if(joinSequence!==roomJoinSequence)return;const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=reconcileRoomPositions(incoming);host=state.host===id;ingestNpcRuntime(state);showNpcRuntime(state);captureRemoteMotion(state);recoverRoomHost();if(host&&worldReady&&state.worldPreparing)syncWorldPrepared(loadedWorldSeed).catch(console.warn);
+await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{if(joinSequence!==roomJoinSequence)return;const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=reconcileRoomPositions(incoming);captureRemoteMotion(state);host=state.host===id;recoverRoomHost();if(host&&worldReady&&state.worldPreparing)syncWorldPrepared(loadedWorldSeed).catch(console.warn);
 if(state?.players?.[id]){applyAssignedSpawn(state);prepareDisconnectChair(state.players[id]);}
 if(state?.phase==='instructions'&&oldPhase!=='instructions'&&state.players?.[id]&&!state.players[id].spawn){
  const p=state.players[id];me.x=p.x;me.z=p.z;playerHeight=0;me.rot=p.rot||Math.PI;yaw=me.rot;
-}scheduleRoomUI(oldPhase!==state.phase||state.phase==='lobby');$('entry').hidden=true;document.getElementById('runtimeError').textContent='';resolve();},reject);});log('部屋 '+room+' に参加（保存データを復元）')}catch(e){console.error('参加失敗',e);alert('部屋に参加できません：'+(e?.message||e))}finally{joiningRoom=false;if(state?.players?.[id]){ingestNpcRuntime(state);showNpcRuntime();startMotionChannel();syncRoomPresence();recoverRoomHost();}$('join').disabled=false;$('join').textContent='あそぶ ➜'}};
+}scheduleRoomUI(oldPhase!==state.phase||state.phase==='lobby');$('entry').hidden=true;document.getElementById('runtimeError').textContent='';resolve();},reject);});log('部屋 '+room+' に参加（保存データを復元）')}catch(e){console.error('参加失敗',e);alert('部屋に参加できません：'+(e?.message||e))}finally{joiningRoom=false;if(state?.players?.[id]){startMotionChannel();syncRoomPresence();recoverRoomHost();}$('join').disabled=false;$('join').textContent='あそぶ ➜'}};
 // Server-side disconnect actions work even when the browser is abruptly closed.
 // Re-arm only when the carried chair or last recorded drop position changes.
 let disconnectChairId=null,disconnectChairPos='',disconnectChairBusy=false;
 async function prepareDisconnectChair(p){
- if(soloMode||!room||!id||disconnectChairBusy)return;
+ if(soloMode||!room||!id||disconnectChairBusy||joiningRoom)return;
  const carrying=Number(p?.carrying)||0;
- const x=Number(me.x)||0,z=Number(me.z)||0;
- const y=Number(playerHeight)||0;
+ const x=Number(p?.x)||0,z=Number(p?.z)||0;
+ const y=Number(p?.y)||0;
  const pos=`${Math.round(x*2)/2},${Math.round(z*2)/2},${Math.round(y*2)/2}`;
  if(carrying===disconnectChairId&&(!carrying||pos===disconnectChairPos))return;
  disconnectChairBusy=true;
@@ -2279,7 +2297,7 @@ async function advance(){
  finally{advancing=false;}
 }
 setInterval(advance,250);
-setInterval(()=>{syncRoomPresence();recoverRoomHost();},4000);
+setInterval(()=>{syncRoomPresence();recoverRoomHost();},6000);
 document.addEventListener('visibilitychange',()=>{syncRoomPresence();if(!document.hidden)recoverRoomHost();});
 // Host alone simulates all NPC decisions; the shared database is authoritative.
 function npcRoofForChair(c){
@@ -2366,7 +2384,6 @@ function npcClearSearchTarget(k,p){
 }
 function npcDecision(s,k,p,now){
  if(s.phase!=='search'||!p.alive||p.sitting||p.carrying)return;
- if((p.npcPriorityCheckAt||0)>now)return;p.npcPriorityCheckAt=now+250;
  const usable=Object.entries(s.chairs||{}).filter(([n])=>npcChairUsable(s,k,p,n));
  const nearby=usable.filter(([n,c])=>Math.hypot(c.x-p.x,c.z-p.z)<=30);
  const remembered=usable.filter(([n])=>p.memory?.[n]);
@@ -2811,7 +2828,7 @@ function npcUpdateSpot(s,k,p,now){
  p.npcSearchOrigin={x:spot.x,z:spot.z};p.npcSpotSearch=null;p.npcExploreAfterSearch=true;p.goal=null;p.waypoint=null;p.decisionAt=0;return false;
 }
 // Update decisions and local motion on the existing host tick; spread terrain work across ticks.
-function npcSimulate(s,dt,now,budget=5){
+function npcSimulate(s,dt,now){
  const beforeMotion=new Map(Object.entries(s.players||{}).filter(([k,p])=>p.npc).map(([k,p])=>[k,{x:p.x,y:p.y||0,z:p.z,rot:p.rot||0}]));
  if(typeof normalizeNPCNames==='function')normalizeNPCNames(s);
  // Reconcile seat claims before any movement, including legacy stale occupancy flags.
@@ -2821,7 +2838,7 @@ function npcSimulate(s,dt,now,budget=5){
   c.occupied=owner?owner[0]:null;
   for(const [k,v] of claims)if(k!==owner?.[0]){v.sitting=0;v.targetChair=null;v.goal=null;v.decisionAt=0;}
  }
- npcEnsureGrid(s);npcNavDeadline=performance.now()+budget;npcNavNodesLeft=2048;
+ npcEnsureGrid(s);npcNavDeadline=performance.now()+5;npcNavNodesLeft=2048;
  if(npcNavRoom!==room){npcNavigation.clear();npcNavRoom=room;}
  npcActorState=s;npcActors=Object.entries(s.players);npcChairActors=Object.entries(s.chairs||{});
  const entries=npcActors.filter(([_,p])=>p.npc),offset=npcNavOrder++%Math.max(1,entries.length);
@@ -2880,7 +2897,7 @@ if(s.phase==='search'&&!p.departureDone){
 if(!npcReturning(s)&&s.phase==='search'){
  // Chair priority is evaluated while walking too; otherwise retain the same spot.
  npcDecision(s,k,p,now);
- if(!p.targetChair&&p.npcSpotSearch){npcUpdateSpot(s,k,p,now);if(!p.npcSpotSearch){p.npcPriorityCheckAt=0;npcDecision(s,k,p,now);}}
+ if(!p.targetChair&&p.npcSpotSearch){npcUpdateSpot(s,k,p,now);if(!p.npcSpotSearch)npcDecision(s,k,p,now);}
  if(!p.targetChair&&!p.npcSpotSearch&&(p.npcSpotDecisionAt||0)<=now)npcChooseSpot(s,k,p,now);
 }
 const inspectingSpot=!npcReturning(s)&&!!p.npcSpotSearch;
@@ -2911,163 +2928,7 @@ let anyMoving=false;
 for(const [k,p] of npcEntries){const before=beforeMotion.get(k);p.motionMoving=!!before&&Math.hypot(p.x-before.x,p.z-before.z,(p.y||0)-before.y)>.001;anyMoving||=p.motionMoving;}
 if(anyMoving||s.npcMoving)s.npcFrameAt=now;s.npcMoving=anyMoving;
 if(!soloMode&&s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
-// NPC physics runs locally at 20 Hz. Database transactions only save a snapshot;
-// neither transaction retries nor acknowledgements are allowed to run the simulation.
-let npcRuntime=null;
-const NPC_RUNTIME_PHASES=new Set(['search','return','voteIntro','vote','results','erase','eraseReveal']);
-const npcCopy=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
-function npcSame(a,b){
- if(a===b)return true;
- if(!a||!b||typeof a!=='object'||typeof b!=='object'||Array.isArray(a)!==Array.isArray(b))return false;
- const keys=Object.keys(a);if(keys.length!==Object.keys(b).length)return false;
- return keys.every(key=>Object.prototype.hasOwnProperty.call(b,key)&&npcSame(a[key],b[key]));
-}
-const npcObject=value=>!!value&&typeof value==='object'&&!Array.isArray(value);
-function npcRuntimeKey(s){return [room,s?.host,s?.started,s?.round,s?.phase,s?.worldSeed].join(':');}
-function npcRuntimeEligible(s=state){return !soloMode&&!joiningRoom&&worldReady&&s?.host===id&&NPC_RUNTIME_PHASES.has(s.phase);}
-function npcValueAt(object,path){for(const key of path){if(object==null)return undefined;object=object[key];}return object;}
-function npcWriteAt(object,path,value){
- let parent=object;for(const key of path.slice(0,-1))parent=parent[key]??={};
- if(value===undefined)delete parent[path.at(-1)];else parent[path.at(-1)]=npcCopy(value);
-}
-function npcCollectChanges(before,after,path,result){
- if(npcSame(before,after))return;
- if(npcObject(after)&&(npcObject(before)||before==null)&&Object.keys(after).length){
-  const old=before||{};for(const key of new Set([...Object.keys(old),...Object.keys(after)]))npcCollectChanges(old[key],after[key],[...path,key],result);
- }else result.push({path,before:npcCopy(before),after:npcCopy(after)});
-}
-function npcKnownWrite(runtime,path,value){
- const key=JSON.stringify(path);return runtime.sent.some(batch=>batch.has(key)&&npcSame(batch.get(key),value));
-}
-function npcMergeWorld(runtime,before,local,remote,path=[]){
- if(npcSame(local,before))return npcCopy(remote);
- if(npcSame(remote,before)||npcSame(local,remote))return local;
- // NPC motion has one owner. A delayed checkpoint can never rewind its engine.
- if(path[0]==='players'&&runtime.world.players?.[path[1]]?.npc&&path.length===3&&['x','y','z','rot','motionMoving'].includes(path[2]))return local;
- if(npcKnownWrite(runtime,path,remote))return local;
- if((npcObject(before)||before==null)&&npcObject(local)&&npcObject(remote)){
-  const old=before||{},result={};for(const key of new Set([...Object.keys(old),...Object.keys(local),...Object.keys(remote)])){
-   const value=npcMergeWorld(runtime,old[key],local[key],remote[key],[...path,key]);if(value!==undefined)result[key]=value;
-  }return result;
- }
- // A human's concurrent chair/coin/memory action wins over a speculative NPC action.
- return npcCopy(remote);
-}
-function ingestNpcRuntime(s){
- if(!npcRuntimeEligible(s)){npcRuntime=null;return;}
- const key=npcRuntimeKey(s);
- if(!npcRuntime||npcRuntime.key!==key){
-  const world=npcCopy(s),now=roomNow();
-  for(const [actor,p] of Object.entries(world.players||{}))if(p.npc)npcNavigation.delete(room+':'+actor);
-  for(const [actor,p] of Object.entries(world.players||{})){
-   const live=liveMotionPackets.get(actor);
-   if(p.npc&&!p.sitting&&live&&live.game===(s.started||0)&&live.round===(s.round||0)&&!live.seat&&live.at<=now+1000&&now-live.at<1200){p.x=live.x;p.y=live.y;p.z=live.z;p.rot=live.rot;}
-  }
-  npcRuntime={key,base:npcCopy(s),world,sent:[],velocities:new Map(),createdAt:now,lastStepAt:now,lastClock:performance.now(),accumulator:0,lastCheckpoint:0,checkpointBusy:false};
- }else{
-  npcRuntime.world=npcMergeWorld(npcRuntime,npcRuntime.base,npcRuntime.world,s);
-  npcRuntime.base=npcCopy(s);
- }
- // Resolve a human winning a seat immediately, even when the rejected NPC
- // sitting flag happens to equal an older, pre-claim checkpoint.
- for(const [actor,p] of Object.entries(npcRuntime.world.players||{}))if(p.npc&&p.sitting){
-  const n=p.sitting,c=npcRuntime.world.chairs?.[n];
-  const taken=Object.entries(npcRuntime.world.players).some(([other,v])=>other!==actor&&!v.npc&&Number(v.sitting)===Number(n));
-  const owner=c?.occupied&&c.occupied!==actor&&Number(npcRuntime.world.players[c.occupied]?.sitting)===Number(n);
-  if(!c||c.removed||c.hiddenAt||c.carrier||taken||owner){
-   if(c?.occupied===actor)c.occupied=null;
-   p.sitting=0;p.targetChair=null;p.goal=null;p.waypoint=null;p.npcPriorityCheckAt=0;
-   const saved=s.players?.[actor];if(saved&&!saved.sitting&&(!c||Math.hypot(saved.x-c.x,saved.z-c.z)>1.4)){p.x=saved.x;p.y=saved.y||0;p.z=saved.z;}
-   npcRuntime.velocities.set(actor,{x:0,y:0,z:0});npcNavigation.delete(room+':'+actor);
-  }
- }
-}
-function npcRuntimePlayer(key){return npcRuntime&&npcRuntimeEligible()&&npcRuntime.key===npcRuntimeKey(state)?npcRuntime.world.players?.[key]:null;}
-function showNpcRuntime(s=state){
- if(!npcRuntime||!npcRuntimeEligible(s)||npcRuntime.key!==npcRuntimeKey(s))return;
- for(const [key,p] of Object.entries(npcRuntime.world.players||{}))if(p.npc&&s.players?.[key]?.npc)s.players[key]=p;
- s.chairs=npcRuntime.world.chairs;
-}
-function prepareNpcCheckpoint(){
- const runtime=npcRuntime;if(!runtime||!npcRuntimeEligible()||runtime.key!==npcRuntimeKey(state))return null;
- const changes=[];
- for(const [key,p] of Object.entries(runtime.world.players||{}))if(p.npc&&runtime.base.players?.[key]?.npc)npcCollectChanges(runtime.base.players[key],p,['players',key],changes);
- for(const key of ['chairs','accessories','votes','spotSearchHistory','npcFrameAt','npcMoving'])npcCollectChanges(runtime.base[key],runtime.world[key],[key],changes);
- if(!changes.length)return null;
- const batch=new Map(changes.map(change=>[JSON.stringify(change.path),npcCopy(change.after)]));
- // Remember object-level values too, so a late 'search started' checkpoint cannot
- // resurrect a job which has already completed locally.
- for(const change of changes)for(let length=change.path[0]==='players'?3:1;length<change.path.length;length++){
-  const path=change.path.slice(0,length),key=JSON.stringify(path);if(!batch.has(key))batch.set(key,npcCopy(npcValueAt(runtime.world,path)));
- }
- runtime.sent.push(batch);if(runtime.sent.length>12)runtime.sent.shift();
- return {runtime,key:runtime.key,at:runtime.lastStepAt,changes};
-}
-function applyNpcCheckpoint(s,checkpoint){
- if(!checkpoint||s.host!==id||npcRuntimeKey(s)!==checkpoint.key)return;
- const previousPositions=new Map(Object.entries(s.players||{}).filter(([key,p])=>p.npc).map(([key,p])=>[key,{x:p.x,y:p.y||0,z:p.z}]));
- for(const change of checkpoint.changes){
-  if(change.path[0]==='players'&&!s.players?.[change.path[1]]?.npc)continue;
-  const current=npcValueAt(s,change.path);
-  const actor=change.path[0]==='players'?s.players?.[change.path[1]]:null;
-  if(actor&&change.path.length===3&&['x','y','z','rot','motionMoving'].includes(change.path[2])){if((actor.positionAt||0)<=checkpoint.at){npcWriteAt(s,change.path,change.after);actor.positionAt=checkpoint.at;}continue;}
-  if(npcSame(current,change.before)||npcSame(current,change.after)||npcKnownWrite(checkpoint.runtime,change.path,current))npcWriteAt(s,change.path,change.after);
- }
- // A chair cannot be awarded to an NPC over a concurrently seated human.
- for(const [key,p] of Object.entries(s.players||{}))if(p.npc&&p.sitting){
-  const n=p.sitting,c=s.chairs?.[n],other=Object.entries(s.players).find(([actor,v])=>actor!==key&&!v.npc&&Number(v.sitting)===Number(n));
-  const occupied=c?.occupied&&c.occupied!==key&&Number(s.players[c.occupied]?.sitting)===Number(n);
-  if(!c||c.removed||c.hiddenAt||c.carrier||other||occupied){
-   if(c?.occupied===key)c.occupied=other?.[0]||null;
-   p.sitting=0;p.targetChair=null;p.goal=null;p.waypoint=null;Object.assign(p,previousPositions.get(key)||{});
-  }else{c.occupied=key;p.x=c.x;p.y=c.y||0;p.z=c.z;}
- }
-}
-function npcCriticalChange(runtime){
- if(runtime.world.phase==='erase'&&runtime.world.players?.[runtime.world.parent]?.npc)return true;
- for(const [key,p] of Object.entries(runtime.world.players||{}))if(p.npc&&((p.sitting||0)!==(runtime.base.players?.[key]?.sitting||0)||(p.carrying||0)!==(runtime.base.players?.[key]?.carrying||0)))return true;
- for(const [key,c] of Object.entries(runtime.world.chairs||{})){
-  const old=runtime.base.chairs?.[key];if(old&&(c.carrier!==old.carrier||c.hiddenAt!==old.hiddenAt))return true;
- }return false;
-}
-function npcRuntimeChanged(runtime){
- for(const [key,p] of Object.entries(runtime.world.players||{}))if(p.npc&&!npcSame(runtime.base.players?.[key],p))return true;
- return ['chairs','accessories','votes','spotSearchHistory','npcFrameAt','npcMoving'].some(key=>!npcSame(runtime.base[key],runtime.world[key]));
-}
-function saveNpcRuntime(runtime,clock){
- if(runtime.checkpointBusy||clock-runtime.lastCheckpoint<650&&!npcCriticalChange(runtime))return;
- runtime.lastCheckpoint=clock;if(!npcRuntimeChanged(runtime)&&!npcCriticalChange(runtime))return;runtime.checkpointBusy=true;
- mutate(s=>{if(s.host===id&&s.phase==='erase'&&s.players?.[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n);}})
-  .catch(error=>console.warn('NPCの状態保存を再試行します',error)).finally(()=>{runtime.checkpointBusy=false;});
-}
-function tickNpcRuntime(){
- if(!npcRuntimeEligible()||document.hidden||!roomTransportConnected){if(npcRuntime){npcRuntime.lastClock=performance.now();npcRuntime.accumulator=0;}return;}
- if(!npcRuntime||npcRuntime.key!==npcRuntimeKey(state))ingestNpcRuntime(state);
- const runtime=npcRuntime;if(!runtime)return;
- const clock=performance.now();runtime.accumulator+=Math.min(.15,Math.max(0,(clock-runtime.lastClock)/1000));runtime.lastClock=clock;
- while(runtime.accumulator>=.05){
-  runtime.accumulator-=.05;const now=Math.round(roomNow()-runtime.accumulator*1000);
-  // Human motion arrives independently of the slower room snapshots.
-  for(const [key,p] of Object.entries(state.players||{}))if(!p.npc)runtime.world.players[key]={...p};
-  runtime.world.humanSpotSearching=state.humanSpotSearching||{};
-  const before=new Map(Object.entries(runtime.world.players||{}).filter(([key,p])=>p.npc).map(([key,p])=>[key,{x:p.x,y:p.y||0,z:p.z}]));
-  if(runtime.world.phase==='search'&&now>=runtime.world.deadline){
-   for(const [key,p] of Object.entries(runtime.world.players||{}))if(p.npc)p.motionMoving=false;
-   if(runtime.world.npcMoving)runtime.world.npcFrameAt=now;runtime.world.npcMoving=false;
-  }else npcSimulate(runtime.world,.05,now,2);
-  for(const [key,old] of before){const p=runtime.world.players[key];if(p)runtime.velocities.set(key,{x:(p.x-old.x)/.05,y:((p.y||0)-old.y)/.05,z:(p.z-old.z)/.05});}
-  runtime.lastStepAt=now;showNpcRuntime();captureRemoteMotion(state,now);
- }
- saveNpcRuntime(runtime,clock);
-}
-setInterval(tickNpcRuntime,50);
-// Solo keeps its existing local update loop and does not use network checkpoints.
-let npcBusy=false,npcLastTick=0;
-setInterval(async()=>{
- if(!soloMode)return;const now=roomNow();if(now-npcLastTick<280)return;npcLastTick=now;
- if(!worldReady||!host||!state||npcBusy||!NPC_RUNTIME_PHASES.has(phase()))return;
- npcBusy=true;try{await mutate(s=>{if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n);}else npcSimulate(s,.28,now);});}finally{npcBusy=false;}
-},140);
+let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=roomNow();const tickEvery=soloMode?280:650;if(tickNow-npcLastTick<tickEvery)return;const tickDt=soloMode?.28:Math.max(.05,Math.min(.85,(tickNow-npcLastTick)/1000));npcLastTick=tickNow;if(!worldReady||!host||!state||joiningRoom||npcBusy||!['search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=roomNow();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,tickDt,now)})}finally{npcBusy=false}},140);
 const modal=$('modal');$('modalCancel').onclick=()=>{modal.classList.remove('open');$('modalConfirm').textContent='決定';$('modalCancel').textContent='キャンセル';syncGiftInteraction();};
 function nearbyPickup(){if(!state?.coinDrops)return null;const now=roomNow();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(now-d.created>=10000||d.recipient===id||d.owner===id)).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
 $('pickupCoin').onclick=()=>{const nearest=nearbyPickup();if(!nearest)return;mutate(s=>{const d=s.coinDrops?.[nearest[0]],p=s.players?.[id];if(!d||!p||Math.hypot(p.x-d.x,p.z-d.z)>3||roomNow()-d.created<10000&&d.recipient!==id&&d.owner!==id)return;p.wallet??={};p.wallet[d.issuer]=(p.wallet[d.issuer]||0)+d.count;delete s.coinDrops[nearest[0]];})};
