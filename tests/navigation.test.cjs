@@ -21,7 +21,7 @@ function setup(){
  function accessibleCostumeDrop(x,z){return{x:x+2,z:z+2}}
  function canCastVote(){return false}function chooseNPCVote(){}
  const SEARCH_MS=90000,VOTE_MS=30000,accessoryCatalog=[];
- `+cut('function roofEdgeBlocked','function occupiedAt')+cut('// Spatial buckets','// NPC hide-spot inspection')+cut('function npcChairUsable','// NPCs try to collect')+cut('const NPC_SEARCH_OBSERVE_RADIUS','// Update decisions and local motion')+cut('function npcSimulate','let npcBusy='),c);
+ `+cut('function roofEdgeBlocked','function occupiedAt')+cut('// Spatial buckets','// NPC hide-spot inspection')+cut('function npcRoofForChair','// NPCs try to collect')+cut('const NPC_SEARCH_OBSERVE_RADIUS','// Update decisions and local motion')+cut('function npcSimulate','let npcBusy='),c);
  vm.runInContext(`
  function game(players={},phase='search'){state={phase,round:1,deadline:1000000,players,chairs:{},votes:{},accessories:{}};return state;}
  function npc(x,z,goal){return {npc:true,alive:false,initialDispersed:true,departureDone:true,searchIntentRound:1,searchIntent:true,x,z,goal,walk:5,run:9,decisionAt:1e9,npcSpotDecisionAt:1e9,memory:{}};}
@@ -148,4 +148,31 @@ test('departure queue preserves all distinct indoor positions instead of gatheri
 test('an NPC already outdoors starts searching immediately rather than returning to a queue',()=>setup()(`
  const p=npc(0,60,null),s=game({NPC0:p});p.alive=true;p.departureDone=false;p.departureAt=50000;s.chairs={1:{x:0,z:70}};
  npcSimulate(s,.28,10000);assert(p.departureDone);assert.equal(p.targetChair,'1');assert(p.z>60);
+`));
+test('NPC climbs both real stair flights and the landings to a roof chair, then descends on return',()=>setup()(`
+ for(let i=0;i<3;i++){
+  const b=buildingSites[i],c={x:b.x,z:b.z+5,y:b.h+1.2},roof=npcRoofForChair(c);assert(roof);
+  const entry=npcRoofPoints(roof,c)[0],p=npc(entry.x,entry.z,null),s=game({NPC0:p});p.alive=true;p.y=0;p.decisionAt=0;s.chairs={1:c};
+  const visited=new Set();for(let tick=0;tick<140&&!p.sitting;tick++){
+   const before={x:p.x,z:p.z,y:p.y};npcSimulate(s,.85,10000+tick*850);
+   assert(Math.hypot(p.x-before.x,p.z-before.z,p.y-before.y)<=p.run*.85+.01,'teleported on staircase');
+   if(p.npcRoofTrip?.active)visited.add(p.npcRoofTrip.index);
+  }
+  assert.equal(p.sitting,1,JSON.stringify({building:i,x:p.x,y:p.y,z:p.z,index:p.npcRoofTrip?.index}));assert.equal(p.y,c.y);assert(visited.size>=5);
+  s.phase='return';for(let tick=0;tick<100&&p.npcRoofTrip;tick++)npcSimulate(s,.85,130000+tick*850);
+  assert.equal(p.npcRoofTrip,null);assert.equal(p.sitting,0);assert.equal(p.y,0);assert(Math.hypot(p.x-entry.x,p.z-entry.z)<.01);
+ }
+`));
+test('a roof or staircase occupant prevents a new roof expedition and only one NPC reserves it',()=>setup()(`
+ const b=buildingSites[0],c={x:b.x,z:b.z+5,y:b.h+1.2},roof=npcRoofForChair(c),entry=npcRoofPoints(roof,c)[0];
+ const p=npc(entry.x,entry.z,null),s=game({NPC0:p,person:{x:c.x,z:c.z,y:c.y,online:true}});p.alive=true;s.chairs={1:c};
+ assert(!npcChairUsable(s,'NPC0',p,'1'));s.players.person={x:roof.st.outerX,z:roof.st.back,y:roof.st.mid,online:true};assert(!npcChairUsable(s,'NPC0',p,'1'));
+ delete s.players.person;assert(npcChairUsable(s,'NPC0',p,'1'));p.goal=npcChairGoal(s,'NPC0',p,'1');
+ const second=npc(entry.x+5,entry.z,null);s.players.NPC1=second;assert(!npcChairUsable(s,'NPC1',second,'1'));assert(npcChairUsable(s,'NPC0',p,'1'));
+`));
+test('frontmost NPC departs without an artificial delay at round start',()=>setup()(`
+ const s=game({NPC0:npc(0,15,null),NPC1:npc(7,10,null),NPC2:npc(-7,3,null)});
+ for(const p of Object.values(s.players)){p.alive=true;p.searchIntentRound=0;}s.chairs={1:{x:0,z:65}};
+ npcSimulate(s,.28,10000);assert.equal(s.players.NPC0.departureAt,10000);assert(s.players.NPC0.departureDone);
+ assert.equal(s.players.NPC1.departureAt,10450);assert.equal(s.players.NPC1.departureDone,false);assert.equal(s.players.NPC2.departureAt,10900);
 `));

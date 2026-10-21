@@ -207,7 +207,7 @@ function elevationAt(x,z){
 }
 
 // One seed describes the whole island. Never use client-local randomness here.
-const WORLD_LAYOUT_VERSION=1;
+const WORLD_LAYOUT_VERSION=2;
 const PLACEMENT_RULES={buildingGap:55,signGap:25,plantGap:.8,roadWidth:6,shore:288};
 function makeWorldLayout(seed){
  let value=(Number(seed)>>>0)||1;
@@ -341,6 +341,10 @@ function makeWorldLayout(seed){
    p={x,y:0,z,hiddenAt:null,removed:false,carrier:null,occupied:null};break;
   }
   if(!p)throw Error('イスの配置に失敗');chairs[i]=p;
+ }
+ // A single optional rooftop chair across the three non-black buildings.
+ if(random()<.5){const roofBuilding=Math.floor(random()*3),b=buildings[roofBuilding];
+  Object.assign(chairs[15],{x:b.x+between(-b.w/2+5,b.w/2-5),y:b.h+1.2,z:b.z+between(2,b.d/2-7),roofBuilding});
  }
  return {seed:Number(seed)>>>0,buildings,paths,trees,spots,signs,chairs,zones};
 }
@@ -723,7 +727,7 @@ async function syncWorldPrepared(wantedSeed){
     if(!Object.keys(s.chairs||{}).length)s.chairs=structuredClone(worldLayout.chairs);
     else for(const [n,c] of Object.entries(s.chairs||{})){
      if(c.removed||c.carrier||c.occupied)continue;
-     const replacement=worldLayout.chairs[n];if(replacement)Object.assign(c,{x:replacement.x,y:0,z:replacement.z,hiddenAt:replacement.hiddenAt});
+     const replacement=worldLayout.chairs[n];if(replacement)Object.assign(c,{x:replacement.x,y:replacement.y||0,z:replacement.z,hiddenAt:replacement.hiddenAt});
     }
    }
    for(const p of Object.values(s.players||{}))p.z=screenSafeZ(p.x,p.z,p.y||0);
@@ -905,7 +909,7 @@ function occupiedAt(x,z,r=.7,ignorePlayer=null,ignoreChair=null,forHuman=false){
  if(state){
   if(characterMovementBlocked(state,ignorePlayer,x,z,x,z,playerHeight,forHuman,r+.65))return true;
   for(const [k,c] of Object.entries(state.chairs||{})){
-   if(k===String(ignoreChair)||c.removed||c.hiddenAt||c.carrier)continue;
+   if(k===String(ignoreChair)||c.removed||c.hiddenAt||c.carrier||Math.abs((c.y||0)-playerHeight)>2.2)continue;
    if(Math.hypot(x-c.x,z-c.z)<r+1.1)return true;
   }
  }
@@ -1616,7 +1620,7 @@ function admitRoomPlayer(s,key,name,now){
  }
  remap(s);const inherited=s.players[key];
  Object.assign(inherited,{name,npc:false,online:true,worldReady:false,joined:now,bodyColor:inherited.bodyColor??0x4c9ec2});
- inherited.npcSpotSearch=null;inherited.npcSpotHide=null;inherited.goal=null;inherited.waypoint=null;
+ inherited.npcRoofTrip=null;inherited.npcSpotSearch=null;inherited.npcSpotHide=null;inherited.goal=null;inherited.waypoint=null;
  inherited.mapData??={worldSeed:Number(s.worldSeed)||1,notes:Object.entries(inherited.memory||{}).flatMap(([number,known])=>{
   const c=s.chairs?.[number],point=known&&typeof known==='object'?known:c&&!c.hiddenAt&&!c.removed?c:null;
   return point?[{number:String(number),x:point.x,z:point.z}]:[];
@@ -1860,7 +1864,7 @@ $('touch').onclick=()=>mutate(s=>{let p=s.players[id];if(s.phase==='search'&&p?.
 // Nearby chair is marked at its exact world position, with its existing number.
 // Standing players read the -Z back plate; seated players can mark their own chair.
 function nearChairBack(c){
- if(!c||c.removed||c.carrier||c.hiddenAt)return false;
+ if(!c||c.removed||c.carrier||c.hiddenAt||Math.abs((c.y||0)-playerHeight)>2.2)return false;
  const dx=me.x-c.x,dz=me.z-c.z;
  return dz<-.35 && dz>-2.8 && Math.abs(dx)<1.65 && Math.hypot(dx,dz)<3;
 }
@@ -1907,7 +1911,7 @@ $('sit').onclick=()=>mutate(s=>{
   if(c){const spot=findStandingSpot(c,p.sitting);if(!spot)return;c.occupied=null;Object.assign(p,spot);}
   p.sitting=0;me.x=p.x;me.z=p.z;playerHeight=p.y||0;return;
  }
- for(const [n,c] of Object.entries(s.chairs))if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&(s.phase!=='search'||Number(n)!==p.previous)&&Math.hypot(c.x-p.x,c.z-p.z)<3){p.sitting=Number(n);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=id;break;}
+ for(const [n,c] of Object.entries(s.chairs))if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&(s.phase!=='search'||Number(n)!==p.previous)&&Math.abs((c.y||0)-(p.y||0))<2.2&&Math.hypot(c.x-p.x,c.z-p.z)<3){p.sitting=Number(n);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=id;break;}
 });
 // Five-second hide/search action; cancel if the player moves away or conditions change.
 let spotAction=null;
@@ -1943,7 +1947,7 @@ function updateSpotAction(t){
  }
 }
 
-$('moveChair').onclick=()=>mutate(s=>{let p=s.players[id];if(!p||s.phase==='finished')return;if(p.carrying){let c=s.chairs[p.carrying];if(c){{const x=p.x+Math.sin(p.rot)*1.8,z=p.z+Math.cos(p.rot)*1.8;const level=p.y??playerHeight;if(carriedChairBlocked(p.x,p.z,p.rot,level)||carriedChairBlocked(x,z,p.rot,level))return;const floor=chairFloorAt(x,z,level);if(Math.abs(floor-level)>1.05||!validChairPosition(x,z,p.carrying))return;c.carrier=null;c.x=x;c.z=z;c.y=floor}}p.carrying=0;return}for(let [n,c] of Object.entries(s.chairs)){if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.hypot(c.x-p.x,c.z-p.z)<3){c.carrier=id;p.carrying=Number(n);break}}});
+$('moveChair').onclick=()=>mutate(s=>{let p=s.players[id];if(!p||s.phase==='finished')return;if(p.carrying){let c=s.chairs[p.carrying];if(c){{const x=p.x+Math.sin(p.rot)*1.8,z=p.z+Math.cos(p.rot)*1.8;const level=p.y??playerHeight;if(carriedChairBlocked(p.x,p.z,p.rot,level)||carriedChairBlocked(x,z,p.rot,level))return;const floor=chairFloorAt(x,z,level);if(Math.abs(floor-level)>1.05||!validChairPosition(x,z,p.carrying))return;c.carrier=null;c.x=x;c.z=z;c.y=floor}}p.carrying=0;return}for(let [n,c] of Object.entries(s.chairs)){if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-(p.y||0))<2.2&&Math.hypot(c.x-p.x,c.z-p.z)<3){c.carrier=id;p.carrying=Number(n);break}}});
 $('send').onclick=()=>{};
 $('vote').onclick=()=>{if(Math.hypot(me.x-VOTE_X,me.z-VOTE_Z)>=11)return;const target=$('voteTarget').value;mutate(s=>{const p=s.players[id];if(!canCastVote(s,id)||!p||Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)>=11||s.votes?.[id]||!s.players[target]?.alive)return;s.votes??={};if(s.votes[id])return;s.votes[id]=target;p.voted=true;if(soloMode){s.deadline=Date.now();advanceState(s,s.deadline);}})};
 function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=true;c.carrier=null;c.occupied=null;s.noChairErased=false;s.lastRemoved=n;s.selectedEraseChair=n;s.phase='eraseReveal';s.deadline=Date.now()+7000}
@@ -2005,16 +2009,91 @@ async function advance(){
 }
 setInterval(advance,700);
 // Host alone simulates all NPC decisions; the shared database is authoritative.
+function npcRoofForChair(c){
+ if(!c||(c.y||0)<3)return null;
+ const i=buildingSites.findIndex((b,i)=>i<3&&Math.abs(c.x-b.x)<b.w/2-2&&Math.abs(c.z-b.z)<b.d/2-2&&Math.abs(c.y-b.h-1.2)<.5);
+ if(i<0)return null;const b=buildingSites[i],st=stairways.find(st=>Math.abs(st.top-c.y)<.5&&Math.abs(st.front-(b.z+b.d/2-4))<.1&&Math.abs(st.innerX-b.x)<b.w/2+10);
+ return st?{b,st,i}:null;
+}
+function npcRoofBusy(s,k,roof){
+ const {b,st}=roof;
+ return Object.entries(s.players||{}).some(([other,v])=>{
+  if(other===k||v.online===false)return false;
+  if(v.npcRoofTrip?.building===roof.i)return true;
+  const x=other===id?me.x:v.x,z=other===id?me.z:v.z,y=other===id?playerHeight:v.y||0;
+  const onRoof=y>st.top-2&&Math.abs(x-b.x)<b.w/2+1.5&&Math.abs(z-b.z)<b.d/2+1.5;
+  const onStairs=x>=st.minX-.8&&x<=st.maxX+.8&&z>=st.turnZ0-.8&&z<=st.bridgeZ1+2;
+  return onRoof||onStairs;
+ });
+}
+function npcRoofPoints(roof,c){
+ const {b,st}=roof,side=Math.sign(st.innerX-b.x),z=st.front+.85;
+ return [{x:st.outerX,z:st.front+2,y:0},{x:st.outerX,z:st.front,y:0},
+  {x:st.outerX,z:st.back,y:st.mid},{x:st.outerX,z:st.back-2,y:st.mid},
+  {x:st.innerX,z:st.back-2,y:st.mid},{x:st.innerX,z:st.back,y:st.mid},
+  {x:st.innerX,z:st.front,y:st.top},{x:st.innerX,z,y:st.top},
+  {x:b.x+side*(b.w/2-3),z,y:st.top},{x:c.x,z:c.z,y:c.y}];
+}
+function npcChairGoal(s,k,p,n){
+ const c=s.chairs[n],roof=npcRoofForChair(c);
+ if(!roof)return {x:c.x,z:c.z};
+ if(!p.npcRoofTrip)p.npcRoofTrip={building:roof.i,chair:String(n),points:npcRoofPoints(roof,c),index:1,active:false,travel:0};
+ return {...p.npcRoofTrip.points[0]};
+}
+function npcRoofStepClear(s,k,p,q){
+ const save=playerHeight;
+ try{playerHeight=Math.max(p.y||0,q.y||0);
+  if(staticBlocked(q.x,q.z,.68)||characterMovementBlocked(s,k,p.x,p.z,q.x,q.z,q.y||0))return false;
+  return !Object.entries(s.chairs||{}).some(([n,c])=>String(n)!==String(p.npcRoofTrip?.chair)&&!c.hiddenAt&&!c.carrier&&!c.removed&&Math.abs((c.y||0)-(q.y||0))<2&&Math.hypot(c.x-q.x,c.z-q.z)<1.8);
+ }finally{playerHeight=save;}
+}
+function npcUpdateRoofTrip(s,k,p,dt,now){
+ const trip=p.npcRoofTrip;if(!trip)return false;if(s.phase==='finished')return true;if(trip.complete){p.npcRoofTrip=null;return true;}
+ const chair=s.chairs?.[trip.chair],usable=s.phase==='search'&&chair&&!chair.removed&&!chair.carrier&&!chair.hiddenAt&&(!chair.occupied||chair.occupied===k)&&Number(p.previous)!==Number(trip.chair);
+ if(!usable&&!trip.descending){
+  if(!trip.active){p.npcRoofTrip=null;p.targetChair=null;p.goal=null;return false;}
+  if(p.sitting){if(chair?.occupied===k)chair.occupied=null;p.sitting=0;}
+  trip.points=[{x:p.x,z:p.z,y:p.y||0},...trip.points.slice(0,trip.index).reverse()];trip.index=1;trip.travel=0;trip.descending=true;
+ }
+ if(!trip.active){
+  const roof=npcRoofForChair(chair);if(!roof||npcRoofBusy(s,k,roof)){p.npcRoofTrip=null;p.targetChair=null;p.goal=null;p.decisionAt=0;return false;}
+  const entry=trip.points[0];if(Math.hypot(p.x-entry.x,p.z-entry.z)>.65)return false;
+  trip.points[0]={x:p.x,z:p.z,y:0};trip.active=true;p.y=0;
+ }
+ p.goal=null;p.waypoint=null;
+ let distance=(p.run||9)*dt*(p.carrying?.5:1);
+ while(distance>.001&&trip.index<trip.points.length){
+  const target=trip.points[trip.index],dx=target.x-p.x,dz=target.z-p.z,dy=target.y-(p.y||0),length=Math.hypot(dx,dz,dy);
+  if(length<.001){trip.index++;continue;}
+  const step=Math.min(.3,distance,length),f=step/length,q={x:p.x+dx*f,z:p.z+dz*f,y:(p.y||0)+dy*f};
+  if(!npcRoofStepClear(s,k,p,q))break;
+  Object.assign(p,q);p.rot=Math.atan2(dx,dz);trip.travel+=step;distance-=step;
+  if(step>=length-.0001)trip.index++;
+ }
+ if(trip.index>=trip.points.length){
+  if(trip.descending){p.y=0;trip.complete=true;p.targetChair=null;p.goal=null;p.decisionAt=0;return true;}
+  if(usable&&!chair.occupied&&!characterMovementBlocked(s,k,p.x,p.z,chair.x,chair.z,chair.y)){
+   p.sitting=Number(trip.chair);p.x=chair.x;p.z=chair.z;p.y=chair.y;chair.occupied=k;p.memory??={};p.memory[trip.chair]={x:chair.x,y:chair.y,z:chair.z};
+  }
+ }
+ return true;
+}
+function npcRoofVisualPoint(trip,distance){
+ for(let i=1;i<trip.points.length;i++){
+  const a=trip.points[i-1],b=trip.points[i],length=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z);
+  if(distance<=length){const f=length?distance/length:1;return{x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,z:a.z+(b.z-a.z)*f};}distance-=length;
+ }return trip.points[trip.points.length-1];
+}
 function npcChairUsable(s,k,p,n){
- const c=s.chairs?.[n];return !!(c&&!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Number(n)!==Number(p.previous)&&!Object.entries(s.players||{}).some(([other,v])=>other!==k&&Number(v.sitting)===Number(n))&&!npcWorldBlocked(s,c.x,c.z,.78)&&!(p.npcAvoidChairs?.[n]>Date.now()));
+ const c=s.chairs?.[n];return !!(c&&!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Number(n)!==Number(p.previous)&&!Object.entries(s.players||{}).some(([other,v])=>other!==k&&Number(v.sitting)===Number(n))&&(npcRoofForChair(c)?!npcRoofBusy(s,k,npcRoofForChair(c)):!(c.y>3)&&!npcWorldBlocked(s,c.x,c.z,.78))&&!(p.npcAvoidChairs?.[n]>Date.now()));
 }
 function npcDecision(s,k,p,now){
  const committed=s.chairs?.[p.targetChair];
  if(p.goal&&committed&&npcChairUsable(s,k,p,p.targetChair)){
-  p.goal={x:committed.x,z:committed.z};return;
+  p.goal=npcChairGoal(s,k,p,p.targetChair);return;
  }
- if(p.targetChair&&!npcChairUsable(s,k,p,p.targetChair)){p.targetChair=null;p.goal=null;p.decisionAt=0;}
- if(p.decisionAt>now)return;p.decisionAt=now+randBetween(1700,4300);if(s.phase==='search'&&p.alive&&!p.sitting){const chairs=Object.entries(s.chairs).filter(([n,c])=>npcChairUsable(s,k,p,n));if(!chairs.length){p.targetChair=null;p.goal=null;return;}const choice=chairs.map(([n,c])=>{const distance=Math.hypot(c.x-p.x,c.z-p.z);const others=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&!v.sitting&&Math.hypot(v.x-c.x,v.z-c.z)<14).length;let score=-distance*.14-others*(p.personality==='独立型'?5:2)+Math.random()*12;if(p.memory?.[n])score+=5;if(p.personality==='慎重型')score-=distance*.12;if(p.personality==='積極型')score+=distance*.035;return {n,c,score}}).sort((a,b)=>b.score-a.score);if(p.personality==='気まぐれ型'&&Math.random()<.35)choice.reverse();p.targetChair=choice[0]?.n||null;const newGoal=p.targetChair?{x:s.chairs[p.targetChair].x,z:s.chairs[p.targetChair].z}:null;
+ if(p.targetChair&&!npcChairUsable(s,k,p,p.targetChair)){if(!p.npcRoofTrip?.active)p.npcRoofTrip=null;p.targetChair=null;p.goal=null;p.decisionAt=0;}
+ if(p.decisionAt>now)return;p.decisionAt=now+randBetween(1700,4300);if(s.phase==='search'&&p.alive&&!p.sitting){const chairs=Object.entries(s.chairs).filter(([n,c])=>npcChairUsable(s,k,p,n));if(!chairs.length){p.targetChair=null;p.goal=null;return;}const choice=chairs.map(([n,c])=>{const distance=Math.hypot(c.x-p.x,c.z-p.z);const others=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&!v.sitting&&Math.hypot(v.x-c.x,v.z-c.z)<14).length;let score=-distance*.14-others*(p.personality==='独立型'?5:2)+Math.random()*12;if(p.memory?.[n])score+=5;if(p.personality==='慎重型')score-=distance*.12;if(p.personality==='積極型')score+=distance*.035;return {n,c,score}}).sort((a,b)=>b.score-a.score);if(p.personality==='気まぐれ型'&&Math.random()<.35)choice.reverse();p.targetChair=choice[0]?.n||null;const newGoal=p.targetChair?npcChairGoal(s,k,p,p.targetChair):null;
 // Keep this chair until it becomes unavailable or is reached.
 p.goal=newGoal;p.waypoint=null; }
 if(s.phase==='return')p.goal=npcReturnGoal(k);}
@@ -2264,7 +2343,7 @@ function npcMovementClear(s,k,p,x,z){
  const actors=npcActorLists(s);
  if(characterMovementBlocked(s,k,p.x,p.z,x,z,p.y||0))return false;
  for(const [chairId,c] of actors.chairs){
-  if(c.removed||c.hiddenAt||c.carrier)continue;
+  if(c.removed||c.hiddenAt||c.carrier||Math.abs((c.y||0)-(p.y||0))>2.2)continue;
   const radius=String(s.players[k]?.targetChair)===chairId ? .9 : 1.8;
   const ox=p.x-c.x,oz=p.z-c.z,before=ox*ox+oz*oz;
   if(before<radius*radius&&(ox*(x-p.x)+oz*(z-p.z)>0||before<1e-8))continue;
@@ -2434,13 +2513,15 @@ function npcSimulate(s,dt,now){
  npcActorState=s;npcActors=Object.entries(s.players);npcChairActors=Object.entries(s.chairs||{});
  const entries=npcActors.filter(([_,p])=>p.npc),offset=npcNavOrder++%Math.max(1,entries.length);
  const npcEntries=entries.slice(offset).concat(entries.slice(0,offset));
+ const departureOrder=s.phase==='search'&&entries.some(([k,p])=>p.searchIntentRound!==s.round)?entries.slice().sort(([ak,a],[bk,b])=>b.z-a.z||Math.abs(a.x-buildingSites[3].x)-Math.abs(b.x-buildingSites[3].x)||ak.localeCompare(bk)):[];
  for(const [k,p] of npcEntries){
  p.z=screenSafeZ(p.x,p.z,p.y||0);
+ if(p.npcRoofTrip&&npcUpdateRoofTrip(s,k,p,dt,now))continue;
  if(s.phase==='search')npcTryCostume(s,k,p);if(s.phase==='search'&&p.alive&&p.sitting)continue;if(!soloMode&&s.phase==='vote'&&insideBlackBuilding(p.x,p.z)){if(canCastVote(s,k)&&!s.votes?.[k]&&now>s.deadline-VOTE_MS+randBetween(2500,15000)){const choice=chooseNPCVote(s,k);if(choice){s.votes[k]=choice;p.voted=true}}}if(s.phase==='finished')continue;// A chair-search intention is independent of alive/sitting status. Only willing NPCs exit.
 if(s.phase==='search'&&p.searchIntentRound!==s.round){
  p.searchIntentRound=s.round;p.searchIntent=true;p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
  // The front rows depart first; waiting NPCs stay clear of the doorway.
- p.departureAt=now+(Math.max(0,4-Math.floor((p.z-buildingSites[3].z-3)/4.2))*5+(npcDepartureSlot(k)%5))*850;
+ p.departureAt=now+Math.max(0,departureOrder.findIndex(([key])=>key===k))*450;
  p.departureDone=false;
 }
 // Hide a carried/seated chair on a short, time-limited detour during gathering.
@@ -2484,16 +2565,17 @@ if(!p.goal&&!inspectingSpot){if(s.phase==='search'&&!p.departureDone)continue;if
 // Discard legacy fixed routes when resuming an existing room.
 p.buildingRoute=null;p.waypoint=null;p.localBypass=null;p.returnDoorStep=false;
 if(!p.goal){p.waypoint=null;continue;}
+if(p.npcRoofTrip&&!p.npcRoofTrip.active&&Math.hypot(p.x-p.goal.x,p.z-p.goal.z)<.65){npcUpdateRoofTrip(s,k,p,dt,now);continue;}
 const distToGoal=Math.hypot(p.goal.x-p.x,p.goal.z-p.z);
-if(!hidingOnReturn&&!inspectingSpot&&distToGoal<(npcReturning(s)?1.4:2.5)&&npcGoalReachable(s,k,p,p.goal)){
- if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&npcChairUsable(s,k,p,p.targetChair)&&!characterMovementBlocked(s,k,p.x,p.z,c.x,c.z,c.y||0)&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=k;p.memory??={};p.memory[p.targetChair]={x:c.x,z:c.z};continue;}}
+if(!p.npcRoofTrip&&!hidingOnReturn&&!inspectingSpot&&distToGoal<(npcReturning(s)?1.4:2.5)&&npcGoalReachable(s,k,p,p.goal)){
+ if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&Math.abs((p.y||0)-(c.y||0))<2.2&&npcChairUsable(s,k,p,p.targetChair)&&!characterMovementBlocked(s,k,p.x,p.z,c.x,c.z,c.y||0)&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=k;p.memory??={};p.memory[p.targetChair]={x:c.x,z:c.z};continue;}}
  p.goal=null;p.decisionAt=0;npcNavigation.delete(room+":"+k);continue;
 }
 p.npcMotionWatch??={x:p.x,z:p.z,at:now};
 if(Math.hypot(p.x-p.npcMotionWatch.x,p.z-p.npcMotionWatch.z)>1.5)p.npcMotionWatch={x:p.x,z:p.z,at:now};
 else if(now-p.npcMotionWatch.at>10000&&(p.targetChair||p.npcExploreAfterSearch)&&!npcReturning(s)&&!inspectingSpot){
  if(p.targetChair){p.npcAvoidChairs??={};p.npcAvoidChairs[p.targetChair]=Date.now()+15000;}
- p.targetChair=null;p.goal=null;p.decisionAt=0;p.npcMotionWatch={x:p.x,z:p.z,at:now};npcNavigation.delete(room+':'+k);continue;
+ p.npcRoofTrip=null;p.targetChair=null;p.goal=null;p.decisionAt=0;p.npcMotionWatch={x:p.x,z:p.z,at:now};npcNavigation.delete(room+':'+k);continue;
 }
 const destination=npcNavigationTarget(s,k,p,now);
 if(!destination){p.waypoint=null;continue;}
@@ -2568,7 +2650,7 @@ $('givePin').onclick=()=>{if(!mapUnlocked)return;const partner=nearestPartner();
 function nearestAction(){for(let b of ['touch','sit','hideChair','revealChair','moveChair','trade'])if(!$(b).hidden)return $(b);return null}
 const actionIcons={"chair": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></svg>", "walk": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"22\" cy=\"6\" r=\"4\" fill=\"#efc29d\"/><path d=\"m19 13 7 7 7 1m-15-7-7 8m8-9-3 12-7 11m8-11 10 11\" fill=\"none\" stroke=\"#387ca1\" stroke-width=\"4\"/></svg>", "pin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></svg>", "lift": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(9 -2) scale(.65)\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "place": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#f1c39c\" d=\"m5 14 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 10 8 3h5\"/><path d=\"M20 25v12m-5-5 5 5 5-5\"/></svg>", "hide": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#52864b\" d=\"M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z\"/><path fill=\"#9b663a\" d=\"M17 24h6v13h-6z\"/></svg>", "search": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m24 24 9 9\" stroke-width=\"6\"/><circle cx=\"16\" cy=\"16\" r=\"11\" fill=\"#aad7e0\"/><path d=\"M10 15a6 6 0 0 1 6-6\" stroke=\"#fff\"/></svg>", "giveCoin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(6 -3) scale(.7)\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "givePin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(8 -1) scale(.6)\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "shirt": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#699ec8\" d=\"m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z\"/></svg>", "hat": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#805b9d\" d=\"m11 7 3-3 12 3 3 23H11Z\"/><path fill=\"#d5a861\" d=\"M11 23h18v6H11z\"/><ellipse cx=\"20\" cy=\"31\" rx=\"17\" ry=\"5\" fill=\"#805b9d\"/></svg>", "glasses": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g fill=\"#b3d9e4\"><circle cx=\"10\" cy=\"24\" r=\"8\"/><circle cx=\"30\" cy=\"24\" r=\"8\"/></g><path d=\"M18 23h4M3 20 6 8m31 12L34 8\"/></svg>", "pickup": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/><path d=\"M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4\"/></svg>", "vote": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#7298ab\" d=\"m5 21 15-7 15 7v15H5Z\"/><path d=\"M13 23h14\"/><path fill=\"#fff3d7\" d=\"m14 3 15 5-6 17-15-5Z\"/><path d=\"m14 13 3 4 7-6\"/></svg>"};
 function setActionIcon(id,kind){const button=$(id);if(button.dataset.icon===kind)return;button.innerHTML=actionIcons[kind];button.dataset.icon=kind;}
-function refreshActions(){if(!state)return;closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=mapChair?.[1]?.occupied===id?null:nearbyHiddenChairForMark(); $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-Date.now())/1000);}}
+function refreshActions(){if(!state)return;closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=mapChair?.[1]?.occupied===id?null:nearbyHiddenChairForMark(); $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-Date.now())/1000);}}
 function openModal(title,body,mode){$('modalCancel').hidden=false;$('modalConfirm').hidden=false;modalMode=mode;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;modal.classList.add('open');if(mode==='voteButtons')$('touch').hidden=true;}
 function updateTradeAmount(n){const input=$('tradeAmount'),issuer=$('tradeIssuer');if(!input||!issuer)return;const max=Number(player()?.wallet?.[issuer.value]||0);input.value=String(Math.max(1,Math.min(max||1,Math.floor(n)||1)));$('tradeAmountValue').textContent=input.value;}
 function selectTradeCoin(key){$('tradeIssuer').value=key;for(const btn of document.querySelectorAll('#tradeCoinChoices button'))btn.classList.toggle('selected',btn.dataset.issuer===key);updateTradeAmount(1);}
@@ -2751,6 +2833,13 @@ let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSyn
   }updateFinishedPose(a,state,v,t);let seatChair=v.sitting&&state.chairs?.[v.sitting];let seated=!!(seatChair&&!seatChair.removed&&!seatChair.carrier&&!seatChair.hiddenAt&&(!seatChair.occupied||seatChair.occupied===k));if(seated){a.position.set(seatChair.x,seatChair.y||0,seatChair.z+.12);a.rotation.y=0;a.userData.smoothReady=false;}else{
  const tx=k===id?me.x:(v.x||0),ty=k===id?playerHeight:(v.y||0),tz=k===id?me.z:(v.z||0),tr=k===id?me.rot:(v.rot||0);
  if(k===id){a.position.set(tx,ty,tz);a.rotation.y=tr;}
+ else if(v.npcRoofTrip?.active){
+ const trip=v.npcRoofTrip,key=trip.building+':'+trip.descending+':'+JSON.stringify(trip.points[0]);
+ if(a.userData.roofVisualKey!==key){a.userData.roofVisualKey=key;a.userData.roofTravel=0;}
+ const visualTravel=Math.min(trip.travel,(a.userData.roofTravel||0)+(v.run||9)*dt*1.15);
+ const point=npcRoofVisualPoint(trip,visualTravel);
+ if(!characterMovementBlocked(state,k,a.position.x,a.position.z,point.x,point.z,point.y,true)){a.userData.roofTravel=visualTravel;a.position.set(point.x,point.y,point.z);}a.rotation.y=tr;a.userData.smoothReady=false;
+ }
  else if(!a.userData.smoothReady||Math.hypot(tx-a.position.x,tz-a.position.z)>28){a.position.set(tx,ty,tz);a.rotation.y=tr;a.userData.smoothReady=true;}
  else{
   // The NPC simulation is deliberately infrequent to save CPU and Firebase writes.

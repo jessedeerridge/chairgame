@@ -5,10 +5,12 @@ function generate(seed){const c=vm.createContext({});return JSON.parse(JSON.stri
 function distance(x,z,p){const dx=p.bx-p.ax,dz=p.bz-p.az,t=Math.max(0,Math.min(1,((x-p.ax)*dx+(z-p.az)*dz)/(dx*dx+dz*dz||1)));return Math.hypot(x-p.ax-t*dx,z-p.az-t*dz);}
 function inside(x,z,q,r){return x>q.minX-r&&x<q.maxX+r&&z>q.minZ-r&&z<q.maxZ+r;}
 test('100 seeds preserve spacing, hiding, connected roads and collision-free footprints',()=>{
+ let empty=0;const roofs=new Set();
  for(let seed=1;seed<=100;seed++){
   const w=generate(seed),objects=[...w.trees,...w.spots,...w.signs],chairs=Object.values(w.chairs);
   assert.deepEqual(w.buildings[3],{x:0,z:0,w:50,d:44,h:15});
-  assert.equal(chairs.length,15);assert.equal(chairs.filter(c=>c.hiddenAt).length,6);assert.equal(new Set(chairs.filter(c=>c.hiddenAt).map(c=>c.hiddenAt)).size,6);
+  const elevated=chairs.filter(c=>c.y>3);assert(elevated.length<=1);if(elevated.length)roofs.add(elevated[0].roofBuilding);else empty++;
+  assert(chairs.filter(c=>c.y>3).length<=1);assert.equal(chairs.length,15);assert.equal(chairs.filter(c=>c.hiddenAt).length,6);assert.equal(new Set(chairs.filter(c=>c.hiddenAt).map(c=>c.hiddenAt)).size,6);
   assert(w.spots.filter(p=>p.type==='bush').length>=140);assert(w.spots.filter(p=>p.type==='tree').length>=35);assert(w.trees.length>=300);assert(w.signs.length>=30);
   assert(w.trees.some(p=>p.style==='row'));assert(w.trees.some(p=>p.style==='grove'));assert(w.spots.some(p=>p.style==='row'||p.style==='grove'));
   for(let i=0;i<w.zones.length;i++)for(let j=0;j<i;j++){
@@ -25,6 +27,7 @@ test('100 seeds preserve spacing, hiding, connected roads and collision-free foo
   for(let i=0;i<chairs.length;i++){
    const c=chairs[i];for(let j=0;j<i;j++)assert(Math.hypot(c.x-chairs[j].x,c.z-chairs[j].z)>=4);
    if(c.hiddenAt){assert(w.spots.some(p=>p.id===c.hiddenAt&&p.x===c.x&&p.z===c.z));continue;}
+   if(c.y>3){const b=w.buildings[c.roofBuilding];assert(c.roofBuilding<3);assert.equal(c.y,b.h+1.2);assert(Math.abs(c.x-b.x)<b.w/2-3);assert(c.z>b.z);continue;}
    assert(!w.zones.some(q=>inside(c.x,c.z,q,3.3)));
    for(const p of objects)assert(Math.hypot(c.x-p.x,c.z-p.z)>=p.r+1.3+.8-1e-6);
   }
@@ -38,6 +41,7 @@ test('100 seeds preserve spacing, hiding, connected roads and collision-free foo
    const a=w.paths[i];if([...reached].some(j=>{const b=w.paths[j];return Math.min(distance(a.ax,a.az,b),distance(a.bx,a.bz,b),distance(b.ax,b.az,a),distance(b.bx,b.bz,a))<.01;})){reached.add(i);changed=true;}
   }}assert.equal(reached.size,w.paths.length,'disconnected road');
  }
+ assert(empty>0&&empty<100);assert.equal(roofs.size,3);
 });
 test('seed reproduces the complete world and changes every requested object category',()=>{
  const a=generate(123456),b=generate(654321);assert.deepEqual(generate(123456),a);
