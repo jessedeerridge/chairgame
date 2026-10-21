@@ -1115,7 +1115,14 @@ function introSessionKey(s){return room+':'+(s.introStarted||s.started||0);}
 function introPlaybackFor(s){
  if(s?.phase!=='instructions')return null;
  const key=introSessionKey(s);
- if(!introPlayback||introPlayback.key!==key)introPlayback={key,page:0,elapsed:0,lastFrameAt:null,presented:false,complete:false,waitingForWorld:false};
+ if(!introPlayback||introPlayback.key!==key){
+  let saved=null;
+  try{saved=JSON.parse(localStorage.getItem('island-intro:'+room+':'+id)||'null');}catch{}
+  if(saved?.key!==key)saved=null;
+  const seen=s.players?.[id]?.introSeen===key;
+  introPlayback={key,page:seen?8:Math.max(0,Math.min(8,Number(saved?.page)||0)),elapsed:seen?INTRO_PAGE_MS:Math.max(0,Math.min(INTRO_PAGE_MS,Number(saved?.elapsed)||0)),lastFrameAt:null,presented:false,complete:seen||saved?.complete===true,waitingForWorld:false};
+ }
+
  return introPlayback;
 }
 function tickIntroPlayback(s,now,visible=true,contentReady=true){
@@ -1134,13 +1141,22 @@ function tickIntroPlayback(s,now,visible=true,contentReady=true){
    else playback.complete=true;
   }
  }
- playback.lastFrameAt=now;return playback;
+ playback.lastFrameAt=now;saveIntroPlayback();return playback;
 }
 function markIntroFramePresented(s,now){
  const playback=introPlaybackFor(s);
  if(playback&&!playback.presented){playback.presented=true;playback.lastFrameAt=now;}
 }
-function pauseIntroPlayback(){if(introPlayback)introPlayback.lastFrameAt=null;}
+let introSavedValue='';
+function saveIntroPlayback(){
+ if(!introPlayback)return;
+ const p=introPlayback,value=JSON.stringify({key:p.key,page:p.page,elapsed:Math.floor(p.elapsed/1000)*1000,complete:p.complete});
+ const storageKey='island-intro:'+room+':'+id;
+ if(introSavedValue===storageKey+value)return;
+ try{localStorage.setItem(storageKey,value);introSavedValue=storageKey+value;}catch{}
+}
+function pauseIntroPlayback(){if(introPlayback){saveIntroPlayback();introPlayback.lastFrameAt=null;}}
+
 document.addEventListener('visibilitychange',pauseIntroPlayback);
 function introParticipantsReady(s){
  const humans=Object.values(s.players||{}).filter(p=>!p.npc&&p.online!==false);
@@ -1813,24 +1829,25 @@ function renderUI(){if(!state)return;renderLobby();updateMapVisibility();if(!sol
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
 開票：${Object.entries(state.voteCounts||{}).map(([k,n])=>(state.players[k]?.name||k)+' '+n+'票').join(' / ')||'未開票'}`;if(renderUI.oldPhase!==state.phase&&state.phase){const notices={instructions:'',sitIntro:insideBlackBuilding(me.x,me.z)?'':'着席！',search:'',return:'TIME UP!\n投票に戻れ！',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:'',finished:'ゲーム終了！'};if(renderUI.oldPhase!==undefined&&notices[state.phase])announce(notices[state.phase]);else if(!notices[state.phase]){$('gameNotice').style.display='none';clearTimeout(announce.timer)}renderUI.oldPhase=state.phase}if(renderUI.oldRemoved!==state.lastRemoved&&state.lastRemoved){renderUI.oldRemoved=state.lastRemoved}if(state.phase==='sitIntro'&&insideBlackBuilding(me.x,me.z)){$('gameNotice').style.display='none';clearTimeout(announce.timer)}refreshActions();receiveSharedPin()}
 async function mutate(fn){if(soloMode){if(!state)return;fn(state);renderUI();return;}if(!room)return;let result=await runTransaction(ref(database(),`rooms/${room}`),s=>{if(!s)return;fn(s);return s},{applyLocally:false});if(!result.committed)log('操作できませんでした')}
-$('join').onclick=async()=>{try{await ensureFirebase();$('join').disabled=true;$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;
+let roomSubscription=null,joiningRoom=false;
+$('join').onclick=async()=>{if(joiningRoom)return;joiningRoom=true;try{$('join').disabled=true;await ensureFirebase();$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;
 // Same room + same exact name always resolves to the same Firebase player record.
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
 id='U'+Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
 let root=ref(database(),`rooms/${room}`);await runTransaction(root,s=>s||{host:id,hostName:name,phase:'lobby',round:0,chairs:worldReady?seedChairs():{},accessories:initialAccessories(),players:{},votes:{}},{applyLocally:false});
-await update(ref(database(),`rooms/${room}/accessories`),Object.fromEntries(accessoryCatalog.map((_,i)=>['gear'+i,null])));
 const playerPath=ref(database(),`rooms/${room}/players/${id}`);
 const joined=await runTransaction(playerPath,p=>p?{...p,name,online:true,worldReady:false}:{name,worldReady:false,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true},{applyLocally:false});
-const saved=joined.snapshot.val();me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
+const saved=joined.snapshot.val();lastAppliedSpawn=saved?.spawn?.version||null;me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
 await onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(false);
 // Chair state belongs to the shared room. Preserve sitting and the occupied chair
 // across reconnects; only a chair being carried is dropped on disconnection.
 await prepareDisconnectChair(saved);
-onValue(root,snap=>{const oldPhase=state?.phase;state=snap.val();host=state?.host===id;
+roomSubscription?.();
+await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=incoming;host=state.host===id;
 if(state?.players?.[id]){applyAssignedSpawn(state);prepareDisconnectChair(state.players[id]);}
 if(state?.phase==='instructions'&&oldPhase!=='instructions'&&state.players?.[id]&&!state.players[id].spawn){
  const p=state.players[id];me.x=p.x;me.z=p.z;playerHeight=0;me.rot=p.rot||Math.PI;yaw=me.rot;
-}renderUI()});$('entry').hidden=true;log('部屋 '+room+' に参加（保存データを復元）')}catch(e){console.error('参加失敗',e);alert('部屋に参加できません：'+(e?.message||e))}finally{$('join').disabled=false;$('join').textContent='島に参加する'}};
+}renderUI();$('entry').hidden=true;document.getElementById('runtimeError').textContent='';resolve();},reject);});log('部屋 '+room+' に参加（保存データを復元）')}catch(e){console.error('参加失敗',e);alert('部屋に参加できません：'+(e?.message||e))}finally{joiningRoom=false;$('join').disabled=false;$('join').textContent='あそぶ ➜'}};
 // Server-side disconnect actions work even when the browser is abruptly closed.
 // Re-arm only when the carried chair or last recorded drop position changes.
 let disconnectChairId=null,disconnectChairPos='',disconnectChairBusy=false;
@@ -2694,7 +2711,7 @@ $('stackButton').onclick=async event=>{
   applyAssignedSpawn(state);resetStackIdle(performance.now());
  }finally{relocating=false;$('stackButton').disabled=false;}
 };
-let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(isOnlineLobby()){pauseIntroPlayback();previous=t;return;}syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
+let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(!state||isOnlineLobby()){pauseIntroPlayback();previous=t;return;}syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
  // Never step off the rooftop slab, including the stair-side entrance corner.
  // A descent is permitted only onto a real stair flight or its bridge.
  if(current>2.5 && playerHeight>2.5){
@@ -2835,7 +2852,6 @@ function saveEntryFields(){try{localStorage.setItem(entryCacheKey,JSON.stringify
 document.getElementById('name').addEventListener('input',saveEntryFields);
 document.getElementById('room').addEventListener('input',saveEntryFields);
  let booting=false;
- const entry=document.getElementById('entry');
  for(const buttonId of ['join','solo']){
   const button=document.getElementById(buttonId);
   button.addEventListener('click',function firstPlay(event){
@@ -2846,13 +2862,7 @@ document.getElementById('room').addEventListener('input',saveEntryFields);
    if(buttonId==='join'){
     const code=document.getElementById('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);
     if(!code){alert('部屋コードを入力');return;}
-    entry.hidden=true;document.body.classList.add('in-lobby');document.body.classList.remove('playing');
-    document.getElementById('lobbyScreen').hidden=false;
-    const tag=document.getElementById('lobbyRoom');tag.textContent=code;tag.setAttribute('aria-label','ルーム '+code);
-    const card=document.createElement('div');card.className='lobby-player is-self';
-    const name=document.createElement('strong');name.textContent=document.getElementById('name').value.trim()||'プレイヤー';card.append(name);
-    document.getElementById('lobbyParticipants').replaceChildren(card);
-    const start=document.getElementById('start');start.hidden=false;start.disabled=true;
+    // Keep the connection screen until the room snapshot determines lobby or game.
    }
    booting=true;
    const original=button.innerHTML;
@@ -2861,7 +2871,7 @@ document.getElementById('room').addEventListener('input',saveEntryFields);
     window.removeEventListener('islandGameModuleReady',ready);
     window.__islandGameReady=true;
     button.disabled=false;button.innerHTML=original;
-    button.click();
+    button.onclick?.call(button,new Event('click'));
    };
    window.addEventListener('islandGameModuleReady',ready,{once:true});
    const loadGame=()=>{
@@ -2869,7 +2879,7 @@ document.getElementById('room').addEventListener('input',saveEntryFields);
     module.textContent=document.getElementById('deferredGameCode').textContent;
     document.body.appendChild(module);
    };
-   // Present the lobby before importing Three.js or constructing any room geometry.
+   // Paint connection feedback before importing Three.js or constructing geometry.
    if(buttonId==='join')requestAnimationFrame(()=>requestAnimationFrame(loadGame));else loadGame();
   },{capture:true});
  }

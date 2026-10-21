@@ -10,6 +10,7 @@ function setup(){
  const advanceStart=html.indexOf('function prepareSoloNPCVotes(s)'),advanceEnd=html.indexOf('let advancing=false;',advanceStart);
  const roundStart=html.indexOf('function initRound(s)'),roundEnd=html.indexOf('function indoorSpawn',roundStart);
  vm.runInContext(`
+ const stored=new Map(),localStorage={getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v)};
  const listeners={},document={addEventListener:(name,fn)=>listeners[name]=fn};
  let room='TEST',id='human',soloMode=true,state=null,worldReady=true;
  let writes=[];const update=async(path,value)=>writes.push({path,value}),ref=(db,path)=>path,database=()=>({});
@@ -77,4 +78,15 @@ test('tied vote shows no-removal announcement after six seconds without removing
  advanceState(s,100);assert.equal(s.phase,'results');assert.equal(s.deadline,6100);
  advanceState(s,6099);assert.equal(s.phase,'results');advanceState(s,6100);assert.equal(s.phase,'eraseReveal');assert(s.noChairErased);assert.equal(s.lastRemoved,null);assert.equal(s.chairs[1].removed,false);
  paintVoteWall();assert(texts.includes('椅子は除外されませんでした'));advanceState(s,12099);assert.equal(s.phase,'eraseReveal');advanceState(s,12100);assert.equal(s.phase,'sitIntro');assert.equal(s.noChairErased,false);assert.equal(s.chairs[1].removed,false);
+`));
+
+test('reload resumes the same intro page and elapsed display time',()=>setup()(`
+ const s=game();present(s,0);present(s,6000);present(s,9000);
+ assert.equal(introPlayback.page,1);introPlayback=null;
+ const resumed=present(s,100000);assert.equal(resumed.page,1);assert.equal(resumed.elapsed,3000);
+ present(s,102999);assert.equal(resumed.page,1);present(s,103000);assert.equal(resumed.page,2);
+`));
+test('server acknowledgement keeps a completed intro completed on another session',()=>setup()(`
+ const s=game();s.players.human.introSeen=introSessionKey(s);
+ const p=present(s,0);assert.equal(p.page,8);assert.equal(p.complete,true);
 `));

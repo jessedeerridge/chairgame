@@ -16,7 +16,7 @@ export const onValue=(ref,fn)=>{listeners.set(ref.path,fn);window.__emitFakeData
 export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async()=>{}});
 `;
 (async()=>{
- let lobbyBeforeImports=0;let data={},revision=0,pages=[],noticeTimer=null,positionWritesInLobby=0;
+ let connectionBeforeImports=0;let data={},revision=0,pages=[],noticeTimer=null,positionWritesInLobby=0;
  const clone=x=>JSON.parse(JSON.stringify(x??null));
  const read=key=>key.split('/').reduce((v,k)=>v?.[k],data)??null;
  const write=(key,value)=>{const parts=key.split('/');let v=data;for(const k of parts.slice(0,-1))v=v[k]??={};v[parts.at(-1)]=clone(value);};
@@ -40,11 +40,11 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
    await page.route('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js',r=>r.fulfill({body:'export const initializeApp=()=>({});',contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
    await page.route('https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js',r=>r.fulfill({body:databaseModule,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
    if(process.env.THREE_MODULE_PATH)await page.route('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',async r=>{
-    const waiting=await page.evaluate(()=>document.body.classList.contains('in-lobby')&&!document.querySelector('#lobbyScreen').hidden&&document.querySelector('#entry').hidden&&!window.__islandGameReady&&document.querySelector('.lobby-player strong').textContent);
-    assert.equal(waiting,name,'3D import started before the lobby was displayed');lobbyBeforeImports++;
+    const waiting=await page.evaluate(()=>!document.querySelector('#entry').hidden&&document.querySelector('#lobbyScreen').hidden&&!window.__islandGameReady&&document.querySelector('#name').value);
+    assert.equal(waiting,name,'connection screen must remain visible until room state is known');connectionBeforeImports++;
     await r.fulfill({path:process.env.THREE_MODULE_PATH,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}});
    });
-   await page.addInitScript(()=>{window.holdTestLoad=true;localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));});
+   await page.addInitScript(()=>{window.holdTestLoad=true;if(!localStorage.getItem('island-chair-game-entry-v1'))localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));});
    await page.goto('http://127.0.0.1:'+server.address().port);
    assert.equal(await page.inputValue('#name'),'以前の名前');assert.equal(await page.inputValue('#room'),'OLDROOM');
    await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady};performance.mark("island-room-ready");`);});
@@ -74,7 +74,35 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   await guest.waitForFunction(()=>!document.querySelector('#stackButton').hidden);await guest.click('#stackButton');
   await guest.waitForFunction(old=>Math.hypot(window.lobbyTest.getMe().x-old.x,window.lobbyTest.getMe().z-old.z)>2.2,before,{timeout:10000});
   const relocated=await guest.evaluate(()=>{const t=window.lobbyTest,p=t.getMe();return{point:p,minDistance:Math.min(...Object.entries(t.getState().players).filter(([k,v])=>k!==t.getId()&&v.online!==false).map(([k,v])=>Math.hypot(v.x-p.x,v.z-p.z))),hidden:document.querySelector('#stackButton').hidden};});
-  assert(relocated.minDistance>=2.2);assert.equal(relocated.hidden,true);assert.deepEqual(errors,[]);if(process.env.THREE_MODULE_PATH)assert.equal(lobbyBeforeImports,2);
-  console.log(JSON.stringify({participants:2,lobbyBeforeImports,startedBeforeLoad:true,loadedInBackground:true,positionWritesInLobby,uniqueStartingPositions:20,relocated,errors},null,2));
+  assert(relocated.minDistance>=2.2);assert.equal(relocated.hidden,true);
+  await pages[0].close();
+  const guestId=await guest.evaluate(()=>window.lobbyTest.getId());
+  const started=read('rooms/TEST/started'),introStarted=read('rooms/TEST/introStarted');
+  // Preserve an in-progress introduction across a real document reload.
+  await guest.reload();
+  await guest.evaluate(()=>{
+   const code=document.querySelector('#deferredGameCode');
+   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getState:()=>state,getMe:()=>({...me}),getIntro:()=>introPlaybackFor(state),tick:tickIntroPlayback,save:saveIntroPlayback};performance.mark("island-room-ready");`);
+   window.sawRejoinLobby=false;new MutationObserver(()=>{if(!document.querySelector('#lobbyScreen').hidden)window.sawRejoinLobby=true;}).observe(document.querySelector('#lobbyScreen'),{attributes:true});
+  });
+  await guest.click('#join');
+  await guest.waitForFunction(()=>window.rejoinTest?.getState()?.phase==='instructions');
+  assert.equal(await guest.evaluate(()=>window.sawRejoinLobby),false);
+  assert.equal(read('rooms/TEST/started'),started);assert.equal(read('rooms/TEST/introStarted'),introStarted);
+  await guest.evaluate(()=>{const p=window.rejoinTest.getIntro();p.page=4;p.elapsed=3000;window.rejoinTest.save();});
+  await guest.reload();
+  await guest.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getState:()=>state,getMe:()=>({...me}),getIntro:()=>introPlaybackFor(state)};performance.mark("island-room-ready");`);});
+  await guest.click('#join');await guest.waitForFunction(()=>window.rejoinTest?.getState()?.phase==='instructions');
+  assert.equal(await guest.evaluate(()=>window.rejoinTest.getIntro().page),4,'intro restarted on reload');
+  // Mid-round reconnection must restore the saved game, wallet, chair and location.
+  const saved=clone(read('rooms/TEST/players/'+guestId));Object.assign(saved,{x:100,z:80,y:0,roundMarker:'preserved',wallet:{[guestId]:17}});
+  await guest.reload();
+  write('rooms/TEST/players/'+guestId,saved);write('rooms/TEST/phase','search');write('rooms/TEST/round',3);write('rooms/TEST/deadline',Date.now()+90000);revision++;
+  await guest.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getState:()=>state,getMe:()=>({...me})};performance.mark("island-room-ready");`);window.sawRejoinLobby=false;new MutationObserver(()=>{if(!document.querySelector('#lobbyScreen').hidden)window.sawRejoinLobby=true;}).observe(document.querySelector('#lobbyScreen'),{attributes:true});});
+  await guest.click('#join');await guest.waitForFunction(()=>window.rejoinTest?.getState()?.phase==='search');
+  const restored=await guest.evaluate(()=>({s:window.rejoinTest.getState(),me:window.rejoinTest.getMe(),lobby:window.sawRejoinLobby}));
+  assert.equal(restored.s.round,3);assert.equal(restored.s.started,started);assert.equal(restored.me.x,100);assert.equal(restored.me.z,80);assert.equal(restored.s.players[guestId].wallet[guestId],17);assert.equal(restored.lobby,false);
+  assert.deepEqual(errors,[]);if(process.env.THREE_MODULE_PATH)assert.equal(connectionBeforeImports,5);
+  console.log(JSON.stringify({participants:2,connectionBeforeImports,startedBeforeLoad:true,loadedInBackground:true,positionWritesInLobby,uniqueStartingPositions:20,relocated,errors},null,2));
  }finally{clearTimeout(noticeTimer);if(browser)await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
