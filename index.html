@@ -1754,12 +1754,6 @@ function renderUI(){if(!state)return;renderLobby();if(!soloMode)preloadRoomPlaye
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
 開票：${Object.entries(state.voteCounts||{}).map(([k,n])=>(state.players[k]?.name||k)+' '+n+'票').join(' / ')||'未開票'}`;if(renderUI.oldPhase!==state.phase&&state.phase){const notices={instructions:'',sitIntro:insideBlackBuilding(me.x,me.z)?'':'着席！',search:'',return:'TIME UP!\n投票に戻れ！',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:'',finished:'ゲーム終了！'};if(renderUI.oldPhase!==undefined&&notices[state.phase])announce(notices[state.phase]);else if(!notices[state.phase]){$('gameNotice').style.display='none';clearTimeout(announce.timer)}renderUI.oldPhase=state.phase}if(renderUI.oldRemoved!==state.lastRemoved&&state.lastRemoved){renderUI.oldRemoved=state.lastRemoved}if(state.phase==='sitIntro'&&insideBlackBuilding(me.x,me.z)){$('gameNotice').style.display='none';clearTimeout(announce.timer)}refreshActions();receiveSharedPin()}
 async function mutate(fn){if(soloMode){if(!state)return;fn(state);renderUI();return;}if(!room)return;let result=await runTransaction(ref(database(),`rooms/${room}`),s=>{if(!s)return;fn(s);return s},{applyLocally:false});if(!result.committed)log('操作できませんでした')}
-// Remember the entry fields on this device, including unfinished typing.
-const entryCacheKey='island-chair-game-entry-v1';
-try {const saved=JSON.parse(localStorage.getItem(entryCacheKey)||'{}');if(typeof saved.name==='string')$('name').value=saved.name;if(typeof saved.room==='string')$('room').value=saved.room;}catch(e){console.warn('入力欄の復元に失敗',e)}
-function saveEntryFields(){try{localStorage.setItem(entryCacheKey,JSON.stringify({name:$('name').value,room:$('room').value}));}catch(e){console.warn('入力欄の保存に失敗',e)}}
-$('name').addEventListener('input',saveEntryFields);
-$('room').addEventListener('input',saveEntryFields);
 $('join').onclick=async()=>{try{await ensureFirebase();$('join').disabled=true;$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;
 // Same room + same exact name always resolves to the same Firebase player record.
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
@@ -2687,11 +2681,18 @@ window.dispatchEvent(new Event("islandGameModuleReady"));
 // Both buttons use the same deferred boot process; online connection still occurs
 // only in the online button's own handler.
 (()=>{
+// Remember the entry fields on this device, including unfinished typing.
+const entryCacheKey='island-chair-game-entry-v1';
+try {const saved=JSON.parse(localStorage.getItem(entryCacheKey)||'{}');if(typeof saved.name==='string')document.getElementById('name').value=saved.name;if(typeof saved.room==='string')document.getElementById('room').value=saved.room;}catch(e){console.warn('入力欄の復元に失敗',e)}
+function saveEntryFields(){try{localStorage.setItem(entryCacheKey,JSON.stringify({name:document.getElementById('name').value,room:document.getElementById('room').value}));}catch(e){console.warn('入力欄の保存に失敗',e)}}
+document.getElementById('name').addEventListener('input',saveEntryFields);
+document.getElementById('room').addEventListener('input',saveEntryFields);
  let booting=false;
  const entry=document.getElementById('entry');
  for(const buttonId of ['join','solo']){
   const button=document.getElementById(buttonId);
   button.addEventListener('click',function firstPlay(event){
+   saveEntryFields();
    if(window.__islandGameReady)return;
    event.preventDefault();event.stopImmediatePropagation();
    if(booting)return;
