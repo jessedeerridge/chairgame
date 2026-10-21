@@ -9,7 +9,8 @@ function setup(){
  assert(start>=0&&end>start);
  const advanceStart=html.indexOf('function prepareSoloNPCVotes(s)'),advanceEnd=html.indexOf('let advancing=false;',advanceStart);
  const roundStart=html.indexOf('function initRound(s)'),roundEnd=html.indexOf('function indoorSpawn',roundStart);
- vm.runInContext(`
+ vm.runInContext(`function roomNow(){return Date.now()}
+
  const stored=new Map(),localStorage={getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v)};
  const listeners={},document={addEventListener:(name,fn)=>listeners[name]=fn};
  let room='TEST',id='human',soloMode=true,state=null,worldReady=true;

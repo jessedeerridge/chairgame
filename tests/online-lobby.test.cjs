@@ -1,7 +1,8 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const cut=(a,b)=>{const start=html.indexOf(a),end=html.indexOf(b,start);assert(start>=0&&end>start);return html.slice(start,end);};
-function setup(){const c=vm.createContext({assert});vm.runInContext(`function lobbyParticipants(s){return Object.entries(s.players||{}).filter(([_,p])=>!p.npc&&p.online!==false)};`+cut('const SHIRT_COLORS','let playerPreloadTask'),c);return code=>vm.runInContext(code,c);}
+function setup(){const c=vm.createContext({assert});vm.runInContext(`function roomNow(){return Date.now()}
+function lobbyParticipants(s){return Object.entries(s.players||{}).filter(([_,p])=>!p.npc&&p.online!==false)};`+cut('const SHIRT_COLORS','let playerPreloadTask'),c);return code=>vm.runInContext(code,c);}
 test('12 distinct colors can be reserved; changing colors releases the previous choice',()=>setup()(`
  const s={phase:'lobby',players:{}};
  for(let i=0;i<12;i++){s.players['p'+i]={online:true,shirtColor:availableShirtColor(s,'p'+i)};assert(s.players['p'+i].shirtColor);}
@@ -23,12 +24,17 @@ test('an active participant takes over a disconnected host and keeps ownership o
 `));
 test('delayed online advancement keeps absolute deadlines instead of restarting timers',async()=>{
  const c=vm.createContext({assert});
- vm.runInContext(`let state={phase:'search',round:1,deadline:1000,players:{a:{alive:true,sitting:1,x:0,z:0},b:{alive:true,sitting:2,x:0,z:0}},votes:{}},host=true,worldReady=true,soloMode=false;
+ vm.runInContext(`function roomNow(){return Date.now()}
+let state={phase:'search',round:1,deadline:1000,players:{a:{alive:true,sitting:1,x:0,z:0},b:{alive:true,sitting:2,x:0,z:0}},votes:{}},host=true,worldReady=true,soloMode=false;
  const SEARCH_MS=90000,RETURN_MS=40000,VOTE_INTRO_MS=7000,VOTE_MS=30000,RESULTS_MS=7000,VOTE_X=0,VOTE_Z=-7;
  Date.now=()=>50000;const phase=()=>state.phase;async function mutate(fn){fn(state)}function insideBlackBuilding(){return true}function prepareSoloNPCVotes(){}
- `+cut('function advanceState(s,now)','setInterval(advance,700);'),c);
- await vm.runInContext(`advance()`,c);vm.runInContext(`assert.equal(state.phase,'vote');assert.equal(state.deadline,78000);`,c);
- await vm.runInContext(`advance()`,c);vm.runInContext(`assert.equal(state.deadline,78000);`,c);
+ `+cut('function advanceState(s,now)','setInterval(advance,250);'),c);
+ await vm.runInContext(`function roomNow(){return Date.now()}
+advance()`,c);vm.runInContext(`function roomNow(){return Date.now()}
+assert.equal(state.phase,'vote');assert.equal(state.deadline,78000);`,c);
+ await vm.runInContext(`function roomNow(){return Date.now()}
+advance()`,c);vm.runInContext(`function roomNow(){return Date.now()}
+assert.equal(state.deadline,78000);`,c);
 });
 test('reentry bypasses full-room and palette checks without changing the saved outfit',()=>setup()(`
  const s={phase:'search',players:{}};for(let i=0;i<12;i++)s.players['p'+i]={online:true,initial:true,shirtColor:SHIRT_COLORS[i].id};

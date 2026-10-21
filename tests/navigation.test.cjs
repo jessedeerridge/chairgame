@@ -12,7 +12,8 @@ const world=fs.readFileSync(path.join(__dirname,'fixtures/navigation-world.json'
 const cut=(a,b)=>{const start=html.indexOf(a),end=html.indexOf(b,start);assert(start>=0&&end>start);return html.slice(start,end);};
 function setup(){
  const c=vm.createContext({performance,assert,console});
- vm.runInContext(`const {obstacles,hidingSpots,buildingSites,stairways,largeBuildings,VOTE_X,VOTE_Z}=${world};
+ vm.runInContext(`function roomNow(){return Date.now()}
+const {obstacles,hidingSpots,buildingSites,stairways,largeBuildings,VOTE_X,VOTE_Z}=${world};
  let roofRoomWalls=[],playerHeight=0,state=null,soloMode=false,room='TEST',id='local',me={x:150,z:150};
  let randomSeed=123456;Math.random=()=>{randomSeed=(Math.imul(randomSeed,1664525)+1013904223)>>>0;return randomSeed/4294967296;};
  function randBetween(a,b){return a+(b-a)*Math.random()}
@@ -22,7 +23,8 @@ function setup(){
  function canCastVote(){return false}function chooseNPCVote(){}
  const SEARCH_MS=90000,VOTE_MS=30000,accessoryCatalog=[];
  `+cut('function roofEdgeBlocked','function occupiedAt')+cut('// Spatial buckets','// NPC hide-spot inspection')+cut('function npcRoofForChair','// NPCs try to collect')+cut('const NPC_SEARCH_OBSERVE_RADIUS','// Update decisions and local motion')+cut('function npcSimulate','let npcBusy='),c);
- vm.runInContext(`
+ vm.runInContext(`function roomNow(){return Date.now()}
+
  function game(players={},phase='search'){state={phase,round:1,deadline:1000000,players,chairs:{},votes:{},accessories:{}};return state;}
  function npc(x,z,goal){return {npc:true,alive:false,initialDispersed:true,departureDone:true,searchIntentRound:1,searchIntent:true,x,z,goal,walk:5,run:9,decisionAt:1e9,npcSpotDecisionAt:1e9,memory:{}};}
  function safe(p){if(!npcWorldBlocked(state||{phase:'search'},p.x,p.z,1))return p;for(let r=1;r<15;r++)for(let i=0;i<24;i++){const q={x:p.x+Math.sin(i*Math.PI/12)*r,z:p.z+Math.cos(i*Math.PI/12)*r};if(!npcWorldBlocked(state||{phase:'search'},q.x,q.z,1))return q;}throw Error('fixture has no nearby free point');}
@@ -181,4 +183,11 @@ test('later departures accelerate and the last of nineteen is scheduled at exact
  s.chairs={1:{x:0,z:65}};npcSimulate(s,.28,10000);
  const times=Object.values(s.players).map(p=>p.departureAt).sort((a,b)=>a-b);assert.equal(times[0],10000);assert(times[1]-times[0]>100);assert.equal(times.at(-1)-times[0],600);
  let previousGap=Infinity;for(let i=1;i<times.length;i++){const gap=times[i]-times[i-1];assert(gap>0);assert(gap<=previousGap+1);previousGap=gap;}
+`));
+test('indoor departure starts with no A-star budget and retains the distant actual destination',()=>setup()(`
+ const p=npc(0,15,{x:-200,z:-200}),s=game({NPC0:p}),goal=p.goal;
+ npcNavNodesLeft=0;npcNavDeadline=0;
+ const target=npcNavigationTarget(s,'NPC0',p,10000);
+ assert(target);assert.equal(target.x,buildingSites[3].x);assert.equal(target.z,buildingSites[3].z+buildingSites[3].d/2+4);assert.equal(p.goal,goal);assert(p.npcExitPending);
+ p.x=target.x;p.z=target.z;npcNavigationTarget(s,'NPC0',p,11000);assert.equal(p.npcExitPending,false);assert.equal(p.goal,goal);
 `));

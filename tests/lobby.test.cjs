@@ -3,7 +3,8 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'),world=fs
 function cut(a,b){const start=html.indexOf(a),end=html.indexOf(b,start);assert(start>=0&&end>start);return html.slice(start,end);}
 function setup(){
  const c=vm.createContext({assert});
- vm.runInContext(`const {buildingSites,largeBuildings,stairways,obstacles,hidingSpots,VOTE_X,VOTE_Z}=${world};
+ vm.runInContext(`function roomNow(){return Date.now()}
+const {buildingSites,largeBuildings,stairways,obstacles,hidingSpots,VOTE_X,VOTE_Z}=${world};
  let roofRoomWalls=[],playerHeight=0,me={x:0,z:12,rot:0},yaw=0,lastSync=0,clock=0;const performance={now:()=>clock};
  let id='local',room='TEST',soloMode=false,state=null,host=true,worldReady=true,loadedWorldSeed=null;const WORLD_LAYOUT_VERSION=1;let generatedSeed=null;function makeWorldLayout(seed){generatedSeed=seed;return{chairs:{}}}
  const button={hidden:true,disabled:false,classList:{toggle(){}},addEventListener(){}};const $=()=>button;

@@ -5,14 +5,14 @@ const {chromium}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const databaseModule=`
-const listeners=new Map(),transactionCache=new Set();
+const listeners=new Map(),transactionCache=new Set(),pendingTransactions=new Set();window.testCanceledTransactions=0;
 window.__emitFakeDatabase=async()=>{for(const [path,fn] of listeners){const snapshot=await window.testRead(path);fn({val:()=>snapshot.value});}};
 export const getDatabase=()=>({});export const ref=(db,path)=>({path});
-export async function runTransaction(ref,fn){if(!transactionCache.has(ref.path)){const first=fn(null);if(first===undefined)return{committed:false,snapshot:{val:()=>null}};transactionCache.add(ref.path);}for(let i=0;i<100;i++){const old=await window.testRead(ref.path),next=fn(old.value);if(next===undefined)return{committed:false,snapshot:{val:()=>old.value}};const result=await window.testCommit(ref.path,next,old.revision);if(result.ok)return{committed:true,snapshot:{val:()=>result.value}};}throw Error('transaction retry limit');}
-export const update=async(ref,values)=>window.testUpdate(ref.path,values);
+export async function runTransaction(ref,fn){const token={path:ref.path,canceled:false};pendingTransactions.add(token);try{if(!transactionCache.has(ref.path)){const first=fn(null);if(first===undefined)return{committed:false,snapshot:{val:()=>null}};transactionCache.add(ref.path);}for(let i=0;i<100;i++){const old=await window.testRead(ref.path),next=fn(old.value);if(next===undefined||token.canceled)return{committed:false,snapshot:{val:()=>old.value}};const result=await window.testCommit(ref.path,next,old.revision);if(token.canceled)return{committed:false,snapshot:{val:()=>result.value}};if(result.ok)return{committed:true,snapshot:{val:()=>result.value}};}throw Error('transaction retry limit');}finally{pendingTransactions.delete(token);}}
+export const update=async(ref,values)=>{for(const t of pendingTransactions)if(ref.path.startsWith(t.path+'/')){t.canceled=true;window.testCanceledTransactions++;}return window.testUpdate(ref.path,values);};
 export const set=async(ref,value)=>{const old=await window.testRead(ref.path);return window.testCommit(ref.path,value,old.revision);};
 export const get=async(ref)=>{const old=await window.testRead(ref.path);return{val:()=>old.value};};
-export const onValue=(ref,fn)=>{listeners.set(ref.path,fn);window.__emitFakeDatabase();return()=>listeners.delete(ref.path);};
+export const onValue=(ref,fn)=>{if(ref.path==='.info/serverTimeOffset'){fn({val:()=>-(window.testClockSkew||0)});return()=>{}}listeners.set(ref.path,fn);window.__emitFakeDatabase();return()=>listeners.delete(ref.path);};
 export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async()=>{}});
 `;
 (async()=>{
@@ -29,10 +29,12 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   for(const name of ['Host','Guest']){
    const page=await browser.newPage(name==='Guest'?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{});pages.push(page);page.on('pageerror',e=>errors.push(e.message));
    await page.exposeBinding('testRead',(_,key)=>({value:clone(read(key)),revision}));
-   await page.exposeBinding('testCommit',(_,key,next,expected)=>{
+   await page.exposeBinding('testCommit',async(_,key,next,expected)=>{
+    await new Promise(resolve=>setTimeout(resolve,20));
     if(revision!==expected)return{ok:false};const before=JSON.stringify(read(key));if(before!==JSON.stringify(next)){write(key,next);revision++;notify();}return{ok:true,value:clone(next)};
    });
-   await page.exposeBinding('testUpdate',(_,key,values)=>{
+   await page.exposeBinding('testUpdate',async(_,key,values)=>{
+    await new Promise(resolve=>setTimeout(resolve,20));
     if(read('rooms/TEST/phase')==='lobby'&&('x'in values||'z'in values))positionWritesInLobby++;
     const current=clone(read(key))||{};for(const [k,v] of Object.entries(values)){if(v===null)delete current[k];else current[k]=v;}
     if(JSON.stringify(read(key))!==JSON.stringify(current)){write(key,current);revision++;notify();}return true;
@@ -44,10 +46,10 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
     assert.equal(waiting,name,'connection screen must remain visible until room state is known');connectionBeforeImports++;
     await r.fulfill({path:process.env.THREE_MODULE_PATH,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}});
    });
-   await page.addInitScript(()=>{window.holdTestLoad=true;if(!localStorage.getItem('island-chair-game-entry-v1'))localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));});
+   await page.addInitScript(({skew})=>{window.testClockSkew=skew;const realNow=Date.now.bind(Date);Date.now=()=>realNow()+skew;window.holdTestLoad=true;if(!localStorage.getItem('island-chair-game-entry-v1'))localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));},{skew:name==='Guest'?120000:-90000});
    await page.goto('http://127.0.0.1:'+server.address().port);
    assert.equal(await page.inputValue('#name'),'以前の名前');assert.equal(await page.inputValue('#room'),'OLDROOM');
-   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady,getLayout:()=>worldLayout,getAvatarColor:k=>avatars[k]?.userData.torso.material.color.getHex()};performance.mark("island-room-ready");`);});
+   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={debug:()=>({joiningRoom,hidden:document.hidden,yaw,keys:{...keys},phase:state.phase,me:{...me},player:player()}),getNow:()=>roomNow(),keys,getAvatarPosition:k=>avatars[k]?{x:avatars[k].position.x,z:avatars[k].position.z}:null,getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady,getLayout:()=>worldLayout,getAvatarColor:k=>avatars[k]?.userData.torso.material.color.getHex()};performance.mark("island-room-ready");`);});
    await page.fill('#name',name);await page.fill('#room','TEST');await page.click('#join');await page.waitForFunction(()=>window.lobbyTest?.getState()?.players?.[window.lobbyTest.getId()],{timeout:60000});
   }
   assert.deepEqual(Object.values(read('rooms/TEST/players')).filter(p=>!p.npc).map(p=>p.name).sort(),['Guest','Host']);
@@ -84,6 +86,20 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   for(let i=0;i<players.length;i++)for(let j=i+1;j<players.length;j++)assert(Math.hypot(players[i].x-players[j].x,players[i].z-players[j].z)>=2.2,'overlapping initial positions');
   for(const page of pages){const p=await page.evaluate(()=>{const t=window.lobbyTest,me=t.getMe(),spawn=t.getState().players[t.getId()].spawn;return{distance:Math.hypot(me.x-spawn.x,me.z-spawn.z),spawn};});assert.equal(p.distance,0,'client did not apply its assigned spawn');}
   for(const page of pages)assert.equal(await page.locator('#miniMapPanel').isVisible(),false);
+  const clocks=await Promise.all(pages.map(p=>p.evaluate(()=>({corrected:window.lobbyTest.getNow(),raw:Date.now()}))));
+  assert(Math.abs(clocks[0].raw-clocks[1].raw)>200000);assert(Math.abs(clocks[0].corrected-clocks[1].corrected)<1000);
+  const movingGuest=pages[1],movingId=await movingGuest.evaluate(()=>lobbyTest.getId()),startX=await movingGuest.evaluate(()=>lobbyTest.getMe().x);
+  await movingGuest.evaluate(()=>lobbyTest.keys.KeyD=true);await movingGuest.waitForFunction(x=>lobbyTest.getMe().x>x+.5,startX,{timeout:6000}).catch(async error=>{console.log('motion debug',await movingGuest.evaluate(()=>lobbyTest.debug()),errors);throw error});
+  await movingGuest.evaluate(()=>lobbyTest.keys.KeyD=false);const endpoint=await movingGuest.evaluate(()=>lobbyTest.getMe());
+  await pages[0].waitForFunction(({key,x,z})=>{const p=lobbyTest.getState().players[key],a=lobbyTest.getAvatarPosition(key);return a&&Math.hypot(p.x-x,p.z-z)<.1&&Math.hypot(a.x-x,a.z-z)<.3;},{key:movingId,x:endpoint.x,z:endpoint.z},{timeout:10000});
+  for(const page of pages)assert.equal(await page.evaluate(()=>window.testCanceledTransactions),0,'position writes canceled a room transaction');
+  // A confirmed relocation on the other side of the viewer must not leave the remote avatar stuck on that viewer's body.
+  const moved=clone(read('rooms/TEST/players/'+movingId));Object.assign(moved,{x:3,z:15.6,y:0,spawn:{x:3,z:15.6,rot:Math.PI,version:'test:relocation'}});
+  write('rooms/TEST/players/'+movingId,moved);revision++;notify();
+  await movingGuest.waitForFunction(()=>Math.abs(lobbyTest.getMe().x-3)<.1);
+  await pages[0].waitForFunction(key=>{const a=lobbyTest.getAvatarPosition(key);return a&&Math.hypot(a.x-3,a.z-15.6)<.3;},movingId,{timeout:5000});
+
+
   const guest=pages[1],before=await guest.evaluate(()=>{const t=window.lobbyTest,p=t.getState().players.NPC0;t.setMe(p);t.updateMapVisibility();t.showStack();return{x:p.x,z:p.z};});
   await guest.waitForFunction(()=>!document.querySelector('#stackButton').hidden);
   const stack=await guest.evaluate(()=>{const b=document.querySelector('#stackButton'),r=b.getBoundingClientRect();return{floating:b.parentElement===document.body,left:r.left,bottom:innerHeight-r.bottom,mapVisible:document.querySelector('#miniMapPanel').getBoundingClientRect().width>0};});
@@ -101,7 +117,7 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   await guest.reload();
   await guest.evaluate(()=>{
    const code=document.querySelector('#deferredGameCode');
-   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getState:()=>state,getMe:()=>({...me}),getIntro:()=>introPlaybackFor(state),tick:tickIntroPlayback,save:saveIntroPlayback};performance.mark("island-room-ready");`);
+   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getNow:()=>roomNow(),getState:()=>state,getMe:()=>({...me}),getIntro:()=>introPlaybackFor(state),tick:tickIntroPlayback,save:saveIntroPlayback};performance.mark("island-room-ready");`);
    window.sawRejoinLobby=false;new MutationObserver(()=>{if(!document.querySelector('#lobbyScreen').hidden)window.sawRejoinLobby=true;}).observe(document.querySelector('#lobbyScreen'),{attributes:true});
   });
   await guest.click('#join');
@@ -112,20 +128,25 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   const liveIntroStarted=Date.now()-39000;write('rooms/TEST/introStarted',liveIntroStarted);write('rooms/TEST/deadline',liveIntroStarted+54000);revision++;
   await guest.evaluate(({stamp,playerId})=>{
    localStorage.setItem('island-intro:TEST:'+playerId,JSON.stringify({key:'TEST:'+stamp,page:0,elapsed:1000}));
-   const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getState:()=>state,getMe:()=>({...me}),getIntro:()=>introPlaybackFor(state)};performance.mark("island-room-ready");`);
+   const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getNow:()=>roomNow(),getState:()=>state,getMe:()=>({...me}),getIntro:()=>introPlaybackFor(state)};performance.mark("island-room-ready");`);
   },{stamp:liveIntroStarted,playerId:guestId});
   await guest.click('#join');await guest.waitForFunction(()=>window.rejoinTest?.getState()?.phase==='instructions');
-  const synced=await guest.evaluate(()=>{const t=window.rejoinTest,p=t.getIntro();return{page:p.page,expected:Math.min(8,Math.floor((Date.now()-t.getState().introStarted)/6000))};});
+  const synced=await guest.evaluate(()=>{const t=window.rejoinTest,p=t.getIntro();return{page:p.page,expected:Math.min(8,Math.floor((t.getNow()-t.getState().introStarted)/6000))};});
   assert.equal(synced.page,synced.expected);assert(synced.page>=6,'reentry used the old personal playback time');
   // Mid-round reconnection must restore the saved game, wallet, chair and location.
   const saved=clone(read('rooms/TEST/players/'+guestId));Object.assign(saved,{x:100,z:80,y:0,roundMarker:'preserved',wallet:{[guestId]:17}});
   await guest.reload();
   write('rooms/TEST/players/'+guestId,saved);write('rooms/TEST/phase','search');write('rooms/TEST/round',3);write('rooms/TEST/deadline',Date.now()+25000);const liveDeadline=read('rooms/TEST/deadline');revision++;
-  await guest.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getState:()=>state,getMe:()=>({...me})};performance.mark("island-room-ready");`);window.sawRejoinLobby=false;new MutationObserver(()=>{if(!document.querySelector('#lobbyScreen').hidden)window.sawRejoinLobby=true;}).observe(document.querySelector('#lobbyScreen'),{attributes:true});});
+  await guest.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinTest={getNow:()=>roomNow(),getState:()=>state,getMe:()=>({...me})};performance.mark("island-room-ready");`);window.sawRejoinLobby=false;new MutationObserver(()=>{if(!document.querySelector('#lobbyScreen').hidden)window.sawRejoinLobby=true;}).observe(document.querySelector('#lobbyScreen'),{attributes:true});});
   await guest.click('#join');await guest.waitForFunction(()=>window.rejoinTest?.getState()?.phase==='search');
   const restored=await guest.evaluate(()=>({s:window.rejoinTest.getState(),me:window.rejoinTest.getMe(),lobby:window.sawRejoinLobby}));
   assert.equal(restored.s.round,3);assert.equal(restored.s.deadline,liveDeadline);assert(Number((await guest.textContent('#clockSeconds')).split(':')[1])<=25);assert.equal(restored.s.started,started);assert.equal(restored.me.x,100);assert.equal(restored.me.z,80);assert.equal(restored.s.players[guestId].wallet[guestId],17);assert.equal(restored.lobby,false);
+
+  write('rooms/TEST/phase','instructions');write('rooms/TEST/introStarted',Date.now()-54050);write('rooms/TEST/introReadyAt',Date.now()-7000);write('rooms/TEST/worldPreparing',false);write('rooms/TEST/deadline',Date.now()-50);revision++;notify();
+  await guest.waitForFunction(()=>rejoinTest.getState().phase==='sitIntro',null,{timeout:5000});
+  await guest.waitForFunction(()=>rejoinTest.getState().phase==='search',null,{timeout:6000});
+  assert.equal(await guest.evaluate(()=>window.testCanceledTransactions),0);
   assert.deepEqual(errors,[]);if(process.env.THREE_MODULE_PATH)assert.equal(connectionBeforeImports,5);
-  console.log(JSON.stringify({participants:2,connectionBeforeImports,startedBeforeLoad:true,loadedInBackground:true,positionWritesInLobby,uniqueStartingPositions:20,relocated,errors},null,2));
+  console.log(JSON.stringify({participants:2,clockSkewMs:210000,movementSynced:true,finalCountsAdvanced:true,connectionBeforeImports,startedBeforeLoad:true,loadedInBackground:true,positionWritesInLobby,uniqueStartingPositions:20,relocated,errors},null,2));
  }finally{clearTimeout(noticeTimer);if(browser)await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

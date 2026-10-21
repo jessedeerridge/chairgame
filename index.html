@@ -145,14 +145,64 @@ async function loadFirebase(){
  const [app,db]=await Promise.all([import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js')]);
  firebaseModules={...app,...db};return firebaseModules;
 }
-let initializeApp, getDatabase,ref,onValue,set,update,runTransaction,onDisconnect,get;
-async function ensureFirebase(){const f=await loadFirebase();({initializeApp,getDatabase,ref,onValue,set,update,runTransaction,onDisconnect,get}=f);}
+let initializeApp, getDatabase,ref,onValue,set,firebaseUpdate,runTransaction,onDisconnect,get;
+async function ensureFirebase(){const f=await loadFirebase();({initializeApp,getDatabase,ref,onValue,set,update:firebaseUpdate,runTransaction,onDisconnect,get}=f);}
+// Use Firebase's server clock for shared deadlines, never a participant's device clock.
+let serverClockOffset=0,serverClockSubscription=null,connectionSubscription=null;
+function roomNow(){return Date.now()+serverClockOffset;}
+async function syncRoomClock(){
+ if(serverClockSubscription)return;
+ await new Promise((resolve,reject)=>{
+  serverClockSubscription=onValue(ref(database(),'.info/serverTimeOffset'),snap=>{
+   const offset=Number(snap.val());if(Number.isFinite(offset))serverClockOffset=offset;resolve();
+  },reject);
+ });
+ if(!connectionSubscription)connectionSubscription=onValue(ref(database(),'.info/connected'),snap=>{
+  if(snap.val()!==true||joiningRoom||!room||!state?.players?.[id])return;
+  // A reconnect must restore visibility and flush the latest local position.
+  lastPositionPacket='';lastPositionSent=0;
+  onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(false).catch(console.warn);
+  update(ref(database(),`rooms/${room}/players/${id}`),{online:true}).catch(console.warn);
+ });
+}
+// Child update()/set() cancels an overlapping parent transaction in the Firebase SDK.
+// Reserve the room mutation first, finish older writes, and defer newer child writes.
+let roomTransactions=0,roomMutationQueue=Promise.resolve();
+const roomWriteWaiters=[],roomUpdateFlights=new Set();
+async function update(target,values){
+ while(roomTransactions)await new Promise(resolve=>roomWriteWaiters.push(resolve));
+ const flight=firebaseUpdate(target,values);roomUpdateFlights.add(flight);
+ try{return await flight;}finally{roomUpdateFlights.delete(flight);}
+}
+function releaseRoomWrites(){if(!roomTransactions)for(const resolve of roomWriteWaiters.splice(0))resolve();}
+function reconcileRoomPositions(s){
+ for(const p of Object.values(s?.players||{})){
+  const spawn=p.spawn,chair=p.sitting&&s.chairs?.[p.sitting];
+  if(!p.npc&&chair&&!chair.removed&&!chair.carrier&&!chair.hiddenAt){p.x=chair.x;p.z=chair.z;p.y=chair.y||0;continue;}
+  // An older position packet must not override a newly assigned start/relocation.
+  if(!p.npc&&spawn&&p.spawnApplied!==spawn.version){p.x=spawn.x;p.z=spawn.z;p.y=spawn.y||0;p.rot=spawn.rot||Math.PI;}
+ }
+ return s;
+}
+let lastPositionPacket='',lastPositionSent=0,positionWriteBusy=false;
+function publishPlayerPosition(t){
+ const p=player();if(!p||relocating||state.phase==='lobby'||t-lastSync<80)return;
+ const packet={x:Math.round(me.x*100)/100,y:Math.round(playerHeight*100)/100,z:Math.round(me.z*100)/100,rot:me.rot,
+  ...(mapUnlocked?{mapUnlockedFor:mapVisitKey}:{}),...(lastAppliedSpawn?{spawnApplied:lastAppliedSpawn}:{})};
+ if(soloMode){lastSync=t;Object.assign(p,packet);return;}
+ const signature=JSON.stringify(packet),needsAck=p.spawn?.version&&p.spawnApplied!==p.spawn.version;
+ if(positionWriteBusy||roomTransactions||!needsAck&&signature===lastPositionPacket&&t-lastPositionSent<1500)return;
+ lastSync=t;positionWriteBusy=true;const packetRoom=room,packetId=id;
+ update(ref(database(),`rooms/${packetRoom}/players/${packetId}`),packet).then(()=>{
+  if(room===packetRoom&&id===packetId){lastPositionPacket=signature;lastPositionSent=t;if(p.carrying)prepareDisconnectChair({...p,...packet});}
+ }).catch(console.warn).finally(()=>{positionWriteBusy=false;});
+}
 const threeSources=['https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js','https://unpkg.com/three@0.164.1/build/three.module.js','https://esm.sh/three@0.164.1'];
 for(const url of threeSources){try{THREE=await import(url);break}catch(e){console.warn('3D library failed:',url,e)}}
 if(!THREE){document.getElementById('entry').innerHTML='<div class="panel"><h2>3Dの読み込みに失敗</h2><p>通信制限で3Dライブラリを取得できませんでした。Chromeで開き、ネット接続を確認してください。</p><button onclick="location.reload()">再読み込み</button></div>';throw new Error('Three.js の読み込みに失敗しました');}
 
 const config={apiKey:'AIzaSyALgmax4WiOkFrdxaNC1Bfp6MdsEFoIfUU',authDomain:'studio-m7owg.firebaseapp.com',databaseURL:'https://studio-m7owg-default-rtdb.firebaseio.com',projectId:'studio-m7owg',storageBucket:'studio-m7owg.firebasestorage.app',messagingSenderId:'263329516095',appId:'1:263329516095:web:3d90a3993135dce1d8068a'};
-let db=null;function database(){if(!db)db=getDatabase(initializeApp(config));return db;}const $=id=>document.getElementById(id);let id=(globalThis.crypto?.randomUUID?.()||'p'+Date.now().toString(36)+Math.random().toString(36).slice(2)),room='',soloMode=false,state=null,host=false,me={x:0,z:12,rot:0},yaw=0,keys={},lastSync=0,near=null,tradePartner=null,modalMode='',npcs=[];const SIZE=690;
+let db=null;function database(){if(!db)db=getDatabase(initializeApp(config));return db;}const $=id=>document.getElementById(id);let id=(globalThis.crypto?.randomUUID?.()||'p'+roomNow().toString(36)+Math.random().toString(36).slice(2)),room='',soloMode=false,state=null,host=false,me={x:0,z:12,rot:0},yaw=0,keys={},lastSync=0,near=null,tradePartner=null,modalMode='',npcs=[];const SIZE=690;
 window.addEventListener('error',e=>{const d=document.getElementById('runtimeError');if(d)d.textContent='エラー: '+e.message});const scene=new THREE.Scene();scene.background=new THREE.Color(0x91c4db);scene.fog=new THREE.FogExp2(0x91c4db,.0027);const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,950);const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:"high-performance"});renderer.setPixelRatio(Math.min(devicePixelRatio,1));document.body.prepend(renderer.domElement);
 let rendererWidth=0,rendererHeight=0;
 function syncRendererSize(){
@@ -732,7 +782,7 @@ async function syncWorldPrepared(wantedSeed){
    }
    for(const p of Object.values(s.players||{}))p.z=screenSafeZ(p.x,p.z,p.y||0);
    for(const c of Object.values(s.chairs||{}))if(!c.hiddenAt&&!c.carrier)c.z=screenSafeZ(c.x,c.z,c.y||0);
-   s.screenBoundaryVersion=1;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;if(s.worldPreparing)s.introReadyAt=Date.now();s.worldPreparing=false;
+   s.screenBoundaryVersion=1;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;if(s.worldPreparing)s.introReadyAt=roomNow();s.worldPreparing=false;
   });
  }finally{worldPreparationBusy=false;}
 }
@@ -983,7 +1033,7 @@ voteWall.position.set(VOTE_X,8.1,voteWallZ+.09);scene.add(voteWall);
 const INTRO_PAGE_MS=6000,INTRO_PAGE_COUNT=9;
 let introPlayback=null;
 function introSessionKey(s){return room+':'+(s.introStarted||s.started||0);}
-function onlineIntroProgress(s,now=Date.now()){
+function onlineIntroProgress(s,now=roomNow()){
  const started=Number(s.introStarted||s.started||now),age=Math.max(0,now-started);
  const page=Math.min(INTRO_PAGE_COUNT-1,Math.floor(age/INTRO_PAGE_MS));
  const lastStart=Math.max(started+(INTRO_PAGE_COUNT-1)*INTRO_PAGE_MS,Number(s.introReadyAt)||0);
@@ -1069,7 +1119,7 @@ function voteResultLayout(s){
 }
 function paintVoteWall(){
  const s=state,playback=introPlaybackFor(s);
- const data=s?JSON.stringify([playback?.page,s.phase==='instructions'?[s.worldPreparing,Object.values(s.players||{}).filter(p=>p.initial&&p.alive).length,Object.values(s.chairs||{}).filter(c=>!c.removed).length]:null,s.phase,s.round,s.voteCounts,s.lastRemoved,s.noChairErased,s.parent,s.eliminatedNames,s.introStarted,s.selectedEraseChair,s.winner,s.finalRanks,Math.max(0,Math.ceil(((s.deadline||0)-Date.now())/1000)),s.players&&Object.fromEntries(Object.entries(s.players).map(([k,v])=>[k,v.name]))]):'waiting';
+ const data=s?JSON.stringify([playback?.page,s.phase==='instructions'?[s.worldPreparing,Object.values(s.players||{}).filter(p=>p.initial&&p.alive).length,Object.values(s.chairs||{}).filter(c=>!c.removed).length]:null,s.phase,s.round,s.voteCounts,s.lastRemoved,s.noChairErased,s.parent,s.eliminatedNames,s.introStarted,s.selectedEraseChair,s.winner,s.finalRanks,Math.max(0,Math.ceil(((s.deadline||0)-roomNow())/1000)),s.players&&Object.fromEntries(Object.entries(s.players).map(([k,v])=>[k,v.name]))]):'waiting';
  if(data===voteWallStateKey)return;voteWallStateKey=data;
  const c=voteWallCtx,W=1200,H=720;
  const bg=c.createLinearGradient(0,0,W,H);bg.addColorStop(0,'#101f35');bg.addColorStop(1,'#080f20');c.fillStyle=bg;c.fillRect(0,0,W,H);
@@ -1158,7 +1208,7 @@ function paintVoteWall(){
  else if(s.phase==='vote')headline('投票時間…','');
  else if(s.phase==='sitIntro'){c.fillStyle='#e8faff';c.font='bold 180px sans-serif';c.textAlign='center';c.fillText('着席！',W/2,H/2);}
  else if(s.phase==='search'||s.phase==='return'||s.phase==='erase'){
-  c.fillStyle='#e8faff';c.font='bold 180px sans-serif';c.fillText(formatCountdown(((s.deadline||0)-Date.now())/1000),W/2,H/2);
+  c.fillStyle='#e8faff';c.font='bold 180px sans-serif';c.fillText(formatCountdown(((s.deadline||0)-roomNow())/1000),W/2,H/2);
  }
  else headline('ISLAND CHAIR GAME','投票結果はこちらに表示');
  voteWallTexture.needsUpdate=true;
@@ -1420,7 +1470,7 @@ function syncWearable(a,p){const h=a.userData.accessoryHead;if(!h)return;const w
 const groundAccessories={};
 function renderGroundAccessories(){const list=state?.accessories||{};for(const [key,item] of Object.entries(list)){
  let a=groundAccessories[key];if(!a||a.userData.signature!==item.kind+item.style){if(a)scene.remove(a);a=new THREE.Group();const model=accessoryModel(item.kind,item.style);model.scale.setScalar(.95);model.position.y=item.kind==='shirt'?.17:item.kind==='hat'?.12:.38;a.add(model);a.userData.signature=item.kind+item.style;groundAccessories[key]=a;scene.add(a)}// Reward items flutter gently from above before settling on the ground.
- const elapsed=item.dropAt?Math.max(0,(Date.now()-item.dropAt)/1000):99;
+ const elapsed=item.dropAt?Math.max(0,(roomNow()-item.dropAt)/1000):99;
  const progress=Math.min(1,elapsed/2.2);
  const fall=(1-progress)*(1-progress)*3.4;
  const flutter=progress<1?Math.sin(elapsed*10)*.30*(1-progress):0;
@@ -1444,8 +1494,8 @@ function accessibleCostumeDrop(px,pz,spot){
  return fallback||{x:px+Math.cos(base)*1.5,z:pz+Math.sin(base)*1.5};
 }
 function nearestAccessory(kindFilter=null){let best=null,d=3.8;for(const [key,a] of Object.entries(state?.accessories||{})){if(kindFilter&&((kindFilter==='shirt')!==(a.kind==='shirt')))continue;const r=Math.hypot(me.x-a.x,me.z-a.z);if(r<d){best=[key,a];d=r}}return best}
-$('pickupAccessory').onclick=()=>{const item=nearestAccessory('other');if(!item)return;mutate(s=>{const a=s.accessories?.[item[0]],p=s.players?.[id];if(!a||!p||Math.hypot((p.x||0)-a.x,(p.z||0)-a.z)>4)return;p.worn??={};const slot=a.kind==='hat'?'hat':'eyewear';const oldKind=slot==='eyewear'?(p.worn.glasses?'glasses':p.worn.sunglasses?'sunglasses':null):'hat';const old=oldKind?p.worn[oldKind]:null;if(slot==='eyewear'){delete p.worn.glasses;delete p.worn.sunglasses;}p.worn[a.kind]=a.style;delete s.accessories[item[0]];if(old){const key='dropped_'+id+'_'+Date.now()+'_'+Math.floor(Math.random()*99999);s.accessories[key]={kind:oldKind,style:old,x:p.x+1.3,z:p.z+1.3}}});};
-$('pickupShirt').onclick=()=>{const item=nearestAccessory('shirt');if(!item)return;mutate(s=>{const a=s.accessories?.[item[0]],p=s.players?.[id];if(!a||a.kind!=='shirt'||!p||Math.hypot((p.x||0)-a.x,(p.z||0)-a.z)>4)return;p.worn??={};const old=p.worn.shirt;p.worn.shirt=a.style;delete s.accessories[item[0]];if(old){const key='dropped_shirt_'+id+'_'+Date.now()+'_'+Math.floor(Math.random()*99999);s.accessories[key]={kind:'shirt',style:old,x:p.x+1.3,z:p.z+1.3}}});};
+$('pickupAccessory').onclick=()=>{const item=nearestAccessory('other');if(!item)return;mutate(s=>{const a=s.accessories?.[item[0]],p=s.players?.[id];if(!a||!p||Math.hypot((p.x||0)-a.x,(p.z||0)-a.z)>4)return;p.worn??={};const slot=a.kind==='hat'?'hat':'eyewear';const oldKind=slot==='eyewear'?(p.worn.glasses?'glasses':p.worn.sunglasses?'sunglasses':null):'hat';const old=oldKind?p.worn[oldKind]:null;if(slot==='eyewear'){delete p.worn.glasses;delete p.worn.sunglasses;}p.worn[a.kind]=a.style;delete s.accessories[item[0]];if(old){const key='dropped_'+id+'_'+roomNow()+'_'+Math.floor(Math.random()*99999);s.accessories[key]={kind:oldKind,style:old,x:p.x+1.3,z:p.z+1.3}}});};
+$('pickupShirt').onclick=()=>{const item=nearestAccessory('shirt');if(!item)return;mutate(s=>{const a=s.accessories?.[item[0]],p=s.players?.[id];if(!a||a.kind!=='shirt'||!p||Math.hypot((p.x||0)-a.x,(p.z||0)-a.z)>4)return;p.worn??={};const old=p.worn.shirt;p.worn.shirt=a.style;delete s.accessories[item[0]];if(old){const key='dropped_shirt_'+id+'_'+roomNow()+'_'+Math.floor(Math.random()*99999);s.accessories[key]={kind:'shirt',style:old,x:p.x+1.3,z:p.z+1.3}}});};
 const avatars={};const chairs={};const npcNames=['アキ','ユウ','レイ','ミナ','ソラ','カイ','リク','ナオ','ハル','サキ'];for(let i=0;i<24;i++){let a=i*2.399,r=18+rand(i+9000)*170;let npc={id:'NPC'+i,name:npcNames[i%10]+(i+1),x:Math.cos(a)*r,z:Math.sin(a)*r,rot:rand(i+33)*6.28,speed:1+rand(i+99)*4,turn:rand(i+500)*6.28,avatar:null,wallet:23};npcs.push(npc)}function chairObj(c){let g=new THREE.Group();let m=mat(0x8b5331);let seat=new THREE.Mesh(new THREE.BoxGeometry(1.7,.25,1.6),m);seat.position.y=1.1;g.add(seat);let back=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.7,.2),m);back.position.set(0,1.9,-.7);g.add(back);for(let x of [-.65,.65])for(let z of [-.55,.55]){let leg=new THREE.Mesh(new THREE.BoxGeometry(.18,1,.18),m);leg.position.set(x,.5,z);g.add(leg)}// Number is printed on the outward-facing back of the chair.
  const numberCanvas=document.createElement('canvas');numberCanvas.width=256;numberCanvas.height=256;
  const ctx=numberCanvas.getContext('2d');
@@ -1464,8 +1514,8 @@ const miniCanvas=$('miniMapCanvas'),miniCtx=miniCanvas.getContext('2d');
 miniCanvas.width=miniCanvas.height=320;
 const miniPanel=$('miniMapPanel'),miniBackdrop=$('miniMapBackdrop');
 let miniExpanded=false;let pinShareTarget=null;let selectedMapNote=-1;let pendingMapSpot=null;
-const miniNotes=[],explored=new Set(),exploreStep=4;let lastMapSave=0;let mapRestored=false,personalMapSession=null;
-function savePersonalMap(){if(soloMode||!room||!state?.players?.[id])return;const data={worldSeed:Number(state.worldSeed)||1,notes:miniNotes.map(n=>({number:n.number,x:n.x,z:n.z})),explored:[...explored]};update(ref(database(),`rooms/${room}/players/${id}`),{mapData:data}).catch(console.warn)}
+const miniNotes=[],explored=new Set(),exploreStep=4;let lastMapSave=0,lastPersonalMapSignature='';let mapRestored=false,personalMapSession=null;
+function savePersonalMap(){if(soloMode||!room||!state?.players?.[id])return;const data={worldSeed:Number(state.worldSeed)||1,notes:miniNotes.map(n=>({number:n.number,x:n.x,z:n.z})),explored:[...explored]};const signature=room+':'+id+':'+JSON.stringify(data);if(signature===lastPersonalMapSignature)return;lastPersonalMapSignature=signature;update(ref(database(),`rooms/${room}/players/${id}`),{mapData:data}).catch(error=>{if(lastPersonalMapSignature===signature)lastPersonalMapSignature='';console.warn(error)})}
 function restorePersonalMap(p){
  const session=room+':'+(Number(state?.worldSeed)||1);
  if(personalMapSession!==session){personalMapSession=session;mapRestored=false;}
@@ -1474,7 +1524,7 @@ function restorePersonalMap(p){
  miniNotes.splice(0,miniNotes.length,...(Array.isArray(data?.notes)?data.notes:[]));explored.clear();
  for(const cell of (Array.isArray(data?.explored)?data.explored:[]))explored.add(cell);drawMiniMap();
 }
-setInterval(()=>{if(!soloMode&&mapRestored&&Date.now()-lastMapSave>3000){lastMapSave=Date.now();savePersonalMap()}},4000);let miniEraseMode=false;let recentHiddenChair=null;
+setInterval(()=>{if(!soloMode&&mapRestored&&roomNow()-lastMapSave>3000){lastMapSave=roomNow();savePersonalMap()}},4000);let miniEraseMode=false;let recentHiddenChair=null;
 function upsertChairNote(n,x,z){const number=String(n);const i=miniNotes.findIndex(note=>note.number===number);const note={x,z,number};if(i>=0)miniNotes[i]=note;else miniNotes.push(note);drawMiniMap()}
 const mapEraser=$('miniEraser'),mapEditor=$('mapNumberEditor'),mapDisplay=$('mapNumberDisplay');let mapNumberValue='';
 // The highest chair number is based on the original set, including erased chairs.
@@ -1644,12 +1694,17 @@ function shirtColorIcon(color){
  icon.style.color='#'+color.hex.toString(16).padStart(6,'0');return icon;
 }
 function renderShirtColors(){
- const list=$('lobbyColors'),p=player();list.replaceChildren();
+ const list=$('lobbyColors'),p=player();
  for(const color of SHIRT_COLORS){
-  const button=document.createElement('button');button.type='button';button.className='shirt-color';button.dataset.color=color.id;
+  // Preserve the pressed DOM node across room snapshots, including pointerdown -> click.
+  let button=list.querySelector('[data-color="'+color.id+'"]');
+  if(!button){
+   button=document.createElement('button');button.type='button';button.className='shirt-color';button.dataset.color=color.id;
+   button.setAttribute('aria-label',color.name);button.title=color.name;button.append(shirtColorIcon(color));
+   button.onclick=()=>mutate(s=>chooseShirtColor(s,id,color.id));list.append(button);
+  }
   const selected=p?.shirtColor===color.id;button.disabled=availableShirtColor(state,id,color.id)!==color.id;
-  button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));button.setAttribute('aria-label',color.name);button.title=color.name;
-  button.append(shirtColorIcon(color));button.onclick=()=>mutate(s=>chooseShirtColor(s,id,color.id));list.append(button);
+  button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));
  }
 }
 function claimRoomHost(s){
@@ -1759,14 +1814,25 @@ function renderWallet(p){
 function renderUI(){if(!state)return;if(worldReady&&loadedWorldSeed!==Number(state.worldSeed||1))playerPreloadTask=null;renderLobby();updateMapVisibility();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));renderWallet(p);const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
 開票：${Object.entries(state.voteCounts||{}).map(([k,n])=>(state.players[k]?.name||k)+' '+n+'票').join(' / ')||'未開票'}`;if(renderUI.oldPhase!==state.phase&&state.phase){const notices={instructions:'',sitIntro:insideBlackBuilding(me.x,me.z)?'':'着席！',search:'',return:'TIME UP!\n投票に戻れ！',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:'',finished:'ゲーム終了！'};if(renderUI.oldPhase!==undefined&&notices[state.phase])announce(notices[state.phase]);else if(!notices[state.phase]){$('gameNotice').style.display='none';clearTimeout(announce.timer)}renderUI.oldPhase=state.phase}if(renderUI.oldRemoved!==state.lastRemoved&&state.lastRemoved){renderUI.oldRemoved=state.lastRemoved}if(state.phase==='sitIntro'&&insideBlackBuilding(me.x,me.z)){$('gameNotice').style.display='none';clearTimeout(announce.timer)}refreshActions();receiveSharedPin()}
-async function mutate(fn){if(soloMode){if(!state)return;fn(state);renderUI();return;}if(!room)return;let result=await runTransaction(ref(database(),`rooms/${room}`),s=>{if(!s)return;fn(s);return s},{applyLocally:false});if(!result.committed)log('操作できませんでした')}
+async function mutate(fn){
+ if(soloMode){if(!state)return;fn(state);renderUI();return;}if(!room)return;
+ const mutationRoom=room;roomTransactions++;
+ const task=async()=>{
+  try{
+   await Promise.allSettled([...roomUpdateFlights]);if(room!==mutationRoom)return;
+   const result=await runTransaction(ref(database(),`rooms/${mutationRoom}`),s=>{if(!s)return;reconcileRoomPositions(s);fn(s);return s},{applyLocally:false});
+   if(!result.committed)log('操作できませんでした');return result;
+  }finally{roomTransactions--;releaseRoomWrites();}
+ };
+ const pending=roomMutationQueue.then(task,task);roomMutationQueue=pending.catch(()=>{});return pending;
+}
 let roomSubscription=null,joiningRoom=false;
-$('join').onclick=async()=>{if(joiningRoom)return;joiningRoom=true;try{$('join').disabled=true;await ensureFirebase();$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;
+$('join').onclick=async()=>{if(joiningRoom)return;joiningRoom=true;try{$('join').disabled=true;await ensureFirebase();await syncRoomClock();$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;
 // Same room + same exact name always resolves to the same Firebase player record.
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
 id='U'+Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
 let root=ref(database(),`rooms/${room}`),admissionError=null;
-const joinTime=Date.now(),newRoomSeed=Math.floor(Math.random()*4294967295)+1;
+const joinTime=roomNow(),newRoomSeed=Math.floor(Math.random()*4294967295)+1;
 let joined;
 for(let attempt=0;attempt<3;attempt++){
  admissionError=null;
@@ -1781,13 +1847,13 @@ for(let attempt=0;attempt<3;attempt++){
  if(attempt<2)await get(root);
 }
 if(!joined.committed)throw new Error(admissionError==='full'?'この部屋は満員です（最大12人）':admissionError==='noNpc'?'交代できる脱落NPCがまだいません':admissionError==='finished'?'このゲームは終了しています':'入室を完了できませんでした。もう一度お試しください');
-const saved=joined.snapshot.val().players[id];lastAppliedSpawn=saved?.spawn?.version||null;me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
+const saved=joined.snapshot.val().players[id];lastAppliedSpawn=saved?.spawnApplied===saved?.spawn?.version?saved?.spawn?.version||null:null;lastPositionPacket='';lastPositionSent=0;me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
 await onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(false);
 // Chair state belongs to the shared room. Preserve sitting and the occupied chair
 // across reconnects; only a chair being carried is dropped on disconnection.
 await prepareDisconnectChair(saved);
 roomSubscription?.();
-await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=incoming;host=state.host===id;recoverRoomHost();if(host&&worldReady&&state.worldPreparing)syncWorldPrepared(loadedWorldSeed).catch(console.warn);
+await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=reconcileRoomPositions(incoming);host=state.host===id;recoverRoomHost();if(host&&worldReady&&state.worldPreparing)syncWorldPrepared(loadedWorldSeed).catch(console.warn);
 if(state?.players?.[id]){applyAssignedSpawn(state);prepareDisconnectChair(state.players[id]);}
 if(state?.phase==='instructions'&&oldPhase!=='instructions'&&state.players?.[id]&&!state.players[id].spawn){
  const p=state.players[id];me.x=p.x;me.z=p.z;playerHeight=0;me.rot=p.rot||Math.PI;yaw=me.rot;
@@ -1820,13 +1886,13 @@ async function prepareDisconnectChair(p){
  }catch(e){console.warn('切断時のイス配置予約に失敗',e)}
  finally{disconnectChairBusy=false;}
 }
-function launchSolo(){lastAppliedSpawn=null;document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
+function launchSolo(){lastAppliedSpawn=null;document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:roomNow(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
 $('solo').onclick=()=>launchSolo();
 const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=60000, VOTE_MS=30000, ERASE_MS=20000, VOTE_INTRO_MS=7000, RESULTS_MS=7000;
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
 const randBetween=(a,b)=>a+Math.random()*(b-a);
 function announce(message){const el=$('gameNotice');el.textContent=message;el.style.display='block';clearTimeout(announce.timer);announce.timer=setTimeout(()=>el.style.display='none',3600)}
-function initRound(s){s.noChairErased=false;s.soloVotesPreparedRound=null;s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=Date.now()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const [k,p] of Object.entries(s.players)){if(p.npc&&p.carrying)npcDropCarriedChair(s,k,p);p.npcSpotHide=null;p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
+function initRound(s){s.noChairErased=false;s.soloVotesPreparedRound=null;s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=roomNow()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const [k,p] of Object.entries(s.players)){if(p.npc&&p.carrying)npcDropCarriedChair(s,k,p);p.npcSpotHide=null;p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
 function indoorSpawn(i){const b=buildingSites[3];return {x:b.x+((i%5)-2)*7,z:b.z+3+Math.floor(i/5)*4.2};}
 function indoorPositionFree(s,k,point,occupied=[]){
  const b=buildingSites[3];
@@ -1861,7 +1927,7 @@ function beginGame(s){
  const npcCount=Math.max(0,TOTAL_PLAYERS-humans.length),positions=allocateIndoorSpawns(npcCount+humans.length);
  if(!positions)return;
  for(const [key,p] of Object.entries(s.players))if(p.npc)delete s.players[key];
- const version='start:'+Date.now();
+ const version='start:'+roomNow();
  for(let i=0;i<npcCount;i++){const key='NPC'+i;s.players[key]=createNPC(s,key,i,positions[i]);s.players[key].spawn={...positions[i],rot:Math.PI,version};}
  for(let j=0;j<humans.length;j++){
   const [key,p]=humans[j],position=positions[npcCount+j];
@@ -1871,12 +1937,12 @@ function beginGame(s){
  }
  for(let i=0;i<npcCount;i++)for(let j=i+1;j<npcCount;j++)if(Math.random()<.12){const a=s.players['NPC'+i],b=s.players['NPC'+j];a.trust['NPC'+j]=randBetween(.2,.8);b.trust['NPC'+i]=a.trust['NPC'+j];}
  if(s.started||!s.worldSeed)s.worldSeed=Math.floor(Math.random()*4294967295)+1;
- s.screenBoundaryVersion=1;s.spotSearchHistory={};s.started=Date.now();s.chairs=makeWorldLayout(s.worldSeed).chairs;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
- initRound(s);s.phase='instructions';s.introReadyAt=!s.worldPreparing?Date.now():null;s.introStarted=Date.now();s.deadline=s.introStarted+54000;
+ s.screenBoundaryVersion=1;s.spotSearchHistory={};s.started=roomNow();s.chairs=makeWorldLayout(s.worldSeed).chairs;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
+ initRound(s);s.phase='instructions';s.introReadyAt=!s.worldPreparing?roomNow():null;s.introStarted=roomNow();s.deadline=s.introStarted+54000;
 }
 // Core cast and musical-chairs participants from the manga and Reborn adaptation.
 const NPC_NAMES=['秋山深一','神崎直','フクナガ','ヨコヤ','ハリモト','キムラ','ノブテル','サカイ','イケザワ','ミウラ','ヤスカワ','篠宮優','サルカワ','ツキノ','アカギ','サカマキ','ムラタ','イヌヅカ','サイキ'];
-function createNPC(s,k,i,pt=indoorSpawn(i)){const angle=Math.PI;return {name:NPC_NAMES[i%NPC_NAMES.length],npc:true,online:true,joined:Date.now(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:randBetween(3.5,6),run:randBetween(8,12),caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
+function createNPC(s,k,i,pt=indoorSpawn(i)){const angle=Math.PI;return {name:NPC_NAMES[i%NPC_NAMES.length],npc:true,online:true,joined:roomNow(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:randBetween(3.5,6),run:randBetween(8,12),caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
 $('start').onclick=async()=>{await mutate(beginGame);applyAssignedSpawn(state);};
 $('touch').onclick=()=>mutate(s=>{let p=s.players[id];if(s.phase==='search'&&p?.alive&&Math.hypot(p.x-VOTE_X,p.z-VOTE_Z)<6){p.touched=true;p.sitting=0}});
 // Nearby chair is marked at its exact world position, with its existing number.
@@ -1894,7 +1960,7 @@ function closestBackChair(){
 }
 function nearbyHiddenChairForMark(){
  const hidden=recentHiddenChair,c=hidden&&state?.chairs?.[hidden.number];
- if(!hidden||Date.now()-hidden.at>5000||!c||c.removed||c.carrier||!c.hiddenAt)return null;
+ if(!hidden||roomNow()-hidden.at>5000||!c||c.removed||c.carrier||!c.hiddenAt)return null;
  if(Math.hypot(c.x-hidden.x,c.z-hidden.z)>.1||Math.hypot(me.x-hidden.anchorX,me.z-hidden.anchorZ)>=3||Math.hypot(me.x-c.x,me.z-c.z)>7||Math.abs(playerHeight-hidden.y)>1.5)return null;
  return hidden;
 }
@@ -1938,7 +2004,7 @@ function beginSpotAction(kind){
  const spot=closestSpot(),p=player();if(!spot||!p)return;
  if(kind==='hide'&&(!p.carrying||Object.values(state?.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id)))return;
  if(kind==='reveal'&&p.carrying)return;if(kind==='reveal'&&Object.values(state?.players||{}).some(v=>v.npcSpotSearch?.spotId===spot.id&&v.npcSpotSearch?.stage==='searching'))return;
- spotAction={kind,spotId:spot.id,x:me.x,z:me.z,start:performance.now(),chair:p.carrying||0};if(kind==='reveal')mutate(s=>{s.humanSpotSearching??={};s.humanSpotSearching[id]={spotId:spot.id,until:Date.now()+5200};});
+ spotAction={kind,spotId:spot.id,x:me.x,z:me.z,start:performance.now(),chair:p.carrying||0};if(kind==='reveal')mutate(s=>{s.humanSpotSearching??={};s.humanSpotSearching[id]={spotId:spot.id,until:roomNow()+5200};});
 }
 $('hideChair').onclick=()=>beginSpotAction('hide');
 $('revealChair').onclick=()=>beginSpotAction('reveal');
@@ -1950,15 +2016,15 @@ function updateSpotAction(t){
  spotAction=null;
  if(a.kind==='hide'){
   mutate(s=>{const p=s.players[id];if(!p||p.carrying!==a.chair)return;const c=s.chairs[p.carrying];if(!c||c.removed||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===a.spotId))return;c.hiddenAt=a.spotId;c.x=spot.x;c.y=0;c.z=spot.z;c.carrier=null;p.carrying=0;});
-  recentHiddenChair={number:String(a.chair),x:spot.x,z:spot.z,anchorX:me.x,anchorZ:me.z,y:playerHeight,at:Date.now()};
+  recentHiddenChair={number:String(a.chair),x:spot.x,z:spot.z,anchorX:me.x,anchorZ:me.z,y:playerHeight,at:roomNow()};
  }else{
-  mutate(s=>{const p=s.players[id];if(!p||p.carrying)return;recordSpotSearch(s,id,spot,Date.now());if(s.humanSpotSearching)delete s.humanSpotSearching[id];const found=Object.entries(s.chairs).find(([n,c])=>!c.removed&&c.hiddenAt===a.spotId);if(!found){
+  mutate(s=>{const p=s.players[id];if(!p||p.carrying)return;recordSpotSearch(s,id,spot,roomNow());if(s.humanSpotSearching)delete s.humanSpotSearching[id];const found=Object.entries(s.chairs).find(([n,c])=>!c.removed&&c.hiddenAt===a.spotId);if(!found){
    // An empty hiding spot has a one-in-three chance to release a random costume.
    if(Math.random()<1/3){
     const chosen=accessoryCatalog[Math.floor(Math.random()*accessoryCatalog.length)];
     s.accessories??={};
-    const key='found_'+id.replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+Date.now()+'_'+Math.floor(Math.random()*1000000);
-    const landing=accessibleCostumeDrop(p.x??me.x,p.z??me.z,spot);s.accessories[key]={kind:chosen[0],style:chosen[1],x:landing.x,z:landing.z,dropAt:Date.now()};
+    const key='found_'+id.replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+roomNow()+'_'+Math.floor(Math.random()*1000000);
+    const landing=accessibleCostumeDrop(p.x??me.x,p.z??me.z,spot);s.accessories[key]={kind:chosen[0],style:chosen[1],x:landing.x,z:landing.z,dropAt:roomNow()};
    }
    return;
   }const [n,c]=found;c.hiddenAt=null;c.carrier=id;p.carrying=Number(n);});
@@ -1967,8 +2033,8 @@ function updateSpotAction(t){
 
 $('moveChair').onclick=()=>mutate(s=>{let p=s.players[id];if(!p||s.phase==='finished')return;if(p.carrying){let c=s.chairs[p.carrying];if(c){{const x=p.x+Math.sin(p.rot)*1.8,z=p.z+Math.cos(p.rot)*1.8;const level=p.y??playerHeight;if(carriedChairBlocked(p.x,p.z,p.rot,level)||carriedChairBlocked(x,z,p.rot,level))return;const floor=chairFloorAt(x,z,level);if(Math.abs(floor-level)>1.05||!validChairPosition(x,z,p.carrying))return;c.carrier=null;c.x=x;c.z=z;c.y=floor}}p.carrying=0;return}for(let [n,c] of Object.entries(s.chairs)){if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-(p.y||0))<2.2&&Math.hypot(c.x-p.x,c.z-p.z)<3){c.carrier=id;p.carrying=Number(n);break}}});
 $('send').onclick=()=>{};
-$('vote').onclick=()=>{if(Math.hypot(me.x-VOTE_X,me.z-VOTE_Z)>=11)return;const target=$('voteTarget').value;mutate(s=>{const p=s.players[id];if(!canCastVote(s,id)||!p||Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)>=11||s.votes?.[id]||!s.players[target]?.alive)return;s.votes??={};if(s.votes[id])return;s.votes[id]=target;p.voted=true;if(soloMode){s.deadline=Date.now();advanceState(s,s.deadline);}})};
-function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=true;c.carrier=null;c.occupied=null;s.noChairErased=false;s.lastRemoved=n;s.selectedEraseChair=n;s.phase='eraseReveal';s.deadline=Date.now()+7000}
+$('vote').onclick=()=>{if(Math.hypot(me.x-VOTE_X,me.z-VOTE_Z)>=11)return;const target=$('voteTarget').value;mutate(s=>{const p=s.players[id];if(!canCastVote(s,id)||!p||Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)>=11||s.votes?.[id]||!s.players[target]?.alive)return;s.votes??={};if(s.votes[id])return;s.votes[id]=target;p.voted=true;if(soloMode){s.deadline=roomNow();advanceState(s,s.deadline);}})};
+function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=true;c.carrier=null;c.occupied=null;s.noChairErased=false;s.lastRemoved=n;s.selectedEraseChair=n;s.phase='eraseReveal';s.deadline=roomNow()+7000}
 $('erase').onclick=()=>{const n=$('chairNumber').value;mutate(s=>{if(s.phase!=='erase'||s.parent!==id)return;finishErase(s,n)})};
 function chooseNPCVote(s,k){const p=s.players[k],candidates=Object.entries(s.players).filter(([_,v])=>v.alive);if(!candidates.length)return null;let best=null,score=-Infinity;for(const [key,c] of candidates){let value=Math.random()*2.4+(p.trust?.[key]||0)*3+(key===k?(p.personality==='積極型'?2:0):0);if(p.personality==='追従型')value+=(p.trust?.[key]||0)*3;if(p.personality==='独立型'&&key===k)value+=1.8;if(p.personality==='戦略型')value+=(s.lastVoteCounts?.[key]||0)*.2;if(p.personality==='気まぐれ型')value+=Math.random()*3;if(value>score){score=value;best=key}}return best}
 function chooseErase(s,k){const p=s.players[k],available=Object.entries(s.chairs).filter(([_,c])=>!c.removed);if(!available.length)return null;const scored=available.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
@@ -2008,10 +2074,10 @@ async function advance(){
  if(!host||!state||advancing||phase()==='lobby'||phase()==='finished')return;
  if(state.phase==='instructions'){
   if(!worldReady||state.worldPreparing||!introParticipantsReady(state))return;
- }else if(Date.now()<state.deadline)return;
+ }else if(roomNow()<state.deadline)return;
  advancing=true;
  try{await mutate(s=>{
-  const now=Date.now();
+  const now=roomNow();
   for(let i=0;i<8;i++){
    if(s.phase==='lobby'||s.phase==='finished')break;
    const before=s.phase;
@@ -2025,7 +2091,7 @@ async function advance(){
  });}
  finally{advancing=false;}
 }
-setInterval(advance,700);
+setInterval(advance,250);
 // Host alone simulates all NPC decisions; the shared database is authoritative.
 function npcRoofForChair(c){
  if(!c||(c.y||0)<3)return null;
@@ -2103,7 +2169,7 @@ function npcRoofVisualPoint(trip,distance){
  }return trip.points[trip.points.length-1];
 }
 function npcChairUsable(s,k,p,n){
- const c=s.chairs?.[n];return !!(c&&!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Number(n)!==Number(p.previous)&&!Object.entries(s.players||{}).some(([other,v])=>other!==k&&Number(v.sitting)===Number(n))&&(npcRoofForChair(c)?!npcRoofBusy(s,k,npcRoofForChair(c)):!(c.y>3)&&!npcWorldBlocked(s,c.x,c.z,.78))&&!(p.npcAvoidChairs?.[n]>Date.now()));
+ const c=s.chairs?.[n];return !!(c&&!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Number(n)!==Number(p.previous)&&!Object.entries(s.players||{}).some(([other,v])=>other!==k&&Number(v.sitting)===Number(n))&&(npcRoofForChair(c)?!npcRoofBusy(s,k,npcRoofForChair(c)):!(c.y>3)&&!npcWorldBlocked(s,c.x,c.z,.78))&&!(p.npcAvoidChairs?.[n]>roomNow()));
 }
 function npcDecision(s,k,p,now){
  const committed=s.chairs?.[p.targetChair];
@@ -2134,7 +2200,7 @@ function npcTryCostume(s,k,p){
   p.worn[item.kind]=item.style;
   delete s.accessories[key];
   if(oldStyle){
-   const dropKey='npc_drop_'+k+'_'+Date.now()+'_'+Math.floor(Math.random()*1000000);
+   const dropKey='npc_drop_'+k+'_'+roomNow()+'_'+Math.floor(Math.random()*1000000);
    s.accessories[dropKey]={kind:oldKind,style:oldStyle,x:p.x+1.4,z:p.z+.7};
   }
   break;
@@ -2325,7 +2391,15 @@ function npcGoalReachable(s,k,p,goal){
  return npcStaticClearPath(s,p.x,p.z,goal.x,goal.z);
 }
 function npcNavigationTarget(s,k,p,now){
- const goal=p.goal;if(!goal)return null;
+ let goal=p.goal;if(!goal)return null;
+ // Start moving through the actual doorway before planning a long outdoor journey.
+ // Keep this short route until the actor clears the open door leaves as well as the room.
+ const b=buildingSites[3];
+ if(s.phase==='search'&&p.departureDone&&!insideBlackBuilding(goal.x,goal.z)&&(p.npcExitPending||insideBlackBuilding(p.x,p.z))){
+  const exit={x:b.x,z:b.z+b.d/2+4};
+  const cleared=p.z>=b.z+b.d/2+2&&Math.abs(p.x-b.x)<(largeBuildings[3]?.doorW||13)/2-1.2;
+  if(!cleared){p.npcExitPending=true;goal=exit;}else p.npcExitPending=false;
+ }else p.npcExitPending=false;
  const key=room+':'+k;let nav=npcNavigation.get(key);
  if(!nav||Math.hypot(nav.goal.x-goal.x,nav.goal.z-goal.z)>.75){
   const direct=npcStaticClearPath(s,p.x,p.z,goal.x,goal.z,.78);
@@ -2454,7 +2528,7 @@ function npcSpotBusy(s,k,spot){
   if(v.npcSpotSearch?.spotId===spot.id||v.npcSpotHide?.spotId===spot.id)return true;
   // Another reservation blocks only its own spot, not every nearby bush.
   // A human visibly searching here also reserves the area.
-  if(!v.npc&&v.online!==false&&s.humanSpotSearching?.[other]?.spotId===spot.id&&s.humanSpotSearching[other].until>Date.now())return true;
+  if(!v.npc&&v.online!==false&&s.humanSpotSearching?.[other]?.spotId===spot.id&&s.humanSpotSearching[other].until>roomNow())return true;
  }
  return false;
 }
@@ -2598,7 +2672,7 @@ if(!p.npcRoofTrip&&!hidingOnReturn&&!inspectingSpot&&distToGoal<(npcReturning(s)
 p.npcMotionWatch??={x:p.x,z:p.z,at:now};
 if(Math.hypot(p.x-p.npcMotionWatch.x,p.z-p.npcMotionWatch.z)>1.5)p.npcMotionWatch={x:p.x,z:p.z,at:now};
 else if(now-p.npcMotionWatch.at>10000&&(p.targetChair||p.npcExploreAfterSearch)&&!npcReturning(s)&&!inspectingSpot){
- if(p.targetChair){p.npcAvoidChairs??={};p.npcAvoidChairs[p.targetChair]=Date.now()+15000;}
+ if(p.targetChair){p.npcAvoidChairs??={};p.npcAvoidChairs[p.targetChair]=roomNow()+15000;}
  p.npcRoofTrip=null;p.targetChair=null;p.goal=null;p.decisionAt=0;p.npcMotionWatch={x:p.x,z:p.z,at:now};npcNavigation.delete(room+':'+k);continue;
 }
 const destination=npcNavigationTarget(s,k,p,now);
@@ -2609,10 +2683,10 @@ npcMove(s,k,p,destination,speed,dt);
 
 }
 if(!soloMode&&s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
-let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=Date.now();const tickEvery=soloMode?280:850;if(tickNow-npcLastTick<tickEvery)return;npcLastTick=tickNow;if(!worldReady||!host||!state||npcBusy||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=Date.now();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,soloMode?.28:.85,now)})}finally{npcBusy=false}},140);
+let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=roomNow();const tickEvery=soloMode?280:400;if(tickNow-npcLastTick<tickEvery)return;const tickDt=soloMode?.28:Math.max(.05,Math.min(.85,(tickNow-npcLastTick)/1000));npcLastTick=tickNow;if(!worldReady||!host||!state||npcBusy||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=roomNow();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,tickDt,now)})}finally{npcBusy=false}},140);
 const modal=$('modal');$('modalCancel').onclick=()=>{modal.classList.remove('open');$('modalConfirm').textContent='決定';$('modalCancel').textContent='キャンセル';syncGiftInteraction();};
-function nearbyPickup(){if(!state?.coinDrops)return null;const now=Date.now();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(now-d.created>=10000||d.recipient===id||d.owner===id)).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
-$('pickupCoin').onclick=()=>{const nearest=nearbyPickup();if(!nearest)return;mutate(s=>{const d=s.coinDrops?.[nearest[0]],p=s.players?.[id];if(!d||!p||Math.hypot(p.x-d.x,p.z-d.z)>3||Date.now()-d.created<10000&&d.recipient!==id&&d.owner!==id)return;p.wallet??={};p.wallet[d.issuer]=(p.wallet[d.issuer]||0)+d.count;delete s.coinDrops[nearest[0]];})};
+function nearbyPickup(){if(!state?.coinDrops)return null;const now=roomNow();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(now-d.created>=10000||d.recipient===id||d.owner===id)).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
+$('pickupCoin').onclick=()=>{const nearest=nearbyPickup();if(!nearest)return;mutate(s=>{const d=s.coinDrops?.[nearest[0]],p=s.players?.[id];if(!d||!p||Math.hypot(p.x-d.x,p.z-d.z)>3||roomNow()-d.created<10000&&d.recipient!==id&&d.owner!==id)return;p.wallet??={};p.wallet[d.issuer]=(p.wallet[d.issuer]||0)+d.count;delete s.coinDrops[nearest[0]];})};
 const coinMeshes={};
 // All drops share this small texture, materials and geometry: no extra draw calls.
 const coinFaceCanvas=document.createElement('canvas');coinFaceCanvas.width=coinFaceCanvas.height=128;
@@ -2666,7 +2740,7 @@ async function shareChairPin(recipient,number,x,z){
  if(!canGiveTo(state,{...me,y:playerHeight},target))return;
  const partner={id:recipient,name:target.name};
  if(soloMode){log(partner.name+'にイス'+number+'の場所を共有（NPC）');return;}
- const stamp=Date.now();
+ const stamp=roomNow();
  try{
   await mutate(s=>{
    const sender=s.players?.[id],target=s.players?.[recipient];
@@ -2685,7 +2759,7 @@ $('givePin').onclick=()=>{if(!mapUnlocked)return;const partner=nearestPartner();
 function nearestAction(){if(document.body.classList.contains('gift-overlay'))return null;for(let b of ['touch','sit','hideChair','revealChair','moveChair','trade'])if(!$(b).hidden)return $(b);return null}
 const actionIcons={"chair": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></svg>", "walk": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"22\" cy=\"6\" r=\"4\" fill=\"#efc29d\"/><path d=\"m19 13 7 7 7 1m-15-7-7 8m8-9-3 12-7 11m8-11 10 11\" fill=\"none\" stroke=\"#387ca1\" stroke-width=\"4\"/></svg>", "pin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></svg>", "lift": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(9 -2) scale(.65)\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "place": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#f1c39c\" d=\"m5 14 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 10 8 3h5\"/><path d=\"M20 25v12m-5-5 5 5 5-5\"/></svg>", "hide": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#52864b\" d=\"M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z\"/><path fill=\"#9b663a\" d=\"M17 24h6v13h-6z\"/></svg>", "search": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m24 24 9 9\" stroke-width=\"6\"/><circle cx=\"16\" cy=\"16\" r=\"11\" fill=\"#aad7e0\"/><path d=\"M10 15a6 6 0 0 1 6-6\" stroke=\"#fff\"/></svg>", "giveCoin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(6 -3) scale(.7)\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "givePin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(8 -1) scale(.6)\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "shirt": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#699ec8\" d=\"m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z\"/></svg>", "hat": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#805b9d\" d=\"m11 7 3-3 12 3 3 23H11Z\"/><path fill=\"#d5a861\" d=\"M11 23h18v6H11z\"/><ellipse cx=\"20\" cy=\"31\" rx=\"17\" ry=\"5\" fill=\"#805b9d\"/></svg>", "glasses": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g fill=\"#b3d9e4\"><circle cx=\"10\" cy=\"24\" r=\"8\"/><circle cx=\"30\" cy=\"24\" r=\"8\"/></g><path d=\"M18 23h4M3 20 6 8m31 12L34 8\"/></svg>", "pickup": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/><path d=\"M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4\"/></svg>", "vote": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#7298ab\" d=\"m5 21 15-7 15 7v15H5Z\"/><path d=\"M13 23h14\"/><path fill=\"#fff3d7\" d=\"m14 3 15 5-6 17-15-5Z\"/><path d=\"m14 13 3 4 7-6\"/></svg>"};
 function setActionIcon(id,kind){const button=$(id);if(button.dataset.icon===kind)return;button.innerHTML=actionIcons[kind];button.dataset.icon=kind;}
-function refreshActions(){if(!state)return;syncGiftInteraction();closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=mapChair?.[1]?.occupied===id?null:nearbyHiddenChairForMark(); $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-Date.now())/1000);}}
+function refreshActions(){if(!state)return;syncGiftInteraction();closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=mapChair?.[1]?.occupied===id?null:nearbyHiddenChairForMark(); $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-roomNow())/1000);}}
 function openModal(title,body,mode){$('modalCancel').hidden=false;$('modalConfirm').hidden=false;modalMode=mode;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;modal.classList.add('open');if(mode==='voteButtons')$('touch').hidden=true;syncGiftInteraction();}
 function updateTradeAmount(n){const input=$('tradeAmount'),issuer=$('tradeIssuer');if(!input||!issuer)return;const max=Number(player()?.wallet?.[issuer.value]||0);input.value=String(Math.max(1,Math.min(max||1,Math.floor(n)||1)));$('tradeAmountValue').textContent=input.value;}
 function selectTradeCoin(key){$('tradeIssuer').value=key;for(const btn of document.querySelectorAll('#tradeCoinChoices button'))btn.classList.toggle('selected',btn.dataset.issuer===key);updateTradeAmount(1);}
@@ -2750,13 +2824,13 @@ $('modalConfirm').onclick=async()=>{if(!syncGiftInteraction())return;if(modalMod
  confirm.disabled=true;
  try{
   let accepted=false;
-  await mutate(s=>{const voter=s.players?.[id];if(!canCastVote(s,id)||!voter||voter.voted||s.votes?.[id]||!s.players[key]?.alive)return;s.votes??={};s.votes[id]=key;voter.voted=true;voter.returned=true;accepted=true;if(soloMode){s.deadline=Date.now();advanceState(s,s.deadline);}});
+  await mutate(s=>{const voter=s.players?.[id];if(!canCastVote(s,id)||!voter||voter.voted||s.votes?.[id]||!s.players[key]?.alive)return;s.votes??={};s.votes[id]=key;voter.voted=true;voter.returned=true;accepted=true;if(soloMode){s.deadline=roomNow();advanceState(s,s.deadline);}});
   if(accepted){log('親決めに投票しました：'+(state.players?.[key]?.name||key));modal.classList.remove('open');modalMode='';selectedVoteCandidate=null;}
   else{closeVoteWhenEnded();if(phase()==='vote')alert('投票できませんでした');}
  }catch(e){alert('投票の通信に失敗しました：'+(e.message||e));}
  finally{confirm.disabled=false;}
  return;
- }if(modalMode==='trade'){const n=Math.floor(Number($('tradeAmount').value)),issuer=$('tradeIssuer').value,partner=tradePartner;if(!partner||!Number.isInteger(n)||n<1||!canGiveTo(state,{...me,y:playerHeight},state.players?.[partner.id])){alert('相手の近くで操作してください');return;}await mutate(s=>{const a=s.players[id],b=s.players[partner.id];if(!canGiveTo(s,a,b)||!(a.wallet?.[issuer]>=n))return;a.wallet[issuer]-=n;s.coinDrops??={};const dropId='coin_'+id+'_'+Date.now()+'_'+Math.floor(Math.random()*1e7);const baseX=a.x+Math.sin(a.rot||0)*1.1,baseZ=a.z+Math.cos(a.rot||0)*1.1;
+ }if(modalMode==='trade'){const n=Math.floor(Number($('tradeAmount').value)),issuer=$('tradeIssuer').value,partner=tradePartner;if(!partner||!Number.isInteger(n)||n<1||!canGiveTo(state,{...me,y:playerHeight},state.players?.[partner.id])){alert('相手の近くで操作してください');return;}await mutate(s=>{const a=s.players[id],b=s.players[partner.id];if(!canGiveTo(s,a,b)||!(a.wallet?.[issuer]>=n))return;a.wallet[issuer]-=n;s.coinDrops??={};const dropId='coin_'+id+'_'+roomNow()+'_'+Math.floor(Math.random()*1e7);const baseX=a.x+Math.sin(a.rot||0)*1.1,baseZ=a.z+Math.cos(a.rot||0)*1.1;
 const existing=Object.values(s.coinDrops).filter(d=>d.count>0);
 let dropX=baseX,dropZ=baseZ;
 // Place repeated drops in a small spiral so separate coins stay visible and collectible.
@@ -2765,7 +2839,7 @@ for(let k=0;k<48;k++){
  const cx=baseX+Math.cos(angle)*radius,cz=baseZ+Math.sin(angle)*radius;
  if(existing.every(d=>Math.hypot(cx-d.x,cz-d.z)>=0.85)){dropX=cx;dropZ=cz;break;}
 }
-s.coinDrops[dropId]={issuer,count:n,x:dropX,z:dropZ,y:a.y||0,recipient:partner.id,owner:id,created:Date.now()}})}else if(modalMode==='vote'){$('voteTarget').value=$('modalVote').value;$('vote').click()}else if(modalMode==='erase'){const n=$('eraseNumberDisplay')?.dataset.value;if(!n||!state?.chairs?.[n]||state.chairs[n].removed){alert('消去できるイス番号を入力してください');return;}$('chairNumber').value=n;$('erase').click()}modal.classList.remove('open');syncGiftInteraction()};
+s.coinDrops[dropId]={issuer,count:n,x:dropX,z:dropZ,y:a.y||0,recipient:partner.id,owner:id,created:roomNow()}})}else if(modalMode==='vote'){$('voteTarget').value=$('modalVote').value;$('vote').click()}else if(modalMode==='erase'){const n=$('eraseNumberDisplay')?.dataset.value;if(!n||!state?.chairs?.[n]||state.chairs[n].removed){alert('消去できるイス番号を入力してください');return;}$('chairNumber').value=n;$('erase').click()}modal.classList.remove('open');syncGiftInteraction()};
 // Action buttons are refreshed by the animation loop; no duplicate interval.
 const stick=document.getElementById('stickBase'),knob=document.getElementById('stickKnob');let joyX=0,joyY=0,stickPointer=null,viewPointer=null,viewX=0,viewY=0,pitch=0;
 function setStick(e){const r=stick.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),radius=48,l=Math.hypot(dx,dy),scale=l>radius?radius/l:1;joyX=dx*scale/radius;joyY=-dy*scale/radius;knob.style.transform=`translate(${joyX*radius}px,${-joyY*radius}px)`}
@@ -2826,7 +2900,7 @@ $('stackButton').addEventListener('pointerdown',e=>e.stopPropagation());
 $('stackButton').onclick=async event=>{
  event.stopPropagation();updateStackButton(performance.now());if($('stackButton').hidden||relocating)return;
  relocating=true;$('stackButton').disabled=true;
- const version='stack:'+id+':'+Date.now();
+ const version='stack:'+id+':'+roomNow();
  try{
   await mutate(s=>{
    const p=s.players?.[id];if(!p||p.sitting||!insideBlackBuilding(p.x,p.z))return;
@@ -2836,7 +2910,7 @@ $('stackButton').onclick=async event=>{
   applyAssignedSpawn(state);resetStackIdle(performance.now());
  }finally{relocating=false;$('stackButton').disabled=false;}
 };
-let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(!state||isOnlineLobby()){pauseIntroPlayback();previous=t;return;}me.z=screenSafeZ(me.x,me.z,playerHeight);syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
+let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(!state||joiningRoom||isOnlineLobby()){pauseIntroPlayback();previous=t;return;}me.z=screenSafeZ(me.x,me.z,playerHeight);syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
  // Never step off the rooftop slab, including the stair-side entrance corner.
  // A descent is permitted only onto a real stair flight or its bridge.
  if(current>2.5 && playerHeight>2.5){
@@ -2853,7 +2927,7 @@ let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=
  }const savedHeight=playerHeight;playerHeight=Math.max(playerHeight,current,next);const solid=crossesClosedIntroDoor(me.x,me.z,x,z)||characterMovementBlocked(state,id,me.x,me.z,x,z,playerHeight,true)||blocked(x,z)||(player()?.carrying&&carriedChairBlocked(x,z,me.rot,Math.max(current,next)));playerHeight=savedHeight;return !solid&&next<=current+Math.max(1.45,speed*dt*2.6);};
  if(canStep(me.x+dx,me.z))me.x+=dx;if(canStep(me.x,me.z+dz))me.z+=dz;const islandLimit=309;const distanceFromCenter=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);if(distanceFromCenter>islandLimit){me.x*=islandLimit/distanceFromCenter;me.z*=islandLimit/distanceFromCenter;}me.rot=Math.atan2(Math.sin(yaw)*f-Math.cos(yaw)*side,Math.cos(yaw)*f+Math.sin(yaw)*side)}updateMapVisibility();syncGiftInteraction();const localSeat=state?.chairs?.[player()?.sitting];const desiredHeight=localSeat&&!localSeat.removed?(localSeat.y||0):elevationAt(me.x,me.z);playerHeight+=(desiredHeight-playerHeight)*Math.min(1,dt*13);
 if(window.__blackIntroDoor){const closed=phase()==='instructions';for(const leaf of window.__blackIntroDoor.children){leaf.rotation.y=closed?0:leaf.userData.side*Math.PI*.55;}}
-let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSync=t;if(soloMode){p.x=me.x;p.y=playerHeight;p.z=me.z;p.rot=me.rot;p.spawnApplied=lastAppliedSpawn;if(mapUnlocked)p.mapUnlockedFor=mapVisitKey;}else update(ref(database(),`rooms/${room}/players/${id}`),{x:Math.round(me.x*100)/100,y:Math.round(playerHeight*100)/100,z:Math.round(me.z*100)/100,rot:me.rot,...(mapUnlocked?{mapUnlockedFor:mapVisitKey}:{}),...(lastAppliedSpawn?{spawnApplied:lastAppliedSpawn}:{})}).then(()=>{if(p.carrying)prepareDisconnectChair({...p,x:me.x,z:me.z,y:playerHeight})}).catch(console.warn)}const finalPrizeRanks=state.phase==='finished'?coinPrizeRanks(state):null;for(let [k,v] of players()){if(!avatars[k])avatars[k]=character(k===id?0xe8b24d:0x4c9ec2);let a=avatars[k];syncWearable(a,v);if(a.userData.labelName!==v.name){a.userData.labelName=v.name;const c=a.userData.nameCanvas,ctx=c.getContext('2d');ctx.clearRect(0,0,512,160);ctx.fillStyle='#fff9e7';ctx.beginPath();ctx.roundRect(8,8,496,144,25);ctx.fill();ctx.strokeStyle='#8a5c3d';ctx.lineWidth=10;ctx.stroke();ctx.fillStyle='#302a28';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 76px sans-serif';ctx.fillText(String(v.name||'NPC'),256,82,450);a.userData.nameTag.material.map.needsUpdate=true;}a.visible=v.online!==false&&(phase()!=='lobby'||!v.npc);
+publishPlayerPosition(t);const finalPrizeRanks=state.phase==='finished'?coinPrizeRanks(state):null;for(let [k,v] of players()){if(!avatars[k])avatars[k]=character(k===id?0xe8b24d:0x4c9ec2);let a=avatars[k];syncWearable(a,v);if(a.userData.labelName!==v.name){a.userData.labelName=v.name;const c=a.userData.nameCanvas,ctx=c.getContext('2d');ctx.clearRect(0,0,512,160);ctx.fillStyle='#fff9e7';ctx.beginPath();ctx.roundRect(8,8,496,144,25);ctx.fill();ctx.strokeStyle='#8a5c3d';ctx.lineWidth=10;ctx.stroke();ctx.fillStyle='#302a28';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 76px sans-serif';ctx.fillText(String(v.name||'NPC'),256,82,450);a.userData.nameTag.material.map.needsUpdate=true;}a.visible=v.online!==false&&(phase()!=='lobby'||!v.npc);
   const prize=a.userData.prizeSprite;
   if(prize){prize.visible=state.phase==='finished'&&v.initial===true;
    if(prize.visible){const coins=prizeCoinCount(state,v);
@@ -2873,13 +2947,19 @@ let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSyn
  if(a.userData.roofVisualKey!==key){a.userData.roofVisualKey=key;a.userData.roofTravel=0;}
  const visualTravel=Math.min(trip.travel,(a.userData.roofTravel||0)+(v.run||9)*dt*1.15);
  const point=npcRoofVisualPoint(trip,visualTravel);
- if(!characterMovementBlocked(state,k,a.position.x,a.position.z,point.x,point.z,point.y,true)){a.userData.roofTravel=visualTravel;a.position.set(point.x,point.y,point.z);}a.rotation.y=tr;a.userData.smoothReady=false;
+ if(!soloMode||!characterMovementBlocked(state,k,a.position.x,a.position.z,point.x,point.z,point.y,true)){a.userData.roofTravel=visualTravel;a.position.set(point.x,point.y,point.z);}a.rotation.y=tr;a.userData.smoothReady=false;
  }
  else if(!a.userData.smoothReady||Math.hypot(tx-a.position.x,tz-a.position.z)>28){a.position.set(tx,ty,tz);a.rotation.y=tr;a.userData.smoothReady=true;}
  else{
   // The NPC simulation is deliberately infrequent to save CPU and Firebase writes.
   // Smooth only the visible mesh between network updates, never the actual game state.
-  if(v.npc){
+  if(v.npc&&!soloMode){
+   // Online NPC physics belongs to the host. Independent collision/prediction on
+   // each viewer made the same NPC stop or take different routes on each device.
+   const blend=1-Math.exp(-24*dt);
+   a.position.x+=(tx-a.position.x)*blend;a.position.z+=(tz-a.position.z)*blend;a.position.y+=(ty-a.position.y)*blend;
+   const diff=Math.atan2(Math.sin(tr-a.rotation.y),Math.cos(tr-a.rotation.y));a.rotation.y+=diff*blend;
+  }else if(v.npc){
    // Constant-speed interpolation: no exponential easing (which caused rhythmic slowing).
    // Prediction follows the current route segment, never the distant goal.
    const motion=a.userData.npcMotion||(a.userData.npcMotion={x:tx,z:tz,stamp:t,velocity:0});
@@ -2896,7 +2976,7 @@ let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSyn
      (state.phase==='search'||state.phase==='return')&&
      Math.hypot(committed.x-tx,committed.z-tz)>1.5;
    const age=Math.min(.48,Math.max(0,(t-motion.stamp)/1000));
-   const baseSpeed=((state.phase==='return'||state.phase==='search'&&state.deadline-Date.now()<35000)?(v.run||9):(v.walk||5))*(v.carrying?.5:1);
+   const baseSpeed=((state.phase==='return'||state.phase==='search'&&state.deadline-roomNow()<35000)?(v.run||9):(v.walk||5))*(v.carrying?.5:1);
    let aimX=canPredict?tx+(committed.x-tx)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.hypot(committed.x-tx,committed.z-tz)-.8):tx;
    let aimZ=canPredict?tz+(committed.z-tz)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.hypot(committed.x-tx,committed.z-tz)-.8):tz;
    if(canPredict&&(!npcStaticClearPath(state,tx,tz,aimX,aimZ)||characterMovementBlocked(state,k,tx,tz,aimX,aimZ,ty,true))){aimX=tx;aimZ=tz;}
@@ -2916,9 +2996,11 @@ let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSyn
    const diff=Math.atan2(Math.sin(tr-a.rotation.y),Math.cos(tr-a.rotation.y));
    a.rotation.y+=Math.sign(diff)*Math.min(Math.abs(diff),dt*6);
   }else{
-   const blend=1-Math.exp(-10*dt);
+   const blend=1-Math.exp(-24*dt);
    const nx=a.position.x+(tx-a.position.x)*blend,nz=a.position.z+(tz-a.position.z)*blend;
-   if(!characterMovementBlocked(state,k,a.position.x,a.position.z,nx,nz,ty,true)){a.position.x=nx;a.position.z=nz;}
+   // The remote owner already performed movement collision; do not freeze its
+   // avatar forever behind a body that only this client predicts at that location.
+   a.position.x=nx;a.position.z=nz;
    a.position.y+=(ty-a.position.y)*blend;
    const diff=Math.atan2(Math.sin(tr-a.rotation.y),Math.cos(tr-a.rotation.y));
    a.rotation.y+=diff*blend;

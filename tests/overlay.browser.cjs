@@ -6,7 +6,7 @@ const cut=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
  const page=await browser.newPage({viewport:{width:390,height:844}});await page.setContent(html);
  await page.evaluate(source=>{
   document.querySelector('#entry').hidden=true;document.body.classList.add('playing');document.querySelector('#actions').hidden=false;
-  eval(`const $=id=>document.getElementById(id),id='me',VOTE_X=0,VOTE_Z=-7,modal=$('modal');let modalMode='',selectedVoteCandidate=null,recentHiddenChair=null,spotAction=null,mapUnlocked=true;
+  eval(`function roomNow(){return Date.now()}const $=id=>document.getElementById(id),id='me',VOTE_X=0,VOTE_Z=-7,modal=$('modal');let modalMode='',selectedVoteCandidate=null,recentHiddenChair=null,spotAction=null,mapUnlocked=true;
    const me={x:0,z:0},state={phase:'vote',deadline:Date.now()+10000,voteEligible:{me:true},votes:{},players:{me:{name:'自分',alive:true},other:{name:'相手',alive:true}},chairs:{}};
    function phase(){return state.phase}function player(){return state.players[id]}function players(){return Object.entries(state.players)}function isOnlineLobby(){return false}function syncGiftInteraction(){return true}function nearestPartner(){return null}function closestBackChair(){return null}function nearbyHiddenChairForMark(){return null}function closestSpot(){return null}function nearestAccessory(){return null}function nearbyPickup(){return null}function setActionIcon(){}function formatCountdown(){return '00:10'}
   `+source+`; $('touch').onclick=openParentVote;refreshActions();window.overlayTest={refreshActions,voted:()=>{state.players.me.voted=true;state.votes.me='other';refreshActions()}};`);

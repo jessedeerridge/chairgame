@@ -4,10 +4,11 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 function cut(a,b){const start=html.indexOf(a),end=html.indexOf(b,start);assert(start>=0&&end>start);return html.slice(start,end);}
 async function join(initial,canceled=0){
  const c=vm.createContext({assert,TextEncoder,initial,canceled,structuredClone});
- vm.runInContext(`
+ vm.runInContext(`function roomNow(){return Date.now()}
+
  let server=structuredClone(initial),room='',id='',soloMode=false,playerPreloadTask=null,lastAppliedSpawn=null,me={},yaw=0,playerHeight=0,state=null,host=false,worldReady=false,loadedWorldSeed=null;
  const alerts=[],buttons={join:{},name:{value:'Guest'},room:{value:'TEST'},entry:{}};const $=k=>buttons[k]??={};const document={getElementById:$},console={error(){},warn(){}};
- function database(){return {}}function ref(db,path){return {path}}async function ensureFirebase(){}function initialAccessories(){return {}}
+ function database(){return {}}function ref(db,path){return {path}}async function ensureFirebase(){}async function syncRoomClock(){}function reconcileRoomPositions(s){return s}function initialAccessories(){return {}}
  async function runTransaction(ref,fn){
   // Like the SDK, abort immediately if a callback returns undefined for an uncached null.
   const provisional=fn(null);if(canceled>0){canceled--;return {committed:false,snapshot:{val:()=>null}};}if(provisional===undefined)return {committed:false,snapshot:{val:()=>null}};
@@ -20,8 +21,10 @@ async function join(initial,canceled=0){
  function recoverRoomHost(){}function applyAssignedSpawn(){}function renderUI(){}function log(){}function alert(message){alerts.push(message)}
  function lobbyParticipants(s){return Object.entries(s.players||{}).filter(([k,p])=>!p.npc&&p.online!==false)}
  `+cut('const SHIRT_COLORS','let playerPreloadTask')+cut('let roomSubscription=null','// Server-side disconnect actions'),c);
- await vm.runInContext(`$('join').onclick()`,c);
- return vm.runInContext(`({server,alerts,state,me})`,c);
+ await vm.runInContext(`function roomNow(){return Date.now()}
+$('join').onclick()`,c);
+ return vm.runInContext(`function roomNow(){return Date.now()}
+({server,alerts,state,me})`,c);
 }
 test('first click creates a room and joins despite an initially empty local cache',async()=>{
  const result=await join(null);assert.equal(result.alerts.length,0,JSON.stringify(result.alerts));assert(result.server.players.U4775657374);assert.equal(result.state.phase,'lobby');

@@ -3,7 +3,8 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const cut=(a,b)=>{const start=html.indexOf(a),end=html.indexOf(b,start);assert(start>=0&&end>start);return html.slice(start,end);};
 function setup(){
  const context=vm.createContext({assert});
- vm.runInContext(`
+ vm.runInContext(`function roomNow(){return Date.now()}
+
  let clock=1000,id='human',state=null,me=null,spotAction=null,recentHiddenChair=null,playerHeight=0;
  const performance={now:()=>clock};Date.now=()=>clock;Math.random=()=>0;
  const buildingSites=[{},{},{},{x:0,z:0,w:50,d:44}],hidingSpots=[{id:'A',x:20,z:40,type:'bush'},{id:'B',x:40,z:40,type:'tree'}],accessoryCatalog=[];
