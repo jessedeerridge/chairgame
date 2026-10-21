@@ -7,7 +7,7 @@ const code=html.slice(html.indexOf('const SHIRT_COLORS'),html.indexOf('let playe
   const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:1280,height:720},isMobile:mobile,hasTouch:mobile});
   await page.setContent(html);await page.evaluate(source=>{
    document.querySelector('#entry').hidden=true;document.querySelector('#lobbyScreen').hidden=false;document.body.classList.add('in-lobby');
-   eval(`const $=k=>document.getElementById(k),id='me';const state={phase:'lobby',players:{me:{online:true,shirtColor:'red'},other:{online:true,shirtColor:'blue'}}};function player(){return state.players[id]}async function mutate(fn){fn(state);renderShirtColors()}function lobbyParticipants(s){return Object.entries(s.players).filter(([k,p])=>!p.npc&&p.online!==false)}`+source+`;renderShirtColors();window.colorsTest={snapshot:()=>{state.players.other.worldReady=true;renderShirtColors()},selected:()=>player().shirtColor};`);
+   eval(`const $=k=>document.getElementById(k),id='me',room='TEST';const state={phase:'lobby',players:{me:{online:true,shirtColor:'red'},other:{online:true,shirtColor:'blue'}}};function player(){return state.players[id]}function renderLobby(){renderShirtColors()}async function mutate(fn){await new Promise(r=>setTimeout(r,200));fn(state);renderShirtColors();return{committed:true}}function lobbyParticipants(s){return Object.entries(s.players).filter(([k,p])=>!p.npc&&p.online!==false)}`+source+`;renderShirtColors();window.colorsTest={snapshot:()=>{state.players.other.worldReady=true;renderShirtColors()},selected:()=>player().shirtColor};`);
   },code);
   const button=page.locator('[data-color="green"]'),box=await button.boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
   const handle=await button.elementHandle();let cdp;
@@ -16,8 +16,8 @@ const code=html.slice(html.indexOf('const SHIRT_COLORS'),html.indexOf('let playe
   await page.evaluate(()=>colorsTest.snapshot());
   assert(await handle.evaluate(el=>el.isConnected),'snapshot replaced the pressed color button');
   if(mobile)await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});else await page.mouse.up();
-  await page.waitForFunction(()=>colorsTest.selected()==='green');assert.equal(await button.getAttribute('aria-pressed'),'true');
-  assert(await page.locator('[data-color="blue"]').isDisabled());await page.locator('[data-color="pink"]').click();assert.equal(await page.evaluate(()=>colorsTest.selected()),'pink');
+  assert.equal(await button.getAttribute('aria-pressed'),'true','tap feedback waited for the server');await page.waitForFunction(()=>colorsTest.selected()==='green');
+  assert(await page.locator('[data-color="blue"]').isDisabled());await page.locator('[data-color="pink"]').click();assert.equal(await page.locator('[data-color="pink"]').getAttribute('aria-pressed'),'true');await page.waitForFunction(()=>colorsTest.selected()==='pink');
   await page.close();
  }
  console.log('Desktop and mobile: one tap survives a room snapshot, selects immediately, and allows reselection');

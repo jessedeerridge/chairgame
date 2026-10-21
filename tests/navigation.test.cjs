@@ -176,13 +176,13 @@ test('frontmost NPC departs without an artificial delay at round start',()=>setu
  const s=game({NPC0:npc(0,15,null),NPC1:npc(7,10,null),NPC2:npc(-7,3,null)});
  for(const p of Object.values(s.players)){p.alive=true;p.searchIntentRound=0;}s.chairs={1:{x:0,z:65}};
  npcSimulate(s,.28,10000);assert.equal(s.players.NPC0.departureAt,10000);assert(s.players.NPC0.departureDone);
- assert.equal(s.players.NPC1.departureAt,10353);assert.equal(s.players.NPC1.departureDone,false);assert.equal(s.players.NPC2.departureAt,10600);
+ assert.equal(s.players.NPC1.departureAt,11000);assert.equal(s.players.NPC1.departureDone,false);assert.equal(s.players.NPC2.departureAt,12000);
 `));
-test('later departures accelerate and the last of nineteen is scheduled at exactly 600 ms',()=>setup()(`
+test('NPC departure times are one second apart from first through nineteenth',()=>setup()(`
  const s=game();for(let i=0;i<19;i++){const p=npc((i%5-2)*7,3+Math.floor(i/5)*4.2,null);p.alive=true;p.searchIntentRound=0;s.players['NPC'+i]=p;}
  s.chairs={1:{x:0,z:65}};npcSimulate(s,.28,10000);
- const times=Object.values(s.players).map(p=>p.departureAt).sort((a,b)=>a-b);assert.equal(times[0],10000);assert(times[1]-times[0]>100);assert.equal(times.at(-1)-times[0],600);
- let previousGap=Infinity;for(let i=1;i<times.length;i++){const gap=times[i]-times[i-1];assert(gap>0);assert(gap<=previousGap+1);previousGap=gap;}
+ const times=Object.values(s.players).map(p=>p.departureAt).sort((a,b)=>a-b);assert.equal(times[0],10000);assert.equal(times[1]-times[0],1000);assert.equal(times.at(-1)-times[0],18000);
+ let previousGap=Infinity;for(let i=1;i<times.length;i++){const gap=times[i]-times[i-1];assert.equal(gap,1000);assert(gap<=previousGap+1);previousGap=gap;}
 `));
 test('indoor departure starts with no A-star budget and retains the distant actual destination',()=>setup()(`
  const p=npc(0,15,{x:-200,z:-200}),s=game({NPC0:p}),goal=p.goal;

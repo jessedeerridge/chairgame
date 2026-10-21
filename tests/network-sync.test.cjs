@@ -41,3 +41,28 @@ test('unacknowledged stale coordinates cannot override an assigned spawn; acknow
 test('different device clocks resolve the same shared time and intro page',()=>{
  const run=setup();run(`Date.now=()=>200000;serverClockOffset=-100000;assert.equal(roomNow(),100000);Date.now=()=>40000;serverClockOffset=60000;assert.equal(roomNow(),100000);`);
 });
+test('remote motion interpolates regular NPC packets continuously and stops without drift',()=>{
+ setup()(`const p={npc:true,x:0,z:0,rot:3.1,motionMoving:true};const s={started:1,players:{npc:p}};
+ for(let i=0;i<8;i++){p.x=i*4.2;s.npcFrameAt=1000+i*420;captureRemoteMotion(s,s.npcFrameAt);}
+ const steps=[];for(let t=3500;t<3800;t+=20)steps.push(remoteMotionPose('npc',p,t+20).x-remoteMotionPose('npc',p,t).x);
+ assert(steps.every(step=>Math.abs(step-.2)<.001));
+ p.motionMoving=false;s.npcFrameAt+=420;captureRemoteMotion(s,s.npcFrameAt);
+ assert.equal(remoteMotionPose('npc',p,10000).x,p.x);assert(remoteMotionHistory.get('npc').samples.length<=8);
+ `);
+});
+test('a first step after a long idle does not interpolate across the entire idle period',()=>{
+ setup()(`const p={npc:false,x:0,z:0,rot:0,moving:false,positionAt:1000};const s={players:{other:p}};captureRemoteMotion(s,1000);
+ p.x=1;p.moving=true;p.positionAt=10000;captureRemoteMotion(s,10000);
+ assert.equal(remoteMotionPose('other',p,9900).x,0);
+ assert(remoteMotionPose('other',p,10030).x>.4);
+ p.spawn={version:'new'};p.x=80;captureRemoteMotion(s,10100);assert.equal(remoteMotionHistory.get('other').samples.length,1);
+ `);
+});
+test('rotation takes the short turn and roof interpolation follows the stair route',()=>{
+ setup()(`const p={npc:true,x:0,z:0,rot:3.1,motionMoving:true,npcRoofTrip:{active:true,building:1,travel:0}};const s={players:{other:p},npcFrameAt:1000};captureRemoteMotion(s,1000);
+ p.x=4;p.rot=-3.1;p.npcRoofTrip={active:true,building:1,travel:4};s.npcFrameAt=1420;captureRemoteMotion(s,1420);
+ function npcRoofVisualPoint(trip,travel){return{x:travel,y:travel*2,z:0}}
+ const pose=remoteMotionPose('other',p,1575);assert(Math.abs(pose.rot-Math.PI)<.01);assert(Math.abs(pose.y-pose.x*2)<.001);
+ const predicted=remoteMotionPose('other',p,2000);assert.equal(predicted.y,predicted.x*2);
+ `);
+});

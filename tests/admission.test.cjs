@@ -8,7 +8,7 @@ async function join(initial,canceled=0){
 
  let server=structuredClone(initial),room='',id='',soloMode=false,playerPreloadTask=null,lastAppliedSpawn=null,me={},yaw=0,playerHeight=0,state=null,host=false,worldReady=false,loadedWorldSeed=null;
  const alerts=[],buttons={join:{},name:{value:'Guest'},room:{value:'TEST'},entry:{}};const $=k=>buttons[k]??={};const document={getElementById:$},console={error(){},warn(){}};
- function database(){return {}}function ref(db,path){return {path}}async function ensureFirebase(){}async function syncRoomClock(){}function reconcileRoomPositions(s){return s}function initialAccessories(){return {}}
+ function database(){return {}}function ref(db,path){return {path}}async function ensureFirebase(){}async function syncRoomClock(){}function captureRemoteMotion(){}function scheduleRoomUI(){renderUI()}const remoteMotionHistory=new Map();function reconcileRoomPositions(s){return s}function initialAccessories(){return {}}
  async function runTransaction(ref,fn){
   // Like the SDK, abort immediately if a callback returns undefined for an uncached null.
   const provisional=fn(null);if(canceled>0){canceled--;return {committed:false,snapshot:{val:()=>null}};}if(provisional===undefined)return {committed:false,snapshot:{val:()=>null}};
