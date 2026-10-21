@@ -32,3 +32,18 @@ test('hidden-chair marking requires staying near the hiding position and recheck
  state.chairs[1].x=5;recentHiddenChair.at-=6000;assert.equal(nearbyHiddenChairForMark(),null);
  `,ctx);
 });
+test('seated player can mark their occupied chair, but not a removed or reassigned chair',()=>{
+ const ctx=vm.createContext({assert});vm.runInContext(`let id='me',me={x:10,z:10},playerHeight=0,recentHiddenChair=null,state={players:{me:{sitting:2}},chairs:{2:{x:10,z:10,occupied:'me'}}};const button={},$=()=>button,marks=[];function upsertChairNote(...note){marks.push(note)}function refreshActions(){}`+extract('function nearChairBack',"$('sit').onclick")+`
+ assert.equal(closestBackChair()[0],'2');button.onclick();assert.deepEqual(marks[0],['2',10,10]);
+ state.chairs[2].removed=true;assert.equal(closestBackChair(),undefined);button.onclick();assert.equal(marks.length,1);
+ state.chairs[2].removed=false;state.chairs[2].occupied='other';assert.equal(closestBackChair(),undefined);
+ `,ctx);
+});
+test('map unlocks on first exterior exit, stays open after returning, and resets for a new game',()=>{
+ const ctx=vm.createContext({assert});vm.runInContext(`let state={phase:'instructions',started:1,players:{me:{}}},room='TEST',id='me',me={x:0,z:12},miniExpanded=false;const buildingSites=[{},{},{},{x:0,z:0,w:50,d:44}],classes=new Set();const document={body:{classList:{toggle:(name,on)=>on?classes.add(name):classes.delete(name)}}};function setMiniExpanded(v){miniExpanded=v}`+extract('let mapVisitKey=','function setMiniExpanded')+`
+ updateMapVisibility();assert(classes.has('map-locked'));state.phase='search';me.z=22;updateMapVisibility();assert(classes.has('map-locked'));
+ me.z=23;updateMapVisibility();assert(mapUnlocked);assert(!classes.has('map-locked'));me.z=0;state.phase='vote';updateMapVisibility();assert(mapUnlocked);
+ state.players.me.mapUnlockedFor=mapVisitKey;mapVisitKey=null;mapUnlocked=false;updateMapVisibility();assert(mapUnlocked,'reconnect lost first exit');
+ state.started=2;miniExpanded=true;updateMapVisibility();assert(classes.has('map-locked'));assert(!miniExpanded);
+ `,ctx);
+});
