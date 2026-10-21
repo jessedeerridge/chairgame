@@ -23,3 +23,9 @@ test('screen lens magnifies the normal distant view without exceeding the natura
  assert(mobile>=desktop&&mobile<=65);
  const wall=screenCameraFov(0,3.4,20.75,0,0,19.8,1280/720);assert(wall>desktop&&wall<=65);
 `));
+test('winner screen releases camera after two seconds and does not refocus on room reentry',()=>check(`
+ state.phase='finished';assert.equal(guideRoomView(5000),'screen');assert.equal(roomCameraFocus(6999),'screen');
+ assert.equal(guideRoomView(7000),null);yaw=.8;pitch=.3;assert.equal(guideRoomView(7100),null);assert.equal(yaw,.8);assert.equal(pitch,.3);
+ me.z=50;assert.equal(roomCameraFocus(7200),null);me.z=12;assert.equal(roomCameraFocus(7300),null);
+ state.phase='search';roomCameraFocus(8000);state.round=2;state.phase='finished';assert.equal(roomCameraFocus(9000),'screen');assert.equal(roomCameraFocus(11000),null);
+`));

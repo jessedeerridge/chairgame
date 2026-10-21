@@ -84,8 +84,11 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   for(let i=0;i<players.length;i++)for(let j=i+1;j<players.length;j++)assert(Math.hypot(players[i].x-players[j].x,players[i].z-players[j].z)>=2.2,'overlapping initial positions');
   for(const page of pages){const p=await page.evaluate(()=>{const t=window.lobbyTest,me=t.getMe(),spawn=t.getState().players[t.getId()].spawn;return{distance:Math.hypot(me.x-spawn.x,me.z-spawn.z),spawn};});assert.equal(p.distance,0,'client did not apply its assigned spawn');}
   for(const page of pages)assert.equal(await page.locator('#miniMapPanel').isVisible(),false);
-  const guest=pages[1],before=await guest.evaluate(()=>{const t=window.lobbyTest,p=t.getState().players.NPC0;t.setMe({x:0,z:23});t.updateMapVisibility();t.setMe(p);t.showStack();return{x:p.x,z:p.z};});
-  await guest.waitForFunction(()=>!document.querySelector('#stackButton').hidden);await guest.click('#stackButton');
+  const guest=pages[1],before=await guest.evaluate(()=>{const t=window.lobbyTest,p=t.getState().players.NPC0;t.setMe(p);t.updateMapVisibility();t.showStack();return{x:p.x,z:p.z};});
+  await guest.waitForFunction(()=>!document.querySelector('#stackButton').hidden);
+  const stack=await guest.evaluate(()=>{const b=document.querySelector('#stackButton'),r=b.getBoundingClientRect();return{floating:b.parentElement===document.body,left:r.left,bottom:innerHeight-r.bottom,mapVisible:document.querySelector('#miniMapPanel').getBoundingClientRect().width>0};});
+  assert(stack.floating);assert.equal(stack.left,16);assert.equal(stack.bottom,20);assert.equal(stack.mapVisible,false);
+  await guest.click('#stackButton');
   await guest.waitForFunction(old=>Math.hypot(window.lobbyTest.getMe().x-old.x,window.lobbyTest.getMe().z-old.z)>2.2,before,{timeout:10000});
   const relocated=await guest.evaluate(()=>{const t=window.lobbyTest,p=t.getMe();return{point:p,minDistance:Math.min(...Object.entries(t.getState().players).filter(([k,v])=>k!==t.getId()&&v.online!==false).map(([k,v])=>Math.hypot(v.x-p.x,v.z-p.z))),hidden:document.querySelector('#stackButton').hidden};});
   assert(relocated.minDistance>=2.2);assert.equal(relocated.hidden,true);

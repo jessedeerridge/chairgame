@@ -6,7 +6,8 @@ function setup(){
  vm.runInContext(`const {buildingSites,largeBuildings,stairways,obstacles,hidingSpots,VOTE_X,VOTE_Z}=${world};
  let roofRoomWalls=[],playerHeight=0,me={x:0,z:12,rot:0},yaw=0,lastSync=0,clock=0;const performance={now:()=>clock};
  let id='local',room='TEST',soloMode=false,state=null,host=true,worldReady=true,loadedWorldSeed=null;const WORLD_LAYOUT_VERSION=1;let generatedSeed=null;function makeWorldLayout(seed){generatedSeed=seed;return{chairs:{}}}
- const button={hidden:true,disabled:false,addEventListener(){}};const $=()=>button;
+ const button={hidden:true,disabled:false,classList:{toggle(){}},addEventListener(){}};const $=()=>button;
+ let mapUnlocked=false;const document={body:{appendChild(b){b.parentElement=this}}},miniPanel={appendChild(b){b.parentElement=this}};
  const TOTAL_PLAYERS=20,personalities=['慎重型'];const randBetween=(a,b)=>(a+b)/2;
  function player(){return state?.players?.[id]}async function mutate(fn){fn(state)}
  `+cut('function roofEdgeBlocked','function occupiedAt')+cut('function insideBlackBuilding','function canCastVote')+cut('function isOnlineLobby','let playerPreloadTask')+cut('let lastAppliedSpawn','function walletMedalIcon')+cut('function initRound','function indoorSpawn')+cut('function indoorSpawn',"$('start').onclick")+cut('let stackIdle','let _opaqueRoofConfigured')+`
@@ -40,7 +41,7 @@ test('immutable assignment wins over stale coordinates, but does not reset ordin
  s.players.local.spawn={version:'stack:2',x:-10,z:10,rot:Math.PI};applyAssignedSpawn(s);assert.equal(me.x,-10);assert.equal(me.z,10);
 `));
 test('stack button appears after six stationary seconds, resets on motion, and stays inside the black room',()=>setup()(`
- const s=lobby();s.phase='instructions';resetStackIdle(0);updateStackButton(5999);assert(button.hidden);updateStackButton(6000);assert(!button.hidden);
+ const s=lobby();s.phase='instructions';resetStackIdle(0);updateStackButton(5999);assert(button.hidden);updateStackButton(6000);assert(!button.hidden);assert.equal(button.parentElement,document.body);mapUnlocked=true;updateStackButton(6001);assert.equal(button.parentElement,miniPanel);
  me.x+=.2;updateStackButton(6100);assert(button.hidden);updateStackButton(12100);assert(!button.hidden);
  me.x=40;updateStackButton(13000);assert(button.hidden);me.x=0;s.players.local.sitting=1;updateStackButton(20000);assert(button.hidden);
 `));

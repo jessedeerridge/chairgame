@@ -136,3 +136,16 @@ test('a stale empty-chair flag cannot seat a second NPC on the seated owner',()=
  s.chairs={1:{x:0,z:65,occupied:null},2:{x:12,z:65}};
  npcSimulate(s,.28,10000);assert.equal(owner.sitting,1);assert.notEqual(other.sitting,1);assert.equal(s.chairs[1].occupied,'NPC0');
 `));
+test('departure queue preserves all distinct indoor positions instead of gathering in the center',()=>setup()(`
+ const s=game(),positions=[];
+ for(let i=0;i<19;i++){const point={x:(i%5-2)*7,z:3+Math.floor(i/5)*4.2};positions.push(point);const p=npc(point.x,point.z,{x:0,z:8});p.alive=true;p.departureDone=false;p.departureAt=50000;s.players['NPC'+i]=p;}
+ for(let tick=0;tick<15;tick++)npcSimulate(s,.28,10000+tick*280);
+ for(const [i,p] of Object.values(s.players).entries()){assert.equal(p.x,positions[i].x);assert.equal(p.z,positions[i].z);assert.equal(p.goal,null);assert.equal(p.waypoint,null);assert.equal(p.departureDone,false);}
+ const p=s.players.NPC17,goal=safe({x:0,z:65});s.chairs={1:goal};p.departureAt=14000;for(let tick=0;tick<15;tick++)npcSimulate(s,.28,14500+tick*280);
+ assert(p.departureDone);assert.equal(p.targetChair,'1');assert(p.goal);assert(Math.hypot(p.x-positions[17].x,p.z-positions[17].z)>0);
+ assert.equal(s.players.NPC1.departureDone,false);
+`));
+test('an NPC already outdoors starts searching immediately rather than returning to a queue',()=>setup()(`
+ const p=npc(0,60,null),s=game({NPC0:p});p.alive=true;p.departureDone=false;p.departureAt=50000;s.chairs={1:{x:0,z:70}};
+ npcSimulate(s,.28,10000);assert(p.departureDone);assert.equal(p.targetChair,'1');assert(p.z>60);
+`));

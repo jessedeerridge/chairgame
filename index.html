@@ -134,7 +134,7 @@ body.playing{user-select:none;-webkit-user-select:none;-webkit-touch-callout:non
 #lobbyScreen{position:fixed;inset:0;z-index:15;background:rgba(11,27,32,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);color:#314c44;display:grid;place-items:center;padding:18px;overflow:auto}#lobbyScreen[hidden]{display:none}.lobby-panel{position:relative;width:min(94vw,760px);padding:27px 26px 30px;text-align:center;border:3px solid #fff;border-radius:30px;background:#fff9eb;box-shadow:0 15px 0 #182b2d33,0 24px 70px #08191d75}.lobby-panel:before{content:'';position:absolute;inset:0 25px auto;height:5px;background:#e7bd76;border-radius:0 0 8px 8px}.lobby-room-tag{display:inline-block;margin:17px 0 0;font-size:13px;line-height:1.4;font-weight:700;letter-spacing:.12em;color:#927658}.lobby-roster{position:relative;min-height:130px;display:grid;align-items:center;margin:27px 0 0}#lobbyParticipants{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 14px}.lobby-player{position:relative;border:2px solid #e8e3d7;border-radius:16px;background:#fff;padding:17px 10px;min-height:64px;display:flex;align-items:center;justify-content:center;min-width:0}.lobby-player strong{font-size:16px;font-weight:700;line-height:1.45;min-width:0;overflow-wrap:anywhere}.lobby-player.is-self{background:#e6f3db;border-color:#b8d5aa}.lobby-host{position:absolute;width:20px;height:20px;top:-11px;left:12px}#lobbyScreen #start{position:static;display:block;margin:22px auto 0;transform:none;width:140px;min-height:58px;border:0;border-radius:15px;background:#dcb374;color:#44341f;font-size:20px;font-weight:900;box-shadow:0 4px 0 #ae824b}#lobbyScreen #start:disabled{opacity:1;background:#ece4d5;color:#a99d89;box-shadow:0 4px 0 #d5c9b6;cursor:default}#lobbyScreen #start:enabled:active{transform:translateY(3px);box-shadow:0 1px 0 #ae824b}#lobbyScreen #start[hidden]{display:none}
 #lobbyColors{display:grid;grid-template-columns:repeat(6,42px);justify-content:center;gap:9px;margin:23px auto 0}.shirt-color{display:grid;place-items:center;width:42px;height:44px;padding:4px;background:#fff;border:2px solid #e8e3d7;border-radius:12px;box-shadow:0 2px 0 #ded2bf}.shirt-color svg{display:block;width:31px;height:31px}.shirt-color:disabled{opacity:.22;box-shadow:none;cursor:default}.shirt-color.is-selected{border-color:#33815e;background:#e6f3db;box-shadow:0 0 0 2px #b8d5aa}.lobby-player{gap:8px}.lobby-player>svg:not(.lobby-host){width:25px;height:25px;flex:none}
 body.map-locked #miniMapPanel,body.map-locked #miniMapBackdrop{display:none!important}
-body.in-lobby>canvas,body.in-lobby #hud,body.in-lobby #actions,body.in-lobby #clock,body.in-lobby #stickBase,body.in-lobby #miniMapPanel,body.in-lobby #gameNotice{display:none!important}#stackButton{position:absolute;top:5px;right:5px;z-index:27;padding:6px 9px;background:#fff0bf;color:#4a3827;border:1px solid #d0aa64;font-size:12px}#stackButton[hidden]{display:none}#miniMapPanel.expanded #stackButton{top:50px}@media(max-width:600px){#lobbyScreen{padding:12px}.lobby-panel{width:100%;padding:22px 12px 25px;border-radius:28px}#lobbyParticipants{column-gap:12px;row-gap:12px}.lobby-player{padding:13px 7px;min-height:62px;border-radius:15px}.lobby-player strong{font-size:14px}#lobbyScreen #start{width:130px;min-height:54px;font-size:17px}.lobby-room-tag{font-size:12px}.lobby-roster{margin-top:24px;min-height:116px}}
+body.in-lobby>canvas,body.in-lobby #hud,body.in-lobby #actions,body.in-lobby #clock,body.in-lobby #stickBase,body.in-lobby #miniMapPanel,body.in-lobby #stackButton,body.in-lobby #gameNotice{display:none!important}#stackButton{position:absolute;top:5px;right:5px;z-index:27;padding:6px 9px;background:#fff0bf;color:#4a3827;border:1px solid #d0aa64;font-size:12px}#stackButton.stack-floating{position:fixed;top:auto;right:auto;left:16px;bottom:20px;z-index:27}#stackButton[hidden]{display:none}#miniMapPanel.expanded #stackButton{top:50px}@media(max-width:600px){#lobbyScreen{padding:12px}.lobby-panel{width:100%;padding:22px 12px 25px;border-radius:28px}#lobbyParticipants{column-gap:12px;row-gap:12px}.lobby-player{padding:13px 7px;min-height:62px;border-radius:15px}.lobby-player strong{font-size:14px}#lobbyScreen #start{width:130px;min-height:54px;font-size:17px}.lobby-room-tag{font-size:12px}.lobby-roster{margin-top:24px;min-height:116px}}
 
 </style><div id="runtimeError" style="position:fixed;top:0;left:0;z-index:30;color:#fff;background:#8a2323;padding:8px;max-width:100%;pointer-events:none"></div><div id="stickBase"><div id="stickKnob"></div></div><div id="entry"><div class="panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><div class="entry-eyebrow">LET’S PLAY!</div><h1>ISLAND<br><span>CHAIR GAME</span></h1><div class="entry-form"><input id="name" placeholder="なまえ" maxlength="16" aria-label="プレイヤー名"><input id="room" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="ルームコード" maxlength="16" aria-label="ルームコード"><button id="join">あそぶ <span aria-hidden="true">➜</span></button><button id="solo">ひとりでおためし</button></div></div></div><section id="lobbyScreen" hidden aria-label="開始前の待機画面"><div class="lobby-panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><p id="lobbyRoom" class="lobby-room-tag"></p><div class="lobby-roster"><div id="lobbyParticipants"></div></div><div id="lobbyColors" role="group" aria-label="ふくのいろ"></div><button id="start" hidden>開始</button></div></section><div id="hud"><div id="status">未接続</div><div id="players"></div><div id="wallet"></div><div id="log"></div></div><div id="clock" hidden><span id="phaseInstruction"></span><span id="clockSeconds"></span></div><div id="gameNotice" style="white-space:pre-line;position:fixed;top:24%;left:50%;transform:translateX(-50%);background:#10242aee;color:white;padding:18px 26px;border-radius:15px;font-size:22px;font-weight:800;text-align:center;pointer-events:none;display:none;z-index:8"></div><div id="voteResultsPopup" style="display:none;position:fixed;z-index:16;top:22%;left:50%;transform:translateX(-50%);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 24px);max-height:85vh;overflow:hidden;background:rgba(16,36,42,.96);color:white;border:2px solid #e6d39d;border-radius:18px;padding:20px 25px;box-shadow:0 10px 35px #0007;text-align:center;pointer-events:none;font-size:22px;font-weight:800"><div style="font-size:24px;margin-bottom:12px">投票結果</div><div id="voteResultsRows" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;width:100%;box-sizing:border-box"></div></div><div id="gameStats" style="position:fixed;right:12px;top:85px;background:#10242acc;padding:10px;border-radius:10px;font-size:12px;max-width:250px;pointer-events:none"></div><div id="miniMapBackdrop"></div><div id="miniMapPanel"><button id="stackButton" hidden title="空いている位置へ移動" aria-label="黒い建物内の空いている位置へ移動">stack</button><canvas id="miniMapCanvas" width="768" height="768"></canvas><button id="miniEraser" title="この椅子マークを削除" aria-label="消しゴム">🧽</button><div id="mapNumberEditor" hidden><button id="mapNumberCancel" title="閉じる" aria-label="閉じる">×</button><div id="mapNumberDisplay">?</div><div id="mapNumberKeys"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="?">?</button><button data-key="0">0</button><button data-key="back">⌫</button></div><div class="map-editor-actions"><button id="mapNumberSave">✓</button></div></div></div><div id="actions" hidden><button id="touch" data-action-label="とうひょう" hidden title="親を投票" aria-label="親を投票"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#7298ab" d="m5 21 15-7 15 7v15H5Z"/><path d="M13 23h14"/><path fill="#fff3d7" d="m14 3 15 5-6 17-15-5Z"/><path d="m14 13 3 4 7-6"/></svg></button><button id="sit" data-action-label="すわる" hidden title="座る" aria-label="座る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></svg></button><button id="markChair" data-action-label="おぼえる" hidden title="地図に記録" aria-label="地図に記録"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></svg></button><button id="moveChair" data-action-label="はこぶ" hidden title="イスを持ち上げる" aria-label="イスを持ち上げる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(9 -2) scale(.65)"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="hideChair" data-action-label="かくす" hidden title="イスを隠す" aria-label="イスを隠す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#52864b" d="M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z"/><path fill="#9b663a" d="M17 24h6v13h-6z"/></svg></button><button id="revealChair" data-action-label="さがす" hidden title="隠したイスを取り出す" aria-label="隠したイスを取り出す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m24 24 9 9" stroke-width="6"/><circle cx="16" cy="16" r="11" fill="#aad7e0"/><path d="M10 15a6 6 0 0 1 6-6" stroke="#fff"/></svg></button><button id="trade" data-action-label="わたす" hidden title="コインをあげる" aria-label="コインをあげる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(6 -3) scale(.7)"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="givePin" data-action-label="おしえる" hidden title="椅子の位置を共有" aria-label="椅子の位置を共有"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8 -1) scale(.6)"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="pickupShirt" data-action-label="きる" hidden title="Tシャツを着る" aria-label="Tシャツを着る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#699ec8" d="m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z"/></svg></button><button id="pickupAccessory" data-action-label="かぶる" hidden title="帽子をかぶる・眼鏡をつける" aria-label="帽子をかぶる・眼鏡をつける"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#805b9d" d="m11 7 3-3 12 3 3 23H11Z"/><path fill="#d5a861" d="M11 23h18v6H11z"/><ellipse cx="20" cy="31" rx="17" ry="5" fill="#805b9d"/></svg></button><button id="pickupCoin" data-action-label="ひろう" hidden title="コインを拾う" aria-label="コインを拾う"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/><path d="M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4"/></svg></button><button id="voteOpen" hidden>親を投票</button><button id="eraseOpen" hidden>イスを消去</button></div><div id="modal"><div class="panel"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="buttons"><button id="modalCancel">閉じる</button><button id="modalConfirm">決定</button></div></div></div><select id="target" hidden></select><select id="issuer" hidden></select><input id="amount" type="number" value="1" hidden><select id="voteTarget" hidden></select><select id="chairNumber" hidden></select><button id="send" hidden></button><button id="vote" hidden></button><button id="erase" hidden></button>
 <script type="text/plain" id="deferredGameCode">
@@ -1135,9 +1135,9 @@ function paintVoteWall(){
     const pages=[
       ['ルール ①','90秒以内にイスを探して座らなければいけない','座れなかった人は脱落'],
       ['ルール ②','同じイスに続けて座ることはできない','イスの番号を覚えておくとよい'],
-      ['ルール ③','終了後40秒以内にここへ戻らなければ、','親投票が棄権となる'],
+      ['ルール ③','終了後60秒以内にここへ戻らなければ、','親投票が棄権となる'],
       ['ルール ④','投票で親を1人決める','親はイスを1つ除外する'],
-      ['ルール ⑤','脱落した人も親投票に参加できる','戻ると、投票できる'],
+      ['ルール ⑤','脱落した人も親投票に参加できる','この建物に戻ると、投票できる'],
       ['ルール ⑥','優勝者のメダルはゲーム終了時に','1億円に換金される']
     ];
     const [title,line1,line2]=pages[slide-2];
@@ -1397,12 +1397,12 @@ function accessoryModel(kind,style){
  }
  return g;
 }
-function syncWearable(a,p){const h=a.userData.accessoryHead;if(!h)return;const worn=p?.worn||{};const signature=JSON.stringify([worn,p?.shirtColor]);if(a.userData.wornSignature===signature)return;a.userData.wornSignature=signature;
+function syncWearable(a,p){const h=a.userData.accessoryHead;if(!h)return;const worn=p?.worn||{};const signature=JSON.stringify([worn,p?.shirtColor,p?.bodyColor]);if(a.userData.wornSignature===signature)return;a.userData.wornSignature=signature;
  for(const old of (a.userData.wearables||[]))h.remove(old);a.userData.wearables=[];
  // Each avatar owns its torso material: changing one shirt must never recolor other players.
  // Clothing changes the avatar's existing torso, never adds a second shirt model.
  if(a.userData.shirtWear){a.userData.torso.remove(a.userData.shirtWear);a.userData.shirtWear.geometry.dispose();a.userData.shirtWear.material.dispose();a.userData.shirtWear=null;}
- if(a.userData.defaultTorsoColor===undefined)a.userData.defaultTorsoColor=a.userData.torso.material.color.getHex();a.userData.originalTorsoColor=SHIRT_COLORS.find(c=>c.id===p?.shirtColor)?.hex??a.userData.defaultTorsoColor;
+ if(a.userData.defaultTorsoColor===undefined)a.userData.defaultTorsoColor=a.userData.torso.material.color.getHex();a.userData.originalTorsoColor=SHIRT_COLORS.find(c=>c.id===p?.shirtColor)?.hex??p?.bodyColor??a.userData.defaultTorsoColor;
  if(worn.shirt){
    const [shirtColor]=shirtDesigns[worn.shirt]||shirtDesigns.star;
    a.userData.torso.material.color.setHex(shirtColor);
@@ -1593,6 +1593,37 @@ function availableShirtColor(s,k,preferred){
  const used=new Set(Object.entries(s.players||{}).filter(([other,p])=>other!==k&&!p.npc&&(p.online!==false||s.phase!=='lobby'&&p.initial===true)).map(([_,p])=>p.shirtColor));
  return SHIRT_COLORS.find(c=>c.id===preferred&&!used.has(c.id))?.id||SHIRT_COLORS.find(c=>!used.has(c.id))?.id||null;
 }
+// Admission and NPC takeover run atomically on the room, so two guests cannot claim one slot.
+function admitRoomPlayer(s,key,name,now){
+ if(!s)return 'missing';s.players??={};const old=s.players[key];
+ if(old&&!old.npc){Object.assign(old,{name,online:true,worldReady:false});return null;}
+ if(s.phase==='lobby'){
+  if(lobbyParticipants(s).length>=12)return 'full';
+  const shirtColor=availableShirtColor(s,key);if(!shirtColor)return 'full';
+  s.players[key]={name,shirtColor,worldReady:false,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:now,online:true};return null;
+ }
+ if(s.phase==='finished')return 'finished';
+ const slot=Object.entries(s.players).find(([k,p])=>p.npc&&p.alive===false);
+ if(!slot)return 'noNpc';
+ const [former,p]=slot;
+ // Remap references as well as the player: issued coins, votes and chair ownership stay intact.
+ function remap(value){
+  if(!value||typeof value!=='object')return;
+  for(const k of Object.keys(value)){
+   const v=value[k];if(v===former)value[k]=key;else remap(v);
+   if(k===former){value[key]=value[k];delete value[k];}
+  }
+ }
+ remap(s);const inherited=s.players[key];
+ Object.assign(inherited,{name,npc:false,online:true,worldReady:false,joined:now,bodyColor:inherited.bodyColor??0x4c9ec2});
+ inherited.npcSpotSearch=null;inherited.npcSpotHide=null;inherited.goal=null;inherited.waypoint=null;
+ inherited.mapData??={worldSeed:Number(s.worldSeed)||1,notes:Object.entries(inherited.memory||{}).flatMap(([number,known])=>{
+  const c=s.chairs?.[number],point=known&&typeof known==='object'?known:c&&!c.hiddenAt&&!c.removed?c:null;
+  return point?[{number:String(number),x:point.x,z:point.z}]:[];
+ }),explored:[]};
+ delete inherited.spawn;delete inherited.spawnApplied;
+ return null;
+}
 function chooseShirtColor(s,k,color){
  const p=s.players?.[k];if(s.phase!=='lobby'||!p||p.npc||!SHIRT_COLORS.some(c=>c.id===color)||availableShirtColor(s,k,color)!==color)return false;
  p.shirtColor=color;if(p.worn?.shirt)delete p.worn.shirt;return true;
@@ -1725,11 +1756,11 @@ $('join').onclick=async()=>{if(joiningRoom)return;joiningRoom=true;try{$('join')
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
 id='U'+Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
 let root=ref(database(),`rooms/${room}`);await runTransaction(root,s=>s||{host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{},votes:{}},{applyLocally:false});
+let admissionError=null;
 const joined=await runTransaction(root,s=>{
- if(!s||lobbyParticipants(s).filter(([key])=>key!==id).length>=12)return;const old=s.players?.[id],shirtColor=availableShirtColor(s,id,old?.shirtColor);if(!shirtColor)return;
- s.players??={};s.players[id]=old?{...old,name,online:true,worldReady:false,shirtColor}:{name,shirtColor,worldReady:false,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true};return s;
+ admissionError=admitRoomPlayer(s,id,name,Date.now());if(admissionError)return;return s;
 },{applyLocally:false});
-if(!joined.committed)throw new Error('この部屋は満員です（最大12人）');
+if(!joined.committed)throw new Error(admissionError==='full'?'この部屋は満員です（最大12人）':admissionError==='noNpc'?'交代できる脱落NPCがまだいません':admissionError==='finished'?'このゲームは終了しています':'入室を完了できませんでした。もう一度お試しください');
 const saved=joined.snapshot.val().players[id];lastAppliedSpawn=saved?.spawn?.version||null;me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
 await onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(false);
 // Chair state belongs to the shared room. Preserve sitting and the occupied chair
@@ -1771,7 +1802,7 @@ async function prepareDisconnectChair(p){
 }
 function launchSolo(){lastAppliedSpawn=null;document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
 $('solo').onclick=()=>launchSolo();
-const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=40000, VOTE_MS=30000, ERASE_MS=20000, VOTE_INTRO_MS=7000, RESULTS_MS=7000;
+const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=60000, VOTE_MS=30000, ERASE_MS=20000, VOTE_INTRO_MS=7000, RESULTS_MS=7000;
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
 const randBetween=(a,b)=>a+Math.random()*(b-a);
 function announce(message){const el=$('gameNotice');el.textContent=message;el.style.display='block';clearTimeout(announce.timer);announce.timer=setTimeout(()=>el.style.display='none',3600)}
@@ -2380,7 +2411,7 @@ function npcUpdateSpot(s,k,p,now){
  const found=Object.entries(s.chairs||{}).find(([_,c])=>!c.removed&&c.hiddenAt===spot.id);
  if(found){
   const [n,c]=found;const landing=accessibleCostumeDrop(p.x,p.z,spot);c.hiddenAt=null;c.x=landing.x;c.z=landing.z;
-  p.memory??={};p.memory[n]=true;
+  p.memory??={};p.memory[n]={x:c.x,z:c.z};
  }else if(Math.random()<1/3&&accessoryCatalog.length){
   const chosen=accessoryCatalog[Math.floor(Math.random()*accessoryCatalog.length)];
   s.accessories??={};
@@ -2436,23 +2467,14 @@ if(npcReturning(s)&&!hidingOnReturn){
 // door collisions. Non-searchers stay inside and do not block the threshold.
 // Stagger intentions; navigation discovers the doorway from collision geometry.
 if(s.phase==='search'&&!p.departureDone){
- const b=buildingSites[3],front=b.z+b.d/2;
- if(!p.searchIntent){
-  // Nonparticipants remain in the back of the hall, never wander through the doorway.
-  const target={x:b.x+((npcDepartureSlot(k)%5)-2)*2.5,z:front-15-(npcDepartureSlot(k)%3)*2};
-  if(Math.hypot(p.x-target.x,p.z-target.z)<2.2&&now>(p.idleUntil||0)){p.idleStep=(p.idleStep||0)+1;p.idleUntil=now+randBetween(5000,9000);}
-  const idleX=b.x+(((npcDepartureSlot(k)+(p.idleStep||0)*2)%5)-2)*2.5;
-  const idleGoal={x:idleX,z:front-15-((npcDepartureSlot(k)+(p.idleStep||0))%3)*2};
-  if(!p.goal||Math.hypot(p.goal.x-idleGoal.x,p.goal.z-idleGoal.z)>1){p.goal=idleGoal;p.waypoint=null;p.localBypass=null;}p.buildingRoute=null;
- }else if(now<(p.departureAt||0)){
-  // Waiting NPCs must not occupy the doorway. Move aside before their slot.
-  const target={x:b.x+((npcDepartureSlot(k)%5)-2)*2.5,z:front-14-(npcDepartureSlot(k)%3)*2};
-  if(!p.goal||Math.hypot(p.goal.x-target.x,p.goal.z-target.z)>1){p.goal=target;p.waypoint=null;}p.buildingRoute=null;
- }else{
-  // Choose the real destination indoors; pathfinding discovers the exit.
-  p.departureDone=true;p.goal=null;p.decisionAt=0;
-  p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
+ if(!p.searchIntent||insideBlackBuilding(p.x,p.z)&&now<(p.departureAt||0)){
+  // Preserve each actor's distinct starting/return position while its exit slot is pending.
+  // Moving every waiting actor to a shared staging area created a second bottleneck.
+  p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
+  npcNavigation.delete(room+':'+k);continue;
  }
+ p.departureDone=true;p.goal=null;p.decisionAt=0;
+ p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
 }
 if(!p.buildingRoute&&!npcReturning(s)&&!(s.phase==='search'&&!p.departureDone))npcChooseSpot(s,k,p,now);
 const inspectingSpot=!npcReturning(s)&&npcUpdateSpot(s,k,p,now);
@@ -2464,7 +2486,7 @@ p.buildingRoute=null;p.waypoint=null;p.localBypass=null;p.returnDoorStep=false;
 if(!p.goal){p.waypoint=null;continue;}
 const distToGoal=Math.hypot(p.goal.x-p.x,p.goal.z-p.z);
 if(!hidingOnReturn&&!inspectingSpot&&distToGoal<(npcReturning(s)?1.4:2.5)&&npcGoalReachable(s,k,p,p.goal)){
- if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&npcChairUsable(s,k,p,p.targetChair)&&!characterMovementBlocked(s,k,p.x,p.z,c.x,c.z,c.y||0)&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=k;p.memory??={};p.memory[p.targetChair]=true;continue;}}
+ if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&npcChairUsable(s,k,p,p.targetChair)&&!characterMovementBlocked(s,k,p.x,p.z,c.x,c.z,c.y||0)&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=k;p.memory??={};p.memory[p.targetChair]={x:c.x,z:c.z};continue;}}
  p.goal=null;p.decisionAt=0;npcNavigation.delete(room+":"+k);continue;
 }
 p.npcMotionWatch??={x:p.x,z:p.z,at:now};
@@ -2638,6 +2660,7 @@ function roomCameraFocus(now){
  if(session!==roomFocusSession){roomFocusSession=session;roomFocusStarted=now;}
  if(!state||!insideBlackBuilding(me.x,me.z)||playerHeight>=8)return null;
  if(state.phase==='sitIntro')return now-roomFocusStarted<900?'screen':'door';
+ if(state.phase==='finished')return now-roomFocusStarted<2000?'screen':null;
  return ['instructions','voteIntro','vote','results','erase','eraseReveal','finished'].includes(state.phase)?'screen':null;
 }
 function guideRoomView(now){
@@ -2675,6 +2698,9 @@ function guidedScreenAim(cx,cy,cz,px,py,pz,aspect,fov=65){
 let stackIdle=null;
 function resetStackIdle(now){stackIdle={x:me.x,z:me.z,since:now};$('stackButton').hidden=true;}
 function updateStackButton(now){
+ const button=$('stackButton'),floating=!mapUnlocked;
+ if(button.parentElement!==(floating?document.body:miniPanel))(floating?document.body:miniPanel).appendChild(button);
+ button.classList.toggle('stack-floating',floating);
  const active=state&&state.phase!=='lobby'&&state.phase!=='finished'&&insideBlackBuilding(me.x,me.z)&&playerHeight<2.5&&!player()?.sitting;
  if(!active||!stackIdle||Math.hypot(me.x-stackIdle.x,me.z-stackIdle.z)>.15){resetStackIdle(now);return;}
  $('stackButton').hidden=relocating||now-stackIdle.since<6000;
