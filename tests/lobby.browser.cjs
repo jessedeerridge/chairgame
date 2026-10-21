@@ -40,21 +40,24 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
    await page.route('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js',r=>r.fulfill({body:'export const initializeApp=()=>({});',contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
    await page.route('https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js',r=>r.fulfill({body:databaseModule,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
    if(process.env.THREE_MODULE_PATH)await page.route('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',r=>r.fulfill({path:process.env.THREE_MODULE_PATH,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
-   await page.addInitScript(()=>localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'})));
+   await page.addInitScript(()=>{window.holdTestLoad=true;localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));});
    await page.goto('http://127.0.0.1:'+server.address().port);
    assert.equal(await page.inputValue('#name'),'以前の名前');assert.equal(await page.inputValue('#room'),'OLDROOM');
-   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady};performance.mark("island-room-ready");`);});
+   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady};performance.mark("island-room-ready");`);});
    await page.fill('#name',name);await page.fill('#room','TEST');await page.click('#join');await page.waitForFunction(()=>window.lobbyTest?.getState()?.players?.[window.lobbyTest.getId()],{timeout:60000});
   }
   assert.deepEqual(Object.values(read('rooms/TEST/players')).filter(p=>!p.npc).map(p=>p.name).sort(),['Guest','Host']);
   for(const page of pages){await page.waitForFunction(()=>document.body.classList.contains('in-lobby')&&document.querySelectorAll('.lobby-player').length===2);assert(await page.locator('#lobbyScreen').isVisible());assert.equal(await page.locator('body>canvas').isVisible(),false);const cols=await page.locator('#lobbyParticipants').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length);assert.equal(cols,2);}
   if(process.env.CAPTURE_LOBBY){await pages[0].screenshot({path:'/tmp/lobby-desktop.png'});await pages[1].screenshot({path:'/tmp/lobby-mobile.png'});}
   assert.equal(read('rooms/TEST/phase'),'lobby');
-  for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.worldReady()&&Object.values(window.lobbyTest.getState().players).filter(p=>!p.npc&&p.online!==false).every(p=>p.worldReady),{timeout:60000});
+  for(const page of pages)assert.equal(await page.evaluate(()=>window.lobbyTest.worldReady()),false);
   assert.equal(positionWritesInLobby,0,'waiting clients overwrote spawn coordinates');assert.equal(read('rooms/TEST/phase'),'lobby','loading automatically started the game');
   assert.equal(await pages[0].locator('#start').isEnabled(),true);assert.equal(await pages[1].locator('#start').isEnabled(),false);
   await pages[0].click('#start');
   for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.getState().phase==='instructions'&&document.body.classList.contains('playing'),{timeout:10000});
+  assert.equal(read('rooms/TEST/worldPreparing'),true);
+  for(const page of pages)await page.evaluate(()=>window.releaseTestLoad());
+  for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.worldReady()&&!window.lobbyTest.getState().worldPreparing,{timeout:60000});
   for(const page of pages){await page.waitForFunction(()=>{const c=document.querySelector('body>canvas');return c.width===innerWidth&&c.height===innerHeight;});assert.equal(await page.evaluate(()=>visualViewport.scale),1);}
   await pages[1].setViewportSize({width:844,height:390});
   await pages[1].waitForFunction(()=>{const c=document.querySelector('body>canvas');return c.width===844&&c.height===390;});
@@ -67,6 +70,6 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   await guest.waitForFunction(old=>Math.hypot(window.lobbyTest.getMe().x-old.x,window.lobbyTest.getMe().z-old.z)>2.2,before,{timeout:10000});
   const relocated=await guest.evaluate(()=>{const t=window.lobbyTest,p=t.getMe();return{point:p,minDistance:Math.min(...Object.entries(t.getState().players).filter(([k,v])=>k!==t.getId()&&v.online!==false).map(([k,v])=>Math.hypot(v.x-p.x,v.z-p.z))),hidden:document.querySelector('#stackButton').hidden};});
   assert(relocated.minDistance>=2.2);assert.equal(relocated.hidden,true);assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({participants:2,preloadedIndividually:true,positionWritesInLobby,uniqueStartingPositions:20,relocated,errors},null,2));
+  console.log(JSON.stringify({participants:2,startedBeforeLoad:true,loadedInBackground:true,positionWritesInLobby,uniqueStartingPositions:20,relocated,errors},null,2));
  }finally{clearTimeout(noticeTimer);if(browser)await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

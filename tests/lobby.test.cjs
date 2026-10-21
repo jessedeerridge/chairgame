@@ -22,9 +22,9 @@ test('all humans and NPCs start at distinct clear locations, replacing stale NPC
   for(let j=i+1;j<players.length;j++)assert(Math.hypot(players[i].x-players[j].x,players[i].z-players[j].z)>=2.2);
  }
 `));
-test('online game remains in the lobby until every human has preloaded',()=>setup()(`
- const s=lobby();s.players.guest.worldReady=false;assert(!lobbyPlayersReady(s));beginGame(s);assert.equal(s.phase,'lobby');assert.equal(Object.keys(s.players).length,2);
- s.players.guest.worldReady=true;s.players.offline={...human('Gone',false),online:false};assert(lobbyPlayersReady(s));beginGame(s);assert.equal(s.phase,'instructions');
+test('host starts immediately while everyone is still loading',()=>setup()(`
+ const s=lobby();worldReady=false;for(const p of Object.values(s.players))p.worldReady=false;
+ beginGame(s);assert.equal(s.phase,'instructions');assert.equal(Object.keys(s.players).length,20);assert(s.worldPreparing);
 `));
 test('solo mode still begins its introduction without waiting for online readiness',()=>setup()(`
  const s=lobby();soloMode=true;s.players={local:human('Solo',false)};worldReady=false;beginGame(s);assert.equal(s.phase,'instructions');assert(s.worldPreparing);
