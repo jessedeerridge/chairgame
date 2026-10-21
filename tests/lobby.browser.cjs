@@ -16,7 +16,7 @@ export const onValue=(ref,fn)=>{listeners.set(ref.path,fn);window.__emitFakeData
 export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async()=>{}});
 `;
 (async()=>{
- let data={},revision=0,pages=[],noticeTimer=null,positionWritesInLobby=0;
+ let lobbyBeforeImports=0;let data={},revision=0,pages=[],noticeTimer=null,positionWritesInLobby=0;
  const clone=x=>JSON.parse(JSON.stringify(x??null));
  const read=key=>key.split('/').reduce((v,k)=>v?.[k],data)??null;
  const write=(key,value)=>{const parts=key.split('/');let v=data;for(const k of parts.slice(0,-1))v=v[k]??={};v[parts.at(-1)]=clone(value);};
@@ -39,7 +39,11 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
    });
    await page.route('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js',r=>r.fulfill({body:'export const initializeApp=()=>({});',contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
    await page.route('https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js',r=>r.fulfill({body:databaseModule,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
-   if(process.env.THREE_MODULE_PATH)await page.route('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',r=>r.fulfill({path:process.env.THREE_MODULE_PATH,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}}));
+   if(process.env.THREE_MODULE_PATH)await page.route('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js',async r=>{
+    const waiting=await page.evaluate(()=>document.body.classList.contains('in-lobby')&&!document.querySelector('#lobbyScreen').hidden&&document.querySelector('#entry').hidden&&!window.__islandGameReady&&document.querySelector('.lobby-player strong').textContent);
+    assert.equal(waiting,name,'3D import started before the lobby was displayed');lobbyBeforeImports++;
+    await r.fulfill({path:process.env.THREE_MODULE_PATH,contentType:'text/javascript',headers:{'access-control-allow-origin':'*'}});
+   });
    await page.addInitScript(()=>{window.holdTestLoad=true;localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));});
    await page.goto('http://127.0.0.1:'+server.address().port);
    assert.equal(await page.inputValue('#name'),'以前の名前');assert.equal(await page.inputValue('#room'),'OLDROOM');
@@ -69,7 +73,7 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   await guest.waitForFunction(()=>!document.querySelector('#stackButton').hidden);await guest.click('#stackButton');
   await guest.waitForFunction(old=>Math.hypot(window.lobbyTest.getMe().x-old.x,window.lobbyTest.getMe().z-old.z)>2.2,before,{timeout:10000});
   const relocated=await guest.evaluate(()=>{const t=window.lobbyTest,p=t.getMe();return{point:p,minDistance:Math.min(...Object.entries(t.getState().players).filter(([k,v])=>k!==t.getId()&&v.online!==false).map(([k,v])=>Math.hypot(v.x-p.x,v.z-p.z))),hidden:document.querySelector('#stackButton').hidden};});
-  assert(relocated.minDistance>=2.2);assert.equal(relocated.hidden,true);assert.deepEqual(errors,[]);
-  console.log(JSON.stringify({participants:2,startedBeforeLoad:true,loadedInBackground:true,positionWritesInLobby,uniqueStartingPositions:20,relocated,errors},null,2));
+  assert(relocated.minDistance>=2.2);assert.equal(relocated.hidden,true);assert.deepEqual(errors,[]);if(process.env.THREE_MODULE_PATH)assert.equal(lobbyBeforeImports,2);
+  console.log(JSON.stringify({participants:2,lobbyBeforeImports,startedBeforeLoad:true,loadedInBackground:true,positionWritesInLobby,uniqueStartingPositions:20,relocated,errors},null,2));
  }finally{clearTimeout(noticeTimer);if(browser)await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

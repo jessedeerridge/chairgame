@@ -2727,6 +2727,17 @@ document.getElementById('room').addEventListener('input',saveEntryFields);
    if(window.__islandGameReady)return;
    event.preventDefault();event.stopImmediatePropagation();
    if(booting)return;
+   if(buttonId==='join'){
+    const code=document.getElementById('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);
+    if(!code){alert('部屋コードを入力');return;}
+    entry.hidden=true;document.body.classList.add('in-lobby');document.body.classList.remove('playing');
+    document.getElementById('lobbyScreen').hidden=false;
+    const tag=document.getElementById('lobbyRoom');tag.textContent=code;tag.setAttribute('aria-label','ルーム '+code);
+    const card=document.createElement('div');card.className='lobby-player is-self';
+    const name=document.createElement('strong');name.textContent=document.getElementById('name').value.trim()||'プレイヤー';card.append(name);
+    document.getElementById('lobbyParticipants').replaceChildren(card);
+    const start=document.getElementById('start');start.hidden=false;start.disabled=true;
+   }
    booting=true;
    const original=button.innerHTML;
    button.disabled=true;button.textContent='読み込み中…';
@@ -2737,9 +2748,13 @@ document.getElementById('room').addEventListener('input',saveEntryFields);
     button.click();
    };
    window.addEventListener('islandGameModuleReady',ready,{once:true});
-   const module=document.createElement('script');module.type='module';
-   module.textContent=document.getElementById('deferredGameCode').textContent;
-   document.body.appendChild(module);
+   const loadGame=()=>{
+    const module=document.createElement('script');module.type='module';
+    module.textContent=document.getElementById('deferredGameCode').textContent;
+    document.body.appendChild(module);
+   };
+   // Present the lobby before importing Three.js or constructing any room geometry.
+   if(buttonId==='join')requestAnimationFrame(()=>requestAnimationFrame(loadGame));else loadGame();
   },{capture:true});
  }
 })();
