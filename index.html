@@ -1588,7 +1588,7 @@ $('mapNumberKeys').addEventListener('click',e=>{
 });
 function hideMapSelection(){selectedMapNote=-1;mapEraser.classList.remove('visible');mapEditor.hidden=true;pendingMapSpot=null}
 mapEraser.onclick=e=>{e.stopPropagation();if(selectedMapNote>=0&&selectedMapNote<miniNotes.length){miniNotes.splice(selectedMapNote,1)}hideMapSelection();drawMiniMap()};
-function showMapEditor(spot){pendingMapSpot=spot;mapEraser.classList.remove('visible');mapEditor.hidden=false;mapNumberValue='';mapDisplay.textContent='?'}
+function showMapEditor(spot,number=''){pendingMapSpot={x:spot.x,z:spot.z};mapEraser.classList.remove('visible');mapEditor.hidden=false;mapNumberValue=String(number);mapDisplay.textContent=mapNumberValue||'?'}
 function saveMapNumber(){if(!pendingMapSpot)return;const number=mapNumberValue||'?';if(!/^(?:\d{1,3}|\?)$/.test(number)||(number!=='?'&&(Number(number)<1||Number(number)>highestChairNumber()))){resetMapNumber();return}const spot=pendingMapSpot;if(pinShareTarget){const recipient=pinShareTarget;hideMapSelection();setMiniExpanded(false);shareChairPin(recipient,number,spot.x,spot.z)}else{upsertChairNote(number,spot.x,spot.z);hideMapSelection();drawMiniMap()}}
 $('mapNumberSave').onclick=e=>{e.stopPropagation();saveMapNumber()};$('mapNumberCancel').onclick=e=>{e.stopPropagation();hideMapSelection()};
 // A tap outside the keypad dismisses only the keypad; the enlarged map remains open.
@@ -1661,7 +1661,8 @@ miniCanvas.addEventListener('pointerdown',e=>e.stopPropagation());
 miniCanvas.addEventListener('click',e=>{e.stopPropagation();if(!miniExpanded){setMiniExpanded(true);return}const rect=miniCanvas.getBoundingClientRect(),x=(e.clientX-rect.left)*miniCanvas.width/rect.width,y=(e.clientY-rect.top)*miniCanvas.height/rect.height;
  if(e.clientX>rect.right-44&&e.clientY<rect.top+44){setMiniExpanded(false);return}
  const spot=miniWorld(x,y,miniParams());if(Math.hypot(spot.x,spot.z)>310.5){hideMapSelection();return}
- const tolerance=20/miniParams().scale,index=miniNotes.findIndex(n=>Math.hypot(n.x-spot.x,n.z-spot.z)<tolerance);
+ const tolerance=(pinShareTarget?40:20)/miniParams().scale,index=miniNotes.reduce((best,n,i)=>{const distance=Math.hypot(n.x-spot.x,n.z-spot.z);return distance<best.distance?{index:i,distance}:best},{index:-1,distance:tolerance}).index;
+ if(index>=0&&pinShareTarget){const note=miniNotes[index];selectedMapNote=-1;showMapEditor(note,note.number);return}
  if(index>=0&&!pinShareTarget){mapEditor.hidden=true;pendingMapSpot=null;selectedMapNote=index;const pt=miniPoint(miniNotes[index].x,miniNotes[index].z,miniParams());mapEraser.style.left=`${Math.max(35,Math.min(93,pt.x/miniCanvas.width*100))}%`;mapEraser.style.top=`${Math.max(14,Math.min(90,pt.y/miniCanvas.height*100-5))}%`;mapEraser.classList.add('visible');return}
  selectedMapNote=-1;showMapEditor(spot);
 });
@@ -1912,7 +1913,30 @@ $('markChair').onclick=()=>{
  else if(nearby)upsertChairNote(nearby[0],nearby[1].x,nearby[1].z);
  refreshActions();
 };
-$('sit').onclick=()=>mutate(s=>{let p=s.players[id];if(!p)return;if(p.sitting){let c=s.chairs[p.sitting];if(c){c.occupied=null;const spot=findClearSpot(c.x+2.3,c.z+1.5,.7,p.sitting);if(spot){p.x=spot.x;p.z=spot.z;}}p.sitting=0;me.x=p.x;me.z=p.z;return}for(let [n,c] of Object.entries(s.chairs)){if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&(s.phase!=='search'||Number(n)!==p.previous)&&Math.hypot(c.x-p.x,c.z-p.z)<3){p.sitting=Number(n);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=id;break}}});
+function findStandingSpot(chair,chairNumber){
+ const savedHeight=playerHeight,level=chair.y||0;
+ playerHeight=level;
+ try{
+  const candidates=[{x:chair.x+2.3,z:chair.z+1.5}];
+  for(let r=2.2;r<=6;r+=.5)for(let i=0;i<24;i++){const angle=i*Math.PI/12;candidates.push({x:chair.x+Math.sin(angle)*r,z:chair.z+Math.cos(angle)*r});}
+  for(const point of candidates){
+   const y=elevationAt(point.x,point.z);
+   if(Math.abs(y-level)>.8||occupiedAt(point.x,point.z,.7,id,chairNumber,true))continue;
+   const supported=[[-.6,-.6],[-.6,.6],[.6,-.6],[.6,.6]].every(([dx,dz])=>Math.abs(elevationAt(point.x+dx,point.z+dz)-y)<.8);
+   if(supported)return {...point,y};
+  }
+  return null;
+ }finally{playerHeight=savedHeight;}
+}
+$('sit').onclick=()=>mutate(s=>{
+ const p=s.players[id];if(!p)return;
+ if(p.sitting){
+  const c=s.chairs[p.sitting];
+  if(c){const spot=findStandingSpot(c,p.sitting);if(!spot)return;c.occupied=null;Object.assign(p,spot);}
+  p.sitting=0;me.x=p.x;me.z=p.z;playerHeight=p.y||0;return;
+ }
+ for(const [n,c] of Object.entries(s.chairs))if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&(s.phase!=='search'||Number(n)!==p.previous)&&Math.hypot(c.x-p.x,c.z-p.z)<3){p.sitting=Number(n);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=id;break;}
+});
 // Five-second hide/search action; cancel if the player moves away or conditions change.
 let spotAction=null;
 function beginSpotAction(kind){

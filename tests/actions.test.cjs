@@ -47,3 +47,14 @@ test('map unlocks on first exterior exit, stays open after returning, and resets
  state.started=2;miniExpanded=true;updateMapVisibility();assert(classes.has('map-locked'));assert(!miniExpanded);
  `,ctx);
 });
+test('sharing a recorded chair prefills its number and exact saved coordinates while allowing edits',()=>{
+ const ctx=vm.createContext({assert});vm.runInContext(`
+ let miniExpanded=true,pinShareTarget='friend',selectedMapNote=-1,pendingMapSpot=null,mapNumberValue='',sent=null;
+ const miniNotes=[{number:'7',x:100.25,z:-30.75}],mapEditor={hidden:true},mapDisplay={},mapEraser={classList:{remove(){}}},handlers={};
+ const miniCanvas={width:768,height:768,addEventListener:(type,fn)=>handlers[type]=fn,getBoundingClientRect:()=>({left:0,top:0,right:768,width:768,height:768})};
+ function miniParams(){return {scale:1}}function miniWorld(){return {x:102,z:-29}}function highestChairNumber(){return 15}function resetMapNumber(){throw Error('unexpected invalid number')}function hideMapSelection(){pendingMapSpot=null}function setMiniExpanded(v){miniExpanded=v}function shareChairPin(...args){sent=args}function drawMiniMap(){}function upsertChairNote(){throw Error('sharing must not change own note')}
+ `+extract('function showMapEditor','function saveMapNumber')+extract('function saveMapNumber',"$('mapNumberSave')")+extract("miniCanvas.addEventListener('pointerdown'","for(const type of ['pointermove'")+`
+ handlers.click({stopPropagation(){},clientX:200,clientY:200});assert.equal(mapNumberValue,'7');assert.equal(mapDisplay.textContent,'7');assert.equal(mapEditor.hidden,false);assert.deepEqual(pendingMapSpot,{x:100.25,z:-30.75});
+ mapNumberValue='8';saveMapNumber();assert.deepEqual(sent,['friend','8',100.25,-30.75]);assert.equal(miniNotes[0].number,'7');
+ `,ctx);
+});

@@ -65,6 +65,11 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{const t=window.bootTest,s=t.getState(),id=t.getId();s.chairs[900]={x:10,z:6,y:15,occupied:id};s.chairs[901]={x:15,z:6,y:7,occupied:'NPC0'};s.players[id].sitting=900;s.players.NPC0.sitting=901;});
   await page.waitForFunction(()=>{const t=window.bootTest;return t.avatars[t.getId()].position.y===15&&t.avatars.NPC0.position.y===7&&t.getLocalHeight()===15&&t.camera.position.y>15;});
   const seatedHeights=await page.evaluate(()=>{const t=window.bootTest,s=t.getState(),result={local:t.avatars[t.getId()].position.y,remote:t.avatars.NPC0.position.y,cameraFollows:t.camera.position.y>15};s.players[t.getId()].sitting=0;s.players.NPC0.sitting=0;delete s.chairs[900];delete s.chairs[901];return result;});
+  await page.evaluate(()=>{const t=window.bootTest,s=t.getState(),id=t.getId();s.chairs[902]={x:17.7,z:220.7,y:16.2,occupied:id};s.players[id].sitting=902;});
+  await page.waitForFunction(()=>window.bootTest.getLocalHeight()===16.2);
+  await page.click('#sit');
+  await page.waitForFunction(()=>{const t=window.bootTest,p=t.getState().players[t.getId()];return !p.sitting&&Math.abs(t.getLocalHeight()-16.2)<.01&&Math.abs(t.avatars[t.getId()].position.y-16.2)<.01;});
+  const standingHeight=await page.evaluate(()=>window.bootTest.getLocalHeight());
   const display=await page.evaluate(()=>{
    const t=window.bootTest,s=t.getState(),p=Object.values(s.players).find(p=>!p.npc);t.renderWallet(p);
    const wallet=document.querySelector('#wallet'),first=wallet.firstChild;
@@ -76,6 +81,6 @@ const {chromium}=require('playwright');
   });
   assert(display.unchanged,'wallet rebuilt on position-only snapshots');assert(display.sameScreen,'results changed during chair selection');assert.equal(display.leaders,3);
   await page.screenshot({path:'/tmp/vote-results.png'});
-  console.log(JSON.stringify({initial,loaded,transitions,display,focus,framing,seatedHeights,errors},null,2));
+  console.log(JSON.stringify({initial,loaded,transitions,display,focus,framing,seatedHeights,standingHeight,errors},null,2));
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
