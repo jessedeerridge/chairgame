@@ -303,7 +303,7 @@ function captureRemoteMotion(s,now=roomNow()){
 function remoteMotionPose(key,p,now=roomNow()){
  const track=remoteMotionHistory.get(key),last=track?.last;
  if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0,vx:0,vy:0,vz:0,moving:false};
- const horizon=last.stream ? .35 : p.npc ? .75 : .35,age=Math.max(0,Math.min(horizon,(now-last.at)/1000));
+ const horizon=last.stream ? .18 : p.npc ? .3 : .18,age=Math.max(0,Math.min(horizon,(now-last.at)/1000));
  const moving=last.moving!==false&&p.online!==false&&(now-last.at)<(last.stream?650:p.npc?1100:650);
  const vx=moving?track.vx:0,vy=moving?track.vy:0,vz=moving?track.vz:0;
  let x=last.x+vx*age,z=last.z+vz*age,y=last.y+vy*age;
@@ -326,17 +326,15 @@ function moveRemoteAvatar(avatar,key,p,dt,now){
  else{
   const speed=Math.hypot(pose.vx,pose.vz),direction=speed>.05?{x:pose.vx/speed,z:pose.vz/speed}:memory.remoteDirection;
   let dx=pose.vx*dt+errorX*Math.min(1,dt*7),dz=pose.vz*dt+errorZ*Math.min(1,dt*7);
-  // Being a little ahead is corrected by slowing down, never by walking backwards.
-  // A real reversal changes direction with the next velocity packet.
-  if(direction){const forward=dx*direction.x+dz*direction.z;if(forward<0){dx-=forward*direction.x;dz-=forward*direction.z;}}
-  const distance=Math.hypot(dx,dz),maxStep=Math.max(speed,direction?memory.remoteSpeed||2:7)*dt*1.35;
+  // Remote avatars are visual replicas: their authoritative position comes
+  // from the owning client (or NPC host), not this viewer's local collision map.
+  // Always converge to the transmitted position, including when correcting
+  // overshoot or a direction reversal.
+  const distance=Math.hypot(dx,dz);
+  const maxStep=Math.max(3.5,speed*1.5,Math.hypot(errorX,errorZ)*8)*dt;
   if(distance>maxStep&&distance>.0001){dx*=maxStep/distance;dz*=maxStep/distance;}
-  const nextX=avatar.position.x+dx,nextZ=avatar.position.z+dz;
-  // Only the host resolves NPC visual terrain. Guests follow that same motion stream.
-  const hostGround=p.npc&&host&&!p.npcRoofTrip?.active&&(p.y||0)<1.5;
-  if(!hostGround||npcStaticClearPath(state,avatar.position.x,avatar.position.z,nextX,nextZ)&&!characterMovementBlocked(state,key,avatar.position.x,avatar.position.z,nextX,nextZ,pose.y,true)){
-   avatar.position.x=nextX;avatar.position.z=nextZ;
-  }
+  avatar.position.x+=dx;
+  avatar.position.z+=dz;
   avatar.position.y+=(pose.y-avatar.position.y)*Math.min(1,dt*12);
   if(speed>.05){memory.remoteDirection=direction;memory.remoteSpeed=speed;}
  }
@@ -2605,6 +2603,26 @@ function npcDepartureSlot(k){let n=0;for(const ch of String(k))n=(n*31+ch.charCo
 function npcGoalReachable(s,k,p,goal){
  return npcStaticClearPath(s,p.x,p.z,goal.x,goal.z);
 }
+// Precompute the outdoor path while the NPC is still walking to the exit.
+// This cache is host-local; only the host makes NPC decisions.
+const npcExitPrefetch=new Map();
+function npcPrefetchOutdoor(s,k,p,goal,spread,now){
+ const key=room+':'+k,old=npcExitPrefetch.get(key);
+ if(!old||Math.hypot(old.goal.x-goal.x,old.goal.z-goal.z)>.75||Math.hypot(old.start.x-spread.x,old.start.z-spread.z)>1){
+  const origin={x:spread.x,z:spread.z};
+  const direct=npcStaticClearPath(s,origin.x,origin.z,goal.x,goal.z,.78);
+  const job=direct?null:npcCreateSearch(s,origin,goal);
+  npcExitPrefetch.set(key,{goal:{...goal},start:origin,path:direct?[{...goal}]:[],job,ready:direct,retryAt:0});
+ }
+ const cache=npcExitPrefetch.get(key);
+ if(cache.job){
+  npcAdvanceSearch(s,cache.job);
+  if(cache.job.done){cache.path=cache.job.path||[];cache.ready=cache.path.length>0;cache.job=null;cache.retryAt=now+1500;}
+ }else if(!cache.ready&&now>=cache.retryAt){
+  cache.job=npcCreateSearch(s,cache.start,cache.goal);cache.retryAt=now+1500;
+ }
+ return cache;
+}
 function npcNavigationTarget(s,k,p,now){
  let goal=p.goal;if(!goal)return null;
  // Start moving through the actual doorway before planning a long outdoor journey.
@@ -2615,13 +2633,23 @@ function npcNavigationTarget(s,k,p,now){
   if(!p.npcExitPending||!p.npcExitStage)p.npcExitStage=p.z>=front+2?'spread':'door';
   if(p.npcExitStage==='door'&&p.z>=front+2&&Math.abs(p.x-b.x)<(largeBuildings[3]?.doorW||13)/2-1.2)p.npcExitStage='spread';
   const spread={x:b.x+(index%5-2)*4.5,z:front+12+Math.floor(index/5)%4*3};
+  // Start A* before reaching the door, not after the exit pause.
+  const prefetched=npcPrefetchOutdoor(s,k,p,goal,spread,now);
+
   // Use the real destination as soon as it is directly reachable. For longer
   // plans, disperse outside the door before waiting for A-star, rather than
   // stopping every NPC in the same narrow opening. Neither target follows a person.
   const clear=p.npcExitStage==='spread'&&(npcStaticClearPath(s,p.x,p.z,goal.x,goal.z,.78)||Math.hypot(p.x-spread.x,p.z-spread.z)<1.5);
-  if(clear)p.npcExitPending=false;
+  if(clear){
+   p.npcExitPending=false;
+   if(prefetched.ready&&prefetched.path.length){
+    const navKey=room+':'+k;
+    npcNavigation.set(navKey,{goal:{...goal},path:prefetched.path.map(q=>({...q})),cursor:0,job:null,retryAt:0,failures:0});
+   }
+   npcExitPrefetch.delete(room+':'+k);
+  }
   else{p.npcExitPending=true;goal=p.npcExitStage==='door'?{x:b.x,z:front+4}:spread;}
- }else p.npcExitPending=false;
+ }else{p.npcExitPending=false;npcExitPrefetch.delete(room+':'+k);}
  const key=room+':'+k;let nav=npcNavigation.get(key);
  if(!nav||Math.hypot(nav.goal.x-goal.x,nav.goal.z-goal.z)>.75){
   const direct=npcStaticClearPath(s,p.x,p.z,goal.x,goal.z,.78);
