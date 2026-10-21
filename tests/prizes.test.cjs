@@ -12,8 +12,8 @@ test('no survivors produce no champion, first-place rank, or prize',()=>run(`
  advanceState(s,1);assert.equal(s.phase,'finished');assert.equal(s.winner,null);
  assert(!Object.values(s.finalRanks).includes(1));for(const p of Object.values(s.players))assert.equal(prizeCoinCount(s,p),0);
 `));
-test('a sole survivor remains first and their issuer determines every player prize',()=>run(`
- const s={phase:'search',round:2,deadline:0,players:{a:{alive:true,sitting:1,wallet:{a:7,b:16}},b:{alive:true,sitting:0,wallet:{a:4,b:50}}}};
+test('final prize ranks follow the surviving issuer coin counts',()=>run(`
+ const s={phase:'search',round:2,deadline:0,players:{a:{initial:true,alive:true,sitting:1,wallet:{a:7,b:16}},b:{initial:true,alive:true,sitting:0,wallet:{a:4,b:50}}}};
  advanceState(s,1);assert.equal(s.winner,'a');assert.equal(s.finalRanks.a,1);assert.equal(s.finalRanks.b,2);
  assert.equal(prizeCoinCount(s,s.players.a),7);assert.equal(prizeCoinCount(s,s.players.b),4);
 `));
@@ -35,4 +35,10 @@ test('zero prize draws only a silver zero even when the stored rank is first',()
 test('a zero-prize seated finalist releases their seat so they can move while lying down',()=>run(`
  const s={phase:'search',round:2,deadline:0,players:{a:{initial:true,alive:true,sitting:1,wallet:{a:0}},b:{initial:true,alive:true,sitting:0,wallet:{a:2}}},chairs:{1:{occupied:'a'}}};
  advanceState(s,1);assert.equal(s.winner,'a');assert.equal(s.players.a.sitting,0);assert.equal(s.chairs[1].occupied,null);assert(zeroPrizePlayer(s,s.players.a));assert(!zeroPrizePlayer(s,s.players.b));
+`));
+
+test('coin ranks depend only on prize coins, regardless of sitting, survival, or elimination order',()=>run(`
+ const s={winner:'survivor',players:{survivor:{initial:true,alive:true,sitting:1,wallet:{survivor:2}},a:{initial:true,alive:false,sitting:0,wallet:{survivor:8}},b:{initial:true,alive:false,sitting:4,wallet:{survivor:8}},zero:{initial:true,alive:true,sitting:5,wallet:{other:100}},spectator:{initial:false,wallet:{survivor:99}}}};
+ const ranks=coinPrizeRanks(s);assert.equal(ranks.a,1);assert.equal(ranks.b,1);assert.equal(ranks.survivor,3);assert.equal(ranks.zero,undefined);assert.equal(ranks.spectator,undefined);
+ for(const p of Object.values(s.players)){p.sitting=p.sitting?0:7;p.alive=!p.alive;}assert.deepEqual(coinPrizeRanks(s),ranks);
 `));

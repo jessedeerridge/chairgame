@@ -17,3 +17,9 @@ test('wall clipping shortens the TPS orbit without moving it diagonally off the 
  const x=-8-Math.sin(orbitYaw)*distance,z=20-Math.cos(orbitYaw)*distance;
  assert(distance>0&&distance<1);assert(Math.abs(z-20.75)<.00001);assert(Math.abs(x-(-8-8/38*.75))<.00001);
 `));
+test('screen lens magnifies the normal distant view without exceeding the natural field of view',()=>check(`
+ const desktop=screenCameraFov(0,3.4,20.75,0,0,12,1280/720),mobile=screenCameraFov(0,3.4,20.75,0,0,12,390/844);
+ assert(desktop>=45&&desktop<46);assert(Math.tan(65*Math.PI/360)/Math.tan(desktop*Math.PI/360)>1.5);
+ assert(mobile>=desktop&&mobile<=65);
+ const wall=screenCameraFov(0,3.4,20.75,0,0,19.8,1280/720);assert(wall>desktop&&wall<=65);
+`));

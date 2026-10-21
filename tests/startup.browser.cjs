@@ -49,7 +49,7 @@ const {chromium}=require('playwright');
    await page.setViewportSize(viewport);
    for(const [x,z] of [[14,15.6],[0,19.8],[-20,18],[-8,20]]){
     await page.evaluate(([x,z])=>window.bootTest.setMe(x,z),[x,z]);
-    await page.waitForFunction(()=>{const t=window.bootTest,s=t.projectScreen(),orbit=t.orbitTarget(),yaw=Math.atan2(-t.me.x,-18-t.me.z);return Math.abs(Math.atan2(Math.sin(orbit.yaw-yaw),Math.cos(orbit.yaw-yaw)))<.01&&Math.abs(t.camera.position.x-orbit.x)<.1&&Math.abs(t.camera.position.z-orbit.z)<.1&&Math.abs(s.x)<1&&Math.abs(s.y)<1&&t.camera.fov===65&&[2.4,3.4].every(h=>{const p=t.projectPlayer(h);return p.z<1&&p.z>-1&&Math.abs(p.x)<.97&&Math.abs(p.y)<.97;});});
+    await page.waitForFunction(()=>{const t=window.bootTest,s=t.projectScreen(),orbit=t.orbitTarget(),yaw=Math.atan2(-t.me.x,-18-t.me.z);return Math.abs(Math.atan2(Math.sin(orbit.yaw-yaw),Math.cos(orbit.yaw-yaw)))<.01&&Math.abs(t.camera.position.x-orbit.x)<.1&&Math.abs(t.camera.position.z-orbit.z)<.1&&Math.abs(s.x)<1&&Math.abs(s.y)<1&&t.camera.fov>=45&&t.camera.fov<=65&&[2.4,3.4].every(h=>{const p=t.projectPlayer(h);return p.z<1&&p.z>-1&&Math.abs(p.x)<.97&&Math.abs(p.y)<.97;});});
     framing.push(await page.evaluate(()=>({position:{...window.bootTest.me},fov:window.bootTest.camera.fov})));
    }
   }
