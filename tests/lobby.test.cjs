@@ -5,9 +5,9 @@ function setup(){
  const c=vm.createContext({assert});
  vm.runInContext(`const {buildingSites,largeBuildings,stairways,obstacles,hidingSpots,VOTE_X,VOTE_Z}=${world};
  let roofRoomWalls=[],playerHeight=0,me={x:0,z:12,rot:0},yaw=0,lastSync=0,clock=0;const performance={now:()=>clock};
- let id='local',room='TEST',soloMode=false,state=null,host=true,worldReady=true;
+ let id='local',room='TEST',soloMode=false,state=null,host=true,worldReady=true,loadedWorldSeed=null;const WORLD_LAYOUT_VERSION=1;let generatedSeed=null;function makeWorldLayout(seed){generatedSeed=seed;return{chairs:{}}}
  const button={hidden:true,disabled:false,addEventListener(){}};const $=()=>button;
- const TOTAL_PLAYERS=20,personalities=['慎重型'];const randBetween=(a,b)=>(a+b)/2;const seedChairs=()=>({});
+ const TOTAL_PLAYERS=20,personalities=['慎重型'];const randBetween=(a,b)=>(a+b)/2;
  function player(){return state?.players?.[id]}async function mutate(fn){fn(state)}
  `+cut('function roofEdgeBlocked','function occupiedAt')+cut('function insideBlackBuilding','function canCastVote')+cut('function isOnlineLobby','let playerPreloadTask')+cut('let lastAppliedSpawn','function walletMedalIcon')+cut('function initRound','function indoorSpawn')+cut('function indoorSpawn',"$('start').onclick")+cut('let stackIdle','let _opaqueRoofConfigured')+`
  function human(name,ready=true){return {name,npc:false,online:true,worldReady:ready,x:0,z:12,alive:false,initial:false,wallet:{}}}
@@ -55,4 +55,11 @@ test('stack relocates to an empty indoor position without overlapping players or
 test('reconnection preserves saved walking coordinates after the initial assignment was acknowledged',()=>setup()(`
  const s=lobby();s.phase='search';s.players.local.spawn={version:'start:1',x:14,z:15.6,rot:Math.PI};s.players.local.spawnApplied='start:1';
  me.x=100;me.z=80;applyAssignedSpawn(s);assert.equal(me.x,100);assert.equal(me.z,80);assert.equal(lastAppliedSpawn,'start:1');
+`));
+
+test('first start uses the preloaded shared seed; a later game chooses a fresh seed',()=>setup()(`
+ const s=lobby();s.worldSeed=123;loadedWorldSeed=123;beginGame(s);
+ assert.equal(s.worldSeed,123);assert.equal(generatedSeed,123);assert.equal(s.worldPreparing,false);assert.equal(s.worldLayoutVersion,1);
+ s.phase='lobby';Math.random=()=>.25;beginGame(s);
+ assert.equal(s.worldSeed,1073741824);assert.equal(generatedSeed,s.worldSeed);assert.equal(s.worldPreparing,true);
 `));

@@ -47,7 +47,7 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
    await page.addInitScript(()=>{window.holdTestLoad=true;if(!localStorage.getItem('island-chair-game-entry-v1'))localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));});
    await page.goto('http://127.0.0.1:'+server.address().port);
    assert.equal(await page.inputValue('#name'),'以前の名前');assert.equal(await page.inputValue('#room'),'OLDROOM');
-   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady};performance.mark("island-room-ready");`);});
+   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady,getLayout:()=>worldLayout};performance.mark("island-room-ready");`);});
    await page.fill('#name',name);await page.fill('#room','TEST');await page.click('#join');await page.waitForFunction(()=>window.lobbyTest?.getState()?.players?.[window.lobbyTest.getId()],{timeout:60000});
   }
   assert.deepEqual(Object.values(read('rooms/TEST/players')).filter(p=>!p.npc).map(p=>p.name).sort(),['Guest','Host']);
@@ -62,6 +62,9 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   assert.equal(read('rooms/TEST/worldPreparing'),true);
   for(const page of pages)await page.evaluate(()=>window.releaseTestLoad());
   for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.worldReady()&&!window.lobbyTest.getState().worldPreparing,{timeout:60000});
+  const layouts=await Promise.all(pages.map(page=>page.evaluate(()=>JSON.stringify(window.lobbyTest.getLayout()))));
+  assert.equal(layouts[0],layouts[1],'clients generated different worlds');
+  assert.equal(Object.values(read('rooms/TEST/chairs')).filter(c=>c.hiddenAt).length,6);
   for(const page of pages){await page.waitForFunction(()=>{const c=document.querySelector('body>canvas');return c.width===innerWidth&&c.height===innerHeight;});assert.equal(await page.evaluate(()=>visualViewport.scale),1);}
   await pages[1].setViewportSize({width:844,height:390});
   await pages[1].waitForFunction(()=>{const c=document.querySelector('body>canvas');return c.width===844&&c.height===390;});

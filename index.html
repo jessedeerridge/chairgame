@@ -205,223 +205,154 @@ function elevationAt(x,z){
  return 0;
 }
 
-// Roads form one planar, orthogonal network. Intersections share endpoints,
-// and the road surface is one height with no crossing edge rails.
-const pathSegments=[];
-function pathSegment(ax,az,bx,bz,width=7){pathSegments.push({ax,az,bx,bz,width});}
-function pathDistance(x,z,p){const dx=p.bx-p.ax,dz=p.bz-p.az,t=Math.max(0,Math.min(1,((x-p.ax)*dx+(z-p.az)*dz)/(dx*dx+dz*dz||1)));return Math.hypot(x-(p.ax+t*dx),z-(p.az+t*dz));}
-const trailSeed=31741;
-const trailRand=n=>rand(n+trailSeed);
-// Southern junction and two entrance approaches.
-pathSegment(-154,-125,0,-125);
-pathSegment(0,-125,157,-125);
-pathSegment(-210,-155,-210,buildingSites[1].z+buildingSites[1].d/2+9,5);
-pathSegment(210,-155,210,buildingSites[2].z+buildingSites[2].d/2+9,5);
-// Northern approach follows the east side, then turns toward the front door.
-// This avoids routing through the north building's footprint.
-const north=buildingSites[0],east=north.x+north.w/2+13,front=north.z+north.d/2+9;
-pathSegment(0,-125,0,-39);
-pathSegment(0,-39,east,-39);
-pathSegment(east,-39,east,front);
-pathSegment(east,front,north.x,front,5);
-// The dark fourth building now occupies the exact former totem center.
-// Voting is performed at the black desk inside the dark building; no totem remains.
-pathSegment(0,-125,0,-39,5);
-// Additional connected paths. All branches meet at designed junctions,
-// stay outside buildings, and share the same ground plane.
-const extraRoads=[
- [0,0,-67,0],[-67,0,-67,66],[-67,66,0,66],
- [-119,-112,-165,-112],[-165,-112,-165,48],[-165,48,-105,48],
- [-119,-112,-119,-157],[-119,-157,0,-157],[0,-157,0,-112],
- [east,0,77,0],[77,0,77,61],[77,61,east,61],
- [77,61,77,155],[77,155,54,155],
- [119,-112,166,-112],[166,-112,166,45],[166,45,119,45],
- [119,-112,119,-155],[119,-155,166,-155],[166,-155,166,-112]
-];
-// Extra connected neighborhood roads: shared endpoints, no detached fragments.
-extraRoads.push(
- [-165,48,-165,110],[-165,110,-90,110],[-90,110,-67,66],
- [-165,-112,-185,-112],[-185,-112,-185,-45],[-185,-45,-165,-45],
- [-119,-157,-119,-180],[-119,-180,-35,-180],[-35,-180,-35,-157],
- [0,-157,55,-157],[55,-157,55,-112],
- [166,-155,185,-155],[185,-155,185,-75],[185,-75,166,-75],
- [166,45,185,45],[185,45,185,115],[185,115,145,115],
- [77,155,77,180],[77,180,145,180],[145,180,145,115],
- [east,front,east,160],[east,160,54,160],
- [-67,66,-67,145],[-67,145,-20,145],
- [0,0,0,66],[0,66,-67,66],
- [77,61,119,61],[119,61,119,45],
- [-165,48,-165,-45],[-165,-45,-165,-112]
-);
-// New outer districts: connected loops and radial links expand walking distances.
-const outerRoads=[
- [-185,-112,-245,-112],[-245,-112,-245,0],[-245,0,-245,105],[-245,105,-175,105],
- [-175,105,-175,190],[-175,190,-85,190],[-85,190,-85,255],[-85,255,0,255],
- [0,255,85,255],[85,255,85,190],[85,190,145,180],
- [185,-75,245,-75],[245,-75,245,30],[245,30,245,125],[245,125,185,115],
- [166,-155,225,-155],[225,-155,225,-225],[225,-225,110,-225],
- [110,-225,0,-225],[0,-225,-110,-225],[-110,-225,-210,-225],[-210,-225,-245,-112],
- [0,-180,0,-225],[145,180,185,205],[185,205,245,125],
- [-165,110,-175,190],[77,180,85,190],[-185,-45,-245,0]
-];
-for(const [ax,az,bx,bz] of outerRoads)pathSegment(ax,az,bx,bz,5);
-// Split roads at junctions so surfaces connect without odd end fragments.
-for(const [ax,az,bx,bz] of extraRoads){
- if(buildingSites.some(b=>{
-  const minX=b.x-b.w/2-2,maxX=b.x+b.w/2+2,minZ=b.z-b.d/2-2,maxZ=b.z+b.d/2+2;
-  return ax===bx ? ax>minX&&ax<maxX&&Math.max(Math.min(az,bz),minZ)<Math.min(Math.max(az,bz),maxZ)
-                 : az>minZ&&az<maxZ&&Math.max(Math.min(ax,bx),minX)<Math.min(Math.max(ax,bx),maxX);
- }))continue;
- pathSegment(ax,az,bx,bz,5);
-}
-// Reroute entire road centerlines around stair footprints BEFORE meshing.
-// No road is cut out underneath the staircase.
-const stairRoadZones=buildingSites.map((b,i)=>{
- const side=i===0?1:-1,sw=4.3,gap=1;
- const inner=b.x+side*(b.w/2+1.5+sw/2+1.2),outer=inner+side*(sw+gap);
- const front=b.z+b.d/2-4,back=front-(b.d-9);
- return {minX:Math.min(inner,outer)-sw/2-6,maxX:Math.max(inner,outer)+sw/2+6,minZ:back-6.2-6,maxZ:front+sw/2+6};
-});
-function segmentHitsZone(p,q){
- const steps=Math.ceil(Math.hypot(q.x-p.x,q.z-p.z)/1.5);
- for(let i=0;i<=steps;i++){const t=i/steps,x=p.x+(q.x-p.x)*t,z=p.z+(q.z-p.z)*t;
-  if(stairRoadZones.some(b=>x>b.minX&&x<b.maxX&&z>b.minZ&&z<b.maxZ))return true;
- }return false;
-}
-const originalRoads=pathSegments.splice(0);
-for(const road of originalRoads){
- const a={x:road.ax,z:road.az},b={x:road.bx,z:road.bz};
- if(!segmentHitsZone(a,b)){pathSegments.push(road);continue;}
- // Pick a two-bend bypass around the nearest side of the obstructing staircase.
- const zone=stairRoadZones.find(z=>{const n=30;for(let k=0;k<=n;k++){const t=k/n,x=a.x+(b.x-a.x)*t,v=a.z+(b.z-a.z)*t;if(x>z.minX&&x<z.maxX&&v>z.minZ&&v<z.maxZ)return true}return false;});
- if(!zone){pathSegments.push(road);continue;}
- const candidates=[
-  [{x:zone.minX-3,z:a.z},{x:zone.minX-3,z:b.z}],
-  [{x:zone.maxX+3,z:a.z},{x:zone.maxX+3,z:b.z}],
-  [{x:a.x,z:zone.minZ-3},{x:b.x,z:zone.minZ-3}],
-  [{x:a.x,z:zone.maxZ+3},{x:b.x,z:zone.maxZ+3}]
- ];
- const routes=candidates.map(pair=>[a,...pair,b]).filter(pts=>pts.slice(1).every((pt,i)=>!segmentHitsZone(pts[i],pt)));
- routes.sort((u,v)=>{const length=pts=>pts.slice(1).reduce((n,pt,i)=>n+Math.hypot(pt.x-pts[i].x,pt.z-pts[i].z),0);return length(u)-length(v)});
- const route=routes[0];if(!route)continue;
- for(let j=1;j<route.length;j++){const u=route[j-1],v=route[j];if(Math.hypot(v.x-u.x,v.z-u.z)>0.1)pathSegment(u.x,u.z,v.x,v.z,road.width)}
-}
-// Connect nearby loose road ends with gently curved links, without crossing stairs/buildings.
-// Only true dead ends are considered; preserve intentional intersections.
-function endpointDegree(x,z){
- let n=0;
- for(const p of pathSegments){
-  if(Math.hypot(p.ax-x,p.az-z)<.2||Math.hypot(p.bx-x,p.bz-z)<.2)n++;
-  else if(pathDistance(x,z,p)<Math.min(1.2,p.width*.22))n++;
+// One seed describes the whole island. Never use client-local randomness here.
+const WORLD_LAYOUT_VERSION=1;
+const PLACEMENT_RULES={buildingGap:55,signGap:25,plantGap:.8,roadWidth:6,shore:288};
+function makeWorldLayout(seed){
+ let value=(Number(seed)>>>0)||1;
+ const random=()=>{value=(Math.imul(value,1664525)+1013904223)>>>0;return value/4294967296;};
+ const between=(a,b)=>a+(b-a)*random();
+ const buildings=[{w:38,d:34,h:15},{w:36,d:34,h:15},{w:40,d:32,h:15},{x:0,z:0,w:50,d:44,h:15}];
+ const footprint=(b,i)=>({minX:b.x-b.w/2-(i===0?3:19),maxX:b.x+b.w/2+(i===0?19:3),minZ:b.z-b.d/2-9,maxZ:b.z+b.d/2+4});
+ const inRect=(x,z,b,pad)=>x>b.minX-pad&&x<b.maxX+pad&&z>b.minZ-pad&&z<b.maxZ+pad;
+ const zones=[footprint(buildings[3],3)];
+ const rotation=between(0,Math.PI*2);
+ for(let i=0;i<3;i++){
+  let placed=false;
+  for(let attempt=0;attempt<1000;attempt++){
+   const a=rotation+i*Math.PI*2/3+between(-.35,.35),r=between(150,230),b=buildings[i];b.x=Math.cos(a)*r;b.z=Math.sin(a)*r;
+   const box=footprint(b,i),corners=[[box.minX,box.minZ],[box.minX,box.maxZ],[box.maxX,box.minZ],[box.maxX,box.maxZ]];
+   if(corners.some(([x,z])=>Math.hypot(x,z)>280))continue;
+   if(zones.some(q=>box.minX<q.maxX+PLACEMENT_RULES.buildingGap&&box.maxX>q.minX-PLACEMENT_RULES.buildingGap&&box.minZ<q.maxZ+PLACEMENT_RULES.buildingGap&&box.maxZ>q.minZ-PLACEMENT_RULES.buildingGap))continue;
+   zones.push(box);placed=true;break;
+  }
+  if(!placed)throw Error('建物の配置に失敗');
  }
- return n;
-}
-function safeRoadLink(a,b,width){
- const length=Math.hypot(a.x-b.x,a.z-b.z),steps=Math.max(8,Math.ceil(length/1.5));
- for(let k=0;k<=steps;k++){
-  const t=k/steps,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t;
-  if(Math.hypot(x,z)>287-width/2)return false;
-  if(stairRoadZones.some(q=>x>q.minX-width/2&&x<q.maxX+width/2&&z>q.minZ-width/2&&z<q.maxZ+width/2))return false;
-  if(buildingSites.some(q=>Math.abs(x-q.x)<q.w/2+width/2+1&&Math.abs(z-q.z)<q.d/2+width/2+1))return false;
+ const blocked=(x,z,pad)=>Math.hypot(x,z)>PLACEMENT_RULES.shore-pad||zones.some(q=>inRect(x,z,q,pad));
+ const clearLine=(a,b,pad=5)=>{
+  const steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/1.5));
+  for(let i=0;i<=steps;i++){const t=i/steps;if(blocked(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t,pad))return false;}return true;
+ };
+ const paths=[],nodes=[{x:0,z:40}];
+ for(const b of buildings.slice(0,3))nodes.push({x:Math.round(b.x/10)*10,z:Math.ceil((b.z+b.d/2+14)/10)*10});
+ for(let attempt=0;attempt<400&&nodes.length<17;attempt++){
+  const p={x:Math.round(between(-250,250)/10)*10,z:Math.round(between(-250,250)/10)*10};
+  if(!blocked(p.x,p.z,10)&&nodes.every(q=>Math.hypot(q.x-p.x,q.z-p.z)>55))nodes.push(p);
  }
- return true;
-}
-const looseEnds=[];
-for(const p of pathSegments)for(const start of [true,false]){
- const x=start?p.ax:p.bx,z=start?p.az:p.bz;
- if(endpointDegree(x,z)===1&&Math.hypot(x,z)<280)looseEnds.push({x,z,p,start});
-}
-const usedEnds=new Set();
-for(let i=0;i<looseEnds.length;i++){
- if(usedEnds.has(i))continue;
- const a=looseEnds[i],candidates=[];
- for(let j=i+1;j<looseEnds.length;j++){
-  if(usedEnds.has(j))continue;
-  const b=looseEnds[j],distance=Math.hypot(a.x-b.x,a.z-b.z);
-  if(distance<1.5||distance>24||a.p===b.p)continue;
-  const width=Math.min(a.p.width,b.p.width);
-  if(safeRoadLink(a,b,width))candidates.push({j,b,distance,width});
+ // Bounded grid routing connects every district to the existing road network.
+ const N=57,at=p=>Math.round(p.z/10+28)*N+Math.round(p.x/10+28),point=k=>({x:(k%N-28)*10,z:(Math.floor(k/N)-28)*10});
+ const free=new Uint8Array(N*N);for(let k=0;k<free.length;k++){const p=point(k);free[k]=!blocked(p.x,p.z,5);}
+ function route(a,b){
+  if(clearLine(a,b))return[a,b];
+  const start=at(a),goal=at(b),parent=new Int32Array(N*N);parent.fill(-1);
+  const queue=new Int32Array(N*N);let head=0,tail=1;queue[0]=start;parent[start]=start;
+  while(head<tail&&parent[goal]===-1){const k=queue[head++],p=point(k);
+   for(const next of [k-1,k+1,k-N,k+N]){
+    if(next<0||next>=parent.length||parent[next]!==-1||!free[next])continue;
+    const q=point(next);if(Math.hypot(q.x-p.x,q.z-p.z)>10.1||!clearLine(p,q))continue;
+    parent[next]=k;queue[tail++]=next;
+   }
+  }
+  if(parent[goal]===-1)return null;
+  const raw=[];for(let k=goal;;k=parent[k]){raw.push(point(k));if(k===start)break;}raw.reverse();
+  const result=[a];let current=0;
+  while(current<raw.length-1){let next=raw.length-1;while(next>current+1&&!clearLine(raw[current],raw[next]))next--;result.push(raw[next]);current=next;}
+  return result;
  }
- candidates.sort((u,v)=>u.distance-v.distance);
- if(!candidates.length)continue;
- const {j,b,width}=candidates[0];
- // Smooth quadratic arc; centerline remains within the safe corridor.
- const mx=(a.x+b.x)/2,mz=(a.z+b.z)/2;
- const dx=b.x-a.x,dz=b.z-a.z,dist=Math.hypot(dx,dz);
- const bend=Math.min(2.5,dist*.1);
- const control={x:mx-dz/dist*bend,z:mz+dx/dist*bend};
- const points=[];
- for(let k=0;k<=10;k++){
-  const t=k/10,u=1-t;
-  points.push({x:u*u*a.x+2*u*t*control.x+t*t*b.x,z:u*u*a.z+2*u*t*control.z+t*t*b.z});
+ function addRoute(points){
+  if(!points)return;
+  // Round bends with quadratic curves only when the complete curve is clear.
+  const smooth=[points[0]];
+  for(let i=1;i<points.length-1;i++){
+   const a=points[i-1],b=points[i],c=points[i+1],ab=Math.hypot(b.x-a.x,b.z-a.z),bc=Math.hypot(c.x-b.x,c.z-b.z),r=Math.min(10,ab*.25,bc*.25);
+   const u={x:b.x+(a.x-b.x)*r/ab,z:b.z+(a.z-b.z)*r/ab},v={x:b.x+(c.x-b.x)*r/bc,z:b.z+(c.z-b.z)*r/bc},curve=[];
+   for(let j=0;j<=6;j++){const t=j/6,k=1-t;curve.push({x:k*k*u.x+2*k*t*b.x+t*t*v.x,z:k*k*u.z+2*k*t*b.z+t*t*v.z});}
+   if(curve.every((p,j)=>!j||clearLine(curve[j-1],p)))smooth.push(...curve);else smooth.push(b);
+  }
+  smooth.push(points.at(-1));
+  for(let i=1;i<smooth.length;i++){const a=smooth[i-1],b=smooth[i];if(Math.hypot(a.x-b.x,a.z-b.z)>.05)paths.push({ax:a.x,az:a.z,bx:b.x,bz:b.z,width:PLACEMENT_RULES.roadWidth});}
  }
- if(!points.slice(1).every((v,k)=>safeRoadLink(points[k],v,width)))continue;
- for(let k=1;k<points.length;k++)pathSegment(points[k-1].x,points[k-1].z,points[k].x,points[k].z,width);
- usedEnds.add(i);usedEnds.add(j);
+ for(let i=1;i<nodes.length;i++){
+  const candidates=nodes.slice(0,i).sort((a,b)=>Math.hypot(a.x-nodes[i].x,a.z-nodes[i].z)-Math.hypot(b.x-nodes[i].x,b.z-nodes[i].z));
+  let result=null;for(const target of candidates){result=route(nodes[i],target);if(result)break;}
+  if(!result)throw Error('道の接続に失敗');addRoute(result);
+ }
+ // Extend the connected network to the front approach of each entrance.
+ for(let i=0;i<3;i++){const b=buildings[i],door={x:b.x,z:b.z+b.d/2+11};if(clearLine(door,nodes[i+1]))addRoute([door,nodes[i+1]]);}
+ // Add a few loops; all endpoints already belong to the connected network.
+ for(let i=0;i<4;i++){const a=nodes[1+Math.floor(random()*(nodes.length-1))],b=nodes[Math.floor(random()*nodes.length)];if(a!==b)addRoute(route(a,b));}
+ // Join nearby genuine dead ends with a small curve when its full width is safe.
+ const ends=[];
+ for(const p of paths)for(const [x,z] of [[p.ax,p.az],[p.bx,p.bz]]){
+  if(paths.filter(q=>pathDistance(x,z,q)<.05).length===1)ends.push({x,z});
+ }
+ const linked=new Set();
+ for(let i=0;i<ends.length;i++){
+  if(linked.has(i))continue;
+  const a=ends[i],near=ends.map((b,j)=>({b,j,d:Math.hypot(a.x-b.x,a.z-b.z)})).filter(q=>q.j>i&&!linked.has(q.j)&&q.d>1&&q.d<30).sort((a,b)=>a.d-b.d);
+  for(const {b,j,d} of near){
+   const mx=(a.x+b.x)/2-(b.z-a.z)/d*2,mz=(a.z+b.z)/2+(b.x-a.x)/d*2,curve=[];
+   for(let k=0;k<=8;k++){const t=k/8,u=1-t;curve.push({x:u*u*a.x+2*u*t*mx+t*t*b.x,z:u*u*a.z+2*u*t*mz+t*t*b.z});}
+   if(!curve.every((q,k)=>!k||clearLine(curve[k-1],q)))continue;
+   addRoute(curve);linked.add(i);linked.add(j);break;
+  }
+ }
+ const roadDistance=(x,z)=>{let best=Infinity;for(const p of paths)best=Math.min(best,pathDistance(x,z,p)-p.width/2);return best;};
+ const reserved=[],buckets=new Map();
+ function nearby(x,z,r){const found=[];for(let ix=Math.floor((x-r-6)/12);ix<=Math.floor((x+r+6)/12);ix++)for(let iz=Math.floor((z-r-6)/12);iz<=Math.floor((z+r+6)/12);iz++)for(const q of buckets.get(ix+','+iz)||[])found.push(q);return found;}
+ function reserve(p){reserved.push(p);const key=Math.floor(p.x/12)+','+Math.floor(p.z/12);if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(p);}
+ const vacant=(x,z,r)=>!blocked(x,z,r+2)&&nearby(x,z,r).every(q=>Math.hypot(x-q.x,z-q.z)>=r+q.r+PLACEMENT_RULES.plantGap);
+ const signs=[];
+ for(let attempt=0;attempt<5000&&signs.length<40;attempt++){
+  const road=paths[Math.floor(random()*paths.length)],t=random(),dx=road.bx-road.ax,dz=road.bz-road.az,len=Math.hypot(dx,dz),off=road.width/2+between(4,9),side=random()<.5?-1:1;
+  const x=road.ax+dx*t-dz/len*off*side,z=road.az+dz*t+dx/len*off*side;
+  if(!vacant(x,z,2)||roadDistance(x,z)<3||signs.some(q=>Math.hypot(x-q.x,z-q.z)<PLACEMENT_RULES.signGap))continue;
+  const p={x,z,r:2,angle:Math.atan2(dx,dz),variant:Math.floor(random()*60)};reserve(p);signs.push(p);
+ }
+ const trees=[],spots=[];
+ const plant=(x,z,type,style='scattered')=>{
+  const r=type==='bush'?4.1:3.8;
+  const black=buildings[3];if(Math.abs(x)<black.w/2+25&&Math.abs(z)<black.d/2+25)return false;
+  if(!vacant(x,z,r)||roadDistance(x,z)<r+1.6)return false;
+  const p={x,z,r,type,style,height:between(6,10),color:Math.floor(random()*3)};reserve(p);
+  if(type==='bush'||style==='hiding'){p.id='H'+spots.length;spots.push(p);}else trees.push(p);
+  return true;
+ };
+ // Rows and small groves change their center, orientation and species each game.
+ for(let group=0;group<38;group++){
+  const x=between(-245,245),z=between(-245,245),a=between(0,Math.PI*2),type=group%3===0?'bush':'tree',row=group%2===0,count=8+Math.floor(random()*8);
+  for(let j=0;j<count;j++){
+   const along=(j-(count-1)/2)*9,rad=Math.sqrt(random())*27,angle=between(0,Math.PI*2);
+   plant(x+(row?Math.cos(a)*along:Math.cos(angle)*rad),z+(row?Math.sin(a)*along:Math.sin(angle)*rad),type,row?'row':'grove');
+  }
+ }
+ for(let attempt=0;attempt<12000&&spots.filter(p=>p.type==='bush').length<140;attempt++)plant(between(-285,285),between(-285,285),'bush');
+ let hiddenTrees=0;for(let attempt=0;attempt<10000&&hiddenTrees<40;attempt++)if(plant(between(-280,280),between(-280,280),'tree','hiding'))hiddenTrees++;
+ for(let attempt=0;attempt<10000&&trees.length<330;attempt++)plant(between(-285,285),between(-285,285),'tree');
+ if(spots.length<6)throw Error('隠し場所が不足');
+ const shuffled=[...spots];for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
+ const chairs={};
+ for(let i=1;i<=6;i++){const p=shuffled[i-1];chairs[i]={x:p.x,y:0,z:p.z,hiddenAt:p.id,removed:false,carrier:null,occupied:null};}
+ for(let i=7;i<=15;i++){
+  let p=null;for(let attempt=0;attempt<10000;attempt++){
+   const x=between(-285,285),z=between(-285,285);
+   if(Math.hypot(x,z)<35||!vacant(x,z,1.3)||roadDistance(x,z)<2||Object.values(chairs).some(q=>Math.hypot(x-q.x,z-q.z)<4))continue;
+   p={x,y:0,z,hiddenAt:null,removed:false,carrier:null,occupied:null};break;
+  }
+  if(!p)throw Error('イスの配置に失敗');chairs[i]=p;
+ }
+ return {seed:Number(seed)>>>0,buildings,paths,trees,spots,signs,chairs,zones};
 }
+let worldLayout=null,loadedWorldSeed=null;
+const pathSegments=[],roadRenderSegments=[];
+function pathDistance(x,z,p){const dx=p.bx-p.ax,dz=p.bz-p.az,t=Math.max(0,Math.min(1,((x-p.ax)*dx+(z-p.az)*dz)/(dx*dx+dz*dz||1)));return Math.hypot(x-p.ax-t*dx,z-p.az-t*dz);}
 const onPath=(x,z,extra=0)=>pathSegments.some(p=>pathDistance(x,z,p)<p.width/2+extra);
-const pathMat=mat(0xb9a27c);
-function roadInStairArea(x,z,pad=0){return buildingSites.some((b,i)=>{
- const side=i===0?1:-1,sw=4.3,gap=1,inner=b.x+side*(b.w/2+1.5+sw/2+1.2),outer=inner+side*(sw+gap);
- const front=b.z+b.d/2-4,back=front-(b.d-9);
- return x>Math.min(inner,outer)-sw/2-pad&&x<Math.max(inner,outer)+sw/2+pad&&z>back-6.2-pad&&z<front+sw/2+pad;
-});}
-// Small surface sections make it possible to fade dead ends and cut out
-// all parts that would otherwise enter a building (including road width).
-const roadFadeLength=11;
-function roadInsideBuilding(x,z,halfWidth){
- return buildingSites.some(b=>x>b.x-b.w/2-halfWidth && x<b.x+b.w/2+halfWidth &&
-  z>b.z-b.d/2-halfWidth && z<b.z+b.d/2+halfWidth);
+function configureWorld(seed){
+ worldLayout=makeWorldLayout(seed);
+ for(let i=0;i<3;i++){Object.assign(buildingSites[i],worldLayout.buildings[i]);Object.assign(largeBuildings[i],worldLayout.buildings[i]);}
+ pathSegments.splice(0,pathSegments.length,...worldLayout.paths);roadRenderSegments.splice(0,roadRenderSegments.length,...worldLayout.paths);
 }
-function roadEndConnected(p,atStart){
- const x=atStart?p.ax:p.bx,z=atStart?p.az:p.bz;
- return pathSegments.some(q=>q!==p && pathDistance(x,z,q)<Math.max(p.width,q.width)*.55);
-}
-// Round 90-degree corners with quadratic Bezier curves. Junctions with
-// three or more branches remain full intersections, not disconnected arcs.
-const nodes=new Map();
-const nodeKey=(x,z)=>`${x.toFixed(3)},${z.toFixed(3)}`;
-for(const p of pathSegments){
- for(const start of [true,false]){
-  const x=start?p.ax:p.bx,z=start?p.az:p.bz;
-  const otherX=start?p.bx:p.ax,otherZ=start?p.bz:p.az;
-  const length=Math.hypot(otherX-x,otherZ-z);
-  const key=nodeKey(x,z);
-  if(!nodes.has(key))nodes.set(key,[]);
-  nodes.get(key).push({p,start,x,z,ux:(otherX-x)/length,uz:(otherZ-z)/length,length});
- }
-}
-const cuts=new Map(),rounded=[];
-for(const entries of nodes.values()){
- if(entries.length!==2)continue;
- const [a,b]=entries;
- const dot=a.ux*b.ux+a.uz*b.uz;
- if(Math.abs(dot)>.2)continue;
- const radius=Math.min(10,a.length*.30,b.length*.30);
- cuts.set(`${pathSegments.indexOf(a.p)}:${a.start?'s':'e'}`,radius);
- cuts.set(`${pathSegments.indexOf(b.p)}:${b.start?'s':'e'}`,radius);
- const count=32;
- const start={x:a.x+a.ux*radius,z:a.z+a.uz*radius};
- const end={x:b.x+b.ux*radius,z:b.z+b.uz*radius};
- const points=[];
- for(let j=0;j<=count;j++){
-  const t=j/count,u=1-t;
-  points.push({x:u*u*start.x+2*u*t*a.x+t*t*end.x,
-               z:u*u*start.z+2*u*t*a.z+t*t*end.z});
- }
- rounded.push({points,width:Math.min(a.p.width,b.p.width),startWidth:a.p.width,endWidth:b.p.width});
-}
-function prevCornerX(a){return a.x+a.ux*cuts.get(`${pathSegments.indexOf(a.p)}:${a.start?'s':'e'}`)}
-function prevCornerZ(a){return a.z+a.uz*cuts.get(`${pathSegments.indexOf(a.p)}:${a.start?'s':'e'}`)}
-const roadRenderSegments=[];
-for(let i=0;i<pathSegments.length;i++){
- const p=pathSegments[i],dx=p.bx-p.ax,dz=p.bz-p.az,len=Math.hypot(dx,dz);
- if(len<.1)continue;
- const startCut=cuts.get(`${i}:s`)||0,endCut=cuts.get(`${i}:e`)||0;
- roadRenderSegments.push({ax:p.ax+dx*startCut/len,az:p.az+dz*startCut/len,
- bx:p.bx-dx*endCut/len,bz:p.bz-dz*endCut/len,width:p.width,
- fadeStart:!startCut&&!roadEndConnected(p,true),fadeEnd:!endCut&&!roadEndConnected(p,false)});
-}
+
 function buildBuilding(i,interiorOnly=false){
  const {x,z,w,d,h}=buildingSites[i];
  const styles=[
@@ -675,41 +606,24 @@ function buildBuilding(i,interiorOnly=false){
  finishExterior();
 }
 const finishBlackExterior=buildBuilding(3,true);
+const indoorMetadata={obstacles:obstacles.length,roofs:interiorRoofs.length,rails:interiorRoofRails.length,walls:roofRoomWalls.length};
 const hidingSpots=[];
 function* buildOutdoorWorld(){
- // Keep original placement metadata until signs have been positioned. Removing
- // nearby plants must not resample plants or move existing signs elsewhere.
- const removedVegetationObstacles=new Set();
 cube(1100,.1,1100,water,0,-2,0);cylinder(333,3,sand,0,-2.7,0);cylinder(310.5,3,green,0,-1.5,0);
 yield;
 // Unified road surface: one continuous union mesh, without overlapping rectangular ends.
 // Clip to island and remove building/stair footprints. Coarse cells keep rendering fast.
 function* buildRoadSurface(){
- const cell=1.35, vertices=[],indices=[];
- const min=-295,max=295;
- function insideRoad(x,z){
-  if(x*x+z*z>292*292)return false;
-  if(roadInsideBuilding(x,z,0.9))return false;
-  for(const p of roadRenderSegments){
-   if(pathDistance(x,z,p)<p.width/2)return true;
+ const cell=1.35,vertices=[],indices=[],min=-295,max=295,N=Math.ceil((max-min)/cell),grid=new Uint8Array(N*N);
+ // Rasterize only each road's bounds, rather than scanning every road per island cell.
+ for(const p of roadRenderSegments){yield;
+  const pad=p.width/2,loX=Math.max(0,Math.floor((Math.min(p.ax,p.bx)-pad-min)/cell)),hiX=Math.min(N-1,Math.ceil((Math.max(p.ax,p.bx)+pad-min)/cell));
+  const loZ=Math.max(0,Math.floor((Math.min(p.az,p.bz)-pad-min)/cell)),hiZ=Math.min(N-1,Math.ceil((Math.max(p.az,p.bz)+pad-min)/cell));
+  for(let j=loZ;j<=hiZ;j++)for(let i=loX;i<=hiX;i++){
+   const x=min+(i+.5)*cell,z=min+(j+.5)*cell;
+   if(pathDistance(x,z,p)<pad)grid[j*N+i]=1;
   }
-  for(const curve of rounded){
-   for(let i=1;i<curve.points.length;i++){
-    const a=curve.points[i-1],b=curve.points[i],t=i/(curve.points.length-1);
-    const w=curve.startWidth*(1-t)+curve.endWidth*t;
-    const dx=b.x-a.x,dz=b.z-a.z;
-    const q=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz||1)));
-    if(Math.hypot(x-a.x-q*dx,z-a.z-q*dz)<w/2)return true;
-   }
-  }
-  return false;
  }
- // Build a single indexed surface, with no duplicate overlapping road planes.
- const N=Math.ceil((max-min)/cell), grid=new Uint8Array(N*N);
- for(let j=0;j<N;j++){yield;for(let i=0;i<N;i++){
-  const x=min+(i+.5)*cell,z=min+(j+.5)*cell;
-  if(insideRoad(x,z))grid[j*N+i]=1;
- }}
  // Remove isolated one-cell fragments and single-cell pinholes at junctions.
  for(let j=1;j<N-1;j++)for(let i=1;i<N-1;i++){
   const k=j*N+i;if(!grid[k])continue;
@@ -728,76 +642,31 @@ function* buildRoadSurface(){
 yield* buildRoadSurface();
 // No square junction pads: road strips meet at their endpoints.
 
-// Avoid generating trees within or immediately around building footprints.
-const sharedTreeCrownGeometry=new THREE.ConeGeometry(1,1,7);
-for(let i=0;i<600;i++){if(i%12===0)yield;let a=rand(i+1)*Math.PI*2,r=Math.sqrt(rand(i+800))*297,x=Math.cos(a)*r,z=Math.sin(a)*r;if(r<22||onPath(x,z,4)||buildingSites.some((b,j)=>j!==2&&Math.abs(x-(b.x+b.w*.28))<9&&z>b.z-b.d/2-53&&z<b.z-b.d/2+3))continue;if(buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+8&&Math.abs(z-b.z)<b.d/2+8))continue;if(buildingSites.some((b,j)=>{const side=j===0?1:-1,sw=4.3,inner=b.x+side*(b.w/2+1.5+sw/2+1.2),outer=inner+side*(sw+1),front=b.z+b.d/2-4,back=front-(b.d-9);return x>Math.min(inner,outer)-sw/2-5&&x<Math.max(inner,outer)+sw/2+5&&z>back-6.2-5&&z<front+sw/2+5;}))continue;const solid=addObstacle(x,z,.85);if(nearBlackBuildingVegetation(x,z)){removedVegetationObstacles.add(solid);continue;}let h=3+rand(i+300)*7;cylinder(.45,h,brown,x,h/2,z);let crown=new THREE.Mesh(sharedTreeCrownGeometry,mat([0x25552e,0x376b39,0x46763b][i%3]));crown.scale.set(2.5+rand(i+80)*2,7+rand(i+60)*4,2.5+rand(i+80)*2);crown.position.set(x,h+3,z);worldTarget.add(crown)}
-for(const i of [0,1,2]){
- const exterior=buildBuilding(i,true);yield;exterior();yield;
-}
+// Building geometry and collision use the same generated coordinates.
+for(const i of [0,1,2]){const exterior=buildBuilding(i,true);yield;exterior();yield;}
 finishBlackExterior();yield;
-
-// 木の根元・藪にイスを隠せる。箱は全て撤去。
-// Forty low-poly bushes, separate from trees. Bushes are hiding places but never solid obstacles.
 const bushGeometry=new THREE.IcosahedronGeometry(1.65,0),bushMaterials=[mat(0x285a32),mat(0x346b3a),mat(0x3d7540)];
-const bushInstances=[[],[],[]];
-for(let i=0;i<220;i++){if(i%4===0)yield;
- const type=i<180?'bush':'tree';let placed=false;
- for(let attempt=0;attempt<22&&!placed;attempt++){
-  const a=rand(i*31+attempt+3200)*Math.PI*2,r=25+rand(i*43+attempt+3300)*268,x=Math.cos(a)*r,z=Math.sin(a)*r;
-  if(onPath(x,z,4)||stairways.some(st=>x>st.minX-5&&x<st.maxX+5&&z>st.back-5&&z<st.front+5)||buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+6&&Math.abs(z-b.z)<b.d/2+6))continue;
-  if(hidingSpots.some(q=>Math.hypot(x-q.x,z-q.z)<(type==='bush'?4.8:5)))continue;
-  const cleared=nearBlackBuildingVegetation(x,z),g=new THREE.Group();g.position.set(x,0,z);
-  if(type==='tree'){
-   if(!cleared){
-    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.5,7,7),brown);trunk.position.y=3.5;g.add(trunk);
-    const crown=new THREE.Mesh(new THREE.ConeGeometry(4,9,7),green);crown.position.y=10;g.add(crown);
-   }
-   const solid=addObstacle(x,z,1.65);if(cleared)removedVegetationObstacles.add(solid);
-  }else if(!cleared){
-   // Shared geometry and materials keep 40 bushes lightweight.
-   for(let j=0;j<5;j++){const a=j*2.39996;bushInstances[j%3].push([x+Math.cos(a)*1.65,1.45,z+Math.sin(a)*1.65]);}
-  }
-  if(type==='tree'&&!cleared)worldTarget.add(g);hidingSpots.push({id:'H'+i,x,z,type});placed=true;
+const bushInstances=[[],[],[]],forestInstances=[[],[],[],[]];
+for(const [i,p] of [...worldLayout.trees,...worldLayout.spots].entries()){
+ if(i%12===0)yield;
+ if(p.id)hidingSpots.push({id:p.id,x:p.x,z:p.z,type:p.type});
+ if(p.type==='bush'){
+  for(let j=0;j<5;j++){const a=j*2.39996;bushInstances[j%3].push([p.x+Math.cos(a)*1.65,1.45,p.z+Math.sin(a)*1.65]);}
+ }else{
+  addObstacle(p.x,p.z,p.id?1.65:.85);
+  forestInstances[0].push([p.x,3,p.z]);forestInstances[1+p.color].push([p.x,10.2,p.z]);
  }
 }
-const _bushMatrix=new THREE.Matrix4(),_bushScale=new THREE.Vector3(1.4,1,1.4),_bushQuaternion=new THREE.Quaternion();
+const matrix=new THREE.Matrix4(),quaternion=new THREE.Quaternion(),bushScale=new THREE.Vector3(1.4,1,1.4);
 bushInstances.forEach((positions,kind)=>{
- if(!positions.length)return;
- const mesh=new THREE.InstancedMesh(bushGeometry,bushMaterials[kind],positions.length);
- positions.forEach(([x,y,z],i)=>{_bushMatrix.compose(new THREE.Vector3(x,y,z),_bushQuaternion,_bushScale);mesh.setMatrixAt(i,_bushMatrix)});
+ if(!positions.length)return;const mesh=new THREE.InstancedMesh(bushGeometry,bushMaterials[kind],positions.length);
+ positions.forEach(([x,y,z],i)=>{matrix.compose(new THREE.Vector3(x,y,z),quaternion,bushScale);mesh.setMatrixAt(i,matrix)});
  mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();worldTarget.add(mesh);
 });
-// Dense, staggered tree lines: crowns overlap to form woodland walls, while paths and buildings stay open.
-// Reuse shared geometry to avoid hundreds of separate geometry allocations.
-const forestTrunkGeo=new THREE.CylinderGeometry(.46,.55,6,6);
-const forestCrownGeo=new THREE.ConeGeometry(3.7,9,7);
-const forestTrunkMat=brown,forestCrownMat=[mat(0x28572e),mat(0x32683a),mat(0x40723d)];
-// Batch the woodland into just four GPU draw calls (one trunk + three crown colors).
-// All positions and physical obstacles remain exactly the same.
-const forestInstances=[[],[],[],[]];
-for(let row=0;row<25;row++){yield;
- const horizontal=row%2===0;
- const centerX=(rand(row*37+14020)-.5)*470;
- const centerZ=(rand(row*41+14021)-.5)*470;
- const count=9+Math.floor(rand(row+14022)*10);
- for(let j=0;j<count;j++){
-  const along=(j-(count-1)/2)*4.15;
-  const stagger=(rand(row*101+j+14023)-.5)*1.5;
-  const xx=centerX+(horizontal?along:stagger),zz=centerZ+(horizontal?stagger:along);
-  if(Math.hypot(xx,zz)>296||Math.hypot(xx,zz)<22||onPath(xx,zz,5.3))continue;
-  if(buildingSites.some(b=>Math.abs(xx-b.x)<b.w/2+9&&Math.abs(zz-b.z)<b.d/2+9))continue;
-  if(stairways.some(st=>xx>st.minX-6&&xx<st.maxX+6&&zz>st.back-9&&zz<st.front+8))continue;
-  const solid=addObstacle(xx,zz,.65);if(nearBlackBuildingVegetation(xx,zz)){removedVegetationObstacles.add(solid);continue;}
-  forestInstances[0].push([xx,3,zz]);
-  forestInstances[1+(row+j)%3].push([xx,10.2,zz]);
- }
-}
-const _forestMatrix=new THREE.Matrix4();
+const forestTrunkGeo=new THREE.CylinderGeometry(.46,.55,6,6),forestCrownGeo=new THREE.ConeGeometry(3.7,9,7),forestCrownMat=[mat(0x28572e),mat(0x32683a),mat(0x40723d)];
 forestInstances.forEach((positions,kind)=>{
- if(!positions.length)return;
- const mesh=new THREE.InstancedMesh(kind===0?forestTrunkGeo:forestCrownGeo,kind===0?forestTrunkMat:forestCrownMat[kind-1],positions.length);
- mesh.name='batched-forest-'+kind;
- positions.forEach(([x,y,z],i)=>{_forestMatrix.makeTranslation(x,y,z);mesh.setMatrixAt(i,_forestMatrix)});
+ if(!positions.length)return;const mesh=new THREE.InstancedMesh(kind===0?forestTrunkGeo:forestCrownGeo,kind===0?brown:forestCrownMat[kind-1],positions.length);
+ mesh.name='batched-forest-'+kind;positions.forEach(([x,y,z],i)=>{matrix.makeTranslation(x,y,z);mesh.setMatrixAt(i,matrix)});
  mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();worldTarget.add(mesh);
 });
 // Colored wayfinding signs along the paths, with collision-safe placement.
@@ -821,82 +690,30 @@ function signTexture(word,hex){
  ctx.font='27px system-ui,sans-serif';ctx.fillText('✦  •  ✦',256,178);
  const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;return tex;
 }
-// 30 signs: junctions first, bushes second, a few along quiet roads.
-// Candidate sampling is bounded and deterministic to keep frame rate smooth.
-const signCandidates=[];
-function signCandidate(x,z,angle,priority){
- if(Math.hypot(x,z)>191||onPath(x,z,.65)||buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+4&&Math.abs(z-b.z)<b.d/2+4))return;
- if(obstacles.some(o=>o.halfX===undefined&&Math.hypot(x-o.x,z-o.z)<o.r+1.8))return;
- signCandidates.push({x,z,angle,priority});
-}
-// A crossing is a point lying on at least three road directions.
-const junctions=[];
-for(const p of pathSegments)for(const [x,z] of [[p.ax,p.az],[p.bx,p.bz]]){
- if(junctions.some(q=>Math.hypot(q.x-x,q.z-z)<5))continue;
- let directions=new Set();
- for(const q of pathSegments){
-  if(pathDistance(x,z,q)>1.5)continue;
-  for(const [ex,ez] of [[q.ax,q.az],[q.bx,q.bz]]){
-   const dx=ex-x,dz=ez-z;
-   if(Math.hypot(dx,dz)<3)continue;
-   directions.add(Math.abs(dx)>Math.abs(dz)?(dx>0?'E':'W'):(dz>0?'S':'N'));
-  }
- }
- if(directions.size>=3)junctions.push({x,z,degree:directions.size});
-}
-for(let i=0;i<junctions.length;i++){
- const j=junctions[i];
- for(let k=0;k<4;k++){
-  const angle=k*Math.PI/2+Math.PI/4;
-  signCandidate(j.x+Math.cos(angle)*8.2,j.z+Math.sin(angle)*8.2,angle,j.degree===4?0:1);
- }
-}
-for(let i=0;i<hidingSpots.length;i++){
- const spot=hidingSpots[i];if(spot.type!=='bush')continue;
- const angle=trailRand(i+905)*Math.PI*2;
- for(let k=0;k<3;k++){
-  const a=angle+k*2.0944;
-  signCandidate(spot.x+Math.cos(a)*8.1,spot.z+Math.sin(a)*8.1,a,2);
- }
-}
-for(let i=0;i<pathSegments.length;i++){
- const p=pathSegments[i],dx=p.bx-p.ax,dz=p.bz-p.az,len=Math.hypot(dx,dz);
- if(len<18)continue;
- const t=.2+trailRand(i+102)*.6,side=i%2?1:-1,off=p.width/2+4.2;
- signCandidate(p.ax+dx*t-dz/len*off*side,p.az+dz*t+dx/len*off*side,Math.atan2(dx,dz),3);
-}
-// Orient every sign to the nearest actual road segment, not the candidate's radial angle.
-// For junctions this picks the nearest branch; for bush signs it picks the closest road.
-function nearestRoadAngle(x,z){
- let best=null,bestD=Infinity;
- for(const p of pathSegments){
-  const dx=p.bx-p.ax,dz=p.bz-p.az,len2=dx*dx+dz*dz;
-  if(len2<.001)continue;
-  const t=Math.max(0,Math.min(1,((x-p.ax)*dx+(z-p.az)*dz)/len2));
-  const px=p.ax+t*dx,pz=p.az+t*dz,d2=(x-px)**2+(z-pz)**2;
-  if(d2<bestD){bestD=d2;best=Math.atan2(dx,dz)}
- }
- return best;
-}
-signCandidates.sort((a,b)=>a.priority-b.priority);
-let signPlaced=0;const signPositions=[];
-for(const c of signCandidates){yield;
- if(signPlaced>=45)break;
- if(signPositions.some(p=>Math.hypot(c.x-p.x,c.z-p.z)<25))continue;
- const theme=signThemes[signPlaced%signThemes.length],word=theme[Math.floor(trailRand(signPlaced+702)*3)],color=signColors[signPlaced%signColors.length];
+// Board width, foliage, roads and stairs were reserved before rendering.
+let signPlaced=0;
+for(const c of worldLayout.signs){yield;
+ const theme=signThemes[signPlaced%signThemes.length],word=theme[c.variant%3],color=signColors[signPlaced%signColors.length];
  cylinder(.13,3.05,mat(0x595650),c.x,1.525,c.z);
  const board=new THREE.Mesh(boxGeo(3.7,1.48,.16),[mat(color),mat(color),mat(color),mat(color),new THREE.MeshBasicMaterial({map:signTexture(word,color)}),mat(color)]);
- board.position.set(c.x,3.55,c.z);board.rotation.y=nearestRoadAngle(c.x,c.z)??(c.angle+Math.PI/2);worldTarget.add(board);
- addObstacle(c.x,c.z,.45);signPositions.push(c);signPlaced++;
+ board.position.set(c.x,3.55,c.z);board.rotation.y=c.angle;worldTarget.add(board);
+ addObstacle(c.x,c.z,2);signPlaced++;
 }
- // Remove collision and hiding targets as well as visuals, before gameplay starts.
- for(let i=obstacles.length-1;i>=0;i--)if(removedVegetationObstacles.has(obstacles[i]))obstacles.splice(i,1);
- for(let i=hidingSpots.length-1;i>=0;i--)if(nearBlackBuildingVegetation(hidingSpots[i].x,hidingSpots[i].z))hidingSpots.splice(i,1);
 }
+
 function startWorldLoading(){
- if(worldReady)return Promise.resolve(true);
- if(worldLoadPromise)return worldLoadPromise;
+ const wantedSeed=Number(state?.worldSeed)||1;
+ if(worldReady&&loadedWorldSeed===wantedSeed)return Promise.resolve(true);
+ if(worldLoadPromise)return worldLoadPromise.then(ok=>!ok?false:loadedWorldSeed===wantedSeed?true:startWorldLoading());
  worldLoadPromise=(async()=>{
+  worldReady=false;outdoorWorld.visible=false;
+  // Dispose per-world geometry/textures while retaining shared material caches.
+  const sharedGeometry=new Set([...boxGeometryCache.values(),...cylinderGeometryCache.values()]);
+  const sharedMaterial=new Set(materialCache.values()),disposed=new Set();
+  outdoorWorld.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.geometry&&!sharedGeometry.has(o.geometry)&&!disposed.has(o.geometry)){o.geometry.dispose();disposed.add(o.geometry);}
+   for(const m of Array.isArray(o.material)?o.material:[o.material])if(m&&!sharedMaterial.has(m)&&!disposed.has(m)){m.map?.dispose();m.dispose();disposed.add(m);}});
+  outdoorWorld.clear();obstacles.length=indoorMetadata.obstacles;interiorRoofs.length=indoorMetadata.roofs;interiorRoofRails.length=indoorMetadata.rails;roofRoomWalls.length=indoorMetadata.walls;stairways.length=0;hidingSpots.length=0;
+  configureWorld(wantedSeed);
   // Give the room and the first instruction slide two paint opportunities.
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   const work=buildOutdoorWorld();let done=false;
@@ -911,20 +728,25 @@ function startWorldLoading(){
   let compiling;try{compiling=renderer.compileAsync(scene,camera);}finally{outdoorWorld.visible=false;}
   await compiling;
   npcCollisionIndex=null;npcTerrainGrid=null;npcGroundStairs=null;npcNavigation.clear();_opaqueRoofConfigured=false;
-  worldReady=true;performance.mark('island-world-ready');
-  const clearedChair=c=>c.hiddenAt&&nearBlackBuildingVegetation(c.x,c.z);
-  if(state&&host&&(state.worldPreparing||Object.values(state.chairs||{}).some(clearedChair)))await mutate(s=>{
-   if(s.host!==id)return;
-   if(s.worldPreparing){s.chairs=seedChairs();s.worldPreparing=false;}
-   // Existing rooms may still have a chair hidden in a bush that was removed.
-   for(const c of Object.values(s.chairs||{}))if(clearedChair(c))c.hiddenAt=null;
+  loadedWorldSeed=wantedSeed;worldReady=true;performance.mark('island-world-ready');
+  if(state&&host&&Number(state.worldSeed||1)===wantedSeed&&(state.worldPreparing||state.worldLayoutVersion!==WORLD_LAYOUT_VERSION))await mutate(s=>{
+   if(s.host!==id||Number(s.worldSeed||1)!==wantedSeed)return;
+   // Upgrade old rooms without restarting their round or losing carried/seated chairs.
+   if(s.worldLayoutVersion!==WORLD_LAYOUT_VERSION){
+    if(!Object.keys(s.chairs||{}).length)s.chairs=structuredClone(worldLayout.chairs);
+    else for(const [n,c] of Object.entries(s.chairs||{})){
+     if(c.removed||c.carrier||c.occupied)continue;
+     const replacement=worldLayout.chairs[n];if(replacement)Object.assign(c,{x:replacement.x,y:0,z:replacement.z,hiddenAt:replacement.hiddenAt});
+    }
+   }
+   s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=false;
   });
   return true;
  })().catch(error=>{
   worldTarget=scene;outdoorWorld.visible=false;
   $('runtimeError').textContent='マップの読み込みに失敗しました。ページを再読み込みしてください。';
   console.error('World loading failed',error);return false;
- });
+ }).finally(()=>{worldLoadPromise=null;});
  return worldLoadPromise;
 }
 // Shared collision tests for world objects, standing people and placed chairs.
@@ -1077,7 +899,7 @@ function chairFloorAt(x,z,level){
  playerHeight=save;
  return y;
 }
-function closestSpot(){let best=null,dist=7.0;for(const spot of hidingSpots){let d=Math.hypot(me.x-spot.x,me.z-spot.z);if(d<dist){dist=d;best=spot}}return best}
+function closestSpot(){if(playerHeight>1.5||!worldReady)return null;let best=null,dist=7.0;for(const spot of hidingSpots){let d=Math.hypot(me.x-spot.x,me.z-spot.z);if(d<dist){dist=d;best=spot}}return best}
 // The voting station is a black table in the center of the dark building.
 // The front entrance faces +Z. Put the voting counter deeper inside (-Z).
 const VOTE_X=0,VOTE_Z=-7;
@@ -1583,9 +1405,16 @@ const miniCanvas=$('miniMapCanvas'),miniCtx=miniCanvas.getContext('2d');
 miniCanvas.width=miniCanvas.height=320;
 const miniPanel=$('miniMapPanel'),miniBackdrop=$('miniMapBackdrop');
 let miniExpanded=false;let pinShareTarget=null;let selectedMapNote=-1;let pendingMapSpot=null;
-const miniNotes=[],explored=new Set(),exploreStep=4;let lastMapSave=0;let mapRestored=false;
-function savePersonalMap(){if(soloMode||!room||!state?.players?.[id])return;const data={notes:miniNotes.map(n=>({number:n.number,x:n.x,z:n.z})),explored:[...explored]};update(ref(database(),`rooms/${room}/players/${id}`),{mapData:data}).catch(console.warn)}
-function restorePersonalMap(p){if(mapRestored||!p)return;mapRestored=true;miniNotes.splice(0,miniNotes.length,...(Array.isArray(p.mapData?.notes)?p.mapData.notes:[]));explored.clear();for(const cell of (Array.isArray(p.mapData?.explored)?p.mapData.explored:[]))explored.add(cell);drawMiniMap()}
+const miniNotes=[],explored=new Set(),exploreStep=4;let lastMapSave=0;let mapRestored=false,personalMapSession=null;
+function savePersonalMap(){if(soloMode||!room||!state?.players?.[id])return;const data={worldSeed:Number(state.worldSeed)||1,notes:miniNotes.map(n=>({number:n.number,x:n.x,z:n.z})),explored:[...explored]};update(ref(database(),`rooms/${room}/players/${id}`),{mapData:data}).catch(console.warn)}
+function restorePersonalMap(p){
+ const session=room+':'+(Number(state?.worldSeed)||1);
+ if(personalMapSession!==session){personalMapSession=session;mapRestored=false;}
+ if(mapRestored||!p)return;mapRestored=true;
+ const data=Number(p.mapData?.worldSeed||1)===Number(state?.worldSeed||1)?p.mapData:null;
+ miniNotes.splice(0,miniNotes.length,...(Array.isArray(data?.notes)?data.notes:[]));explored.clear();
+ for(const cell of (Array.isArray(data?.explored)?data.explored:[]))explored.add(cell);drawMiniMap();
+}
 setInterval(()=>{if(!soloMode&&mapRestored&&Date.now()-lastMapSave>3000){lastMapSave=Date.now();savePersonalMap()}},4000);let miniEraseMode=false;let recentHiddenChair=null;
 function upsertChairNote(n,x,z){const number=String(n);const i=miniNotes.findIndex(note=>note.number===number);const note={x,z,number};if(i>=0)miniNotes[i]=note;else miniNotes.push(note);drawMiniMap()}
 const mapEraser=$('miniEraser'),mapEditor=$('mapNumberEditor'),mapDisplay=$('mapNumberDisplay');let mapNumberValue='';
@@ -1691,41 +1520,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&miniExpanded)setMiniE
 setInterval(()=>{if(!document.hidden&&!miniExpanded)drawMiniMap()},50);
 setInterval(()=>{if(!document.hidden&&miniExpanded)drawMiniMap()},250);
 
-function seedChairs(){
- const out={},available=hidingSpots.filter(v=>v.type==='tree'||v.type==='bush');
- // Shuffle without sort's bias; hidden chairs reserve their locations first.
- const shuffled=[...available];
- for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
- const hidden=[];
- for(const spot of shuffled){
-  if(hidden.some(q=>Math.hypot(spot.x-q.x,spot.z-q.z)<4))continue;
-  hidden.push(spot);if(hidden.length===6)break;
- }
- if(hidden.length<6)throw new Error('イスの安全な隠し場所が不足');
- for(let i=0;i<hidden.length;i++){
-  const spot=hidden[i];
-  out[i+1]={x:spot.x,z:spot.z,removed:false,carrier:null,occupied:null,hiddenAt:spot.id};
- }
- // Initial chairs stand on the ground, even when the host is on an upper floor.
- const previousHeight=playerHeight;
- try{
-  playerHeight=0;
-  for(let i=7;i<=15;i++){
-   let spot=null;
-   for(let step=0;step<2000&&!spot;step++){
-    const angle=Math.random()*Math.PI*2,r=Math.sqrt(28*28+Math.random()*(288*288-28*28));
-    const x=Math.cos(angle)*r,z=Math.sin(angle)*r;
-    if(staticBlocked(x,z,1.2)||bushBlocked(x,z,1.2))continue;
-    if(stairways.some(st=>x>st.minX-1.2&&x<st.maxX+1.2&&z>st.back-1.2&&z<st.front+1.2))continue;
-    if(Object.values(out).some(c=>Math.hypot(x-c.x,z-c.z)<4))continue;
-    spot={x,z};
-   }
-   if(!spot)throw new Error('イスの安全な初期配置に失敗');
-   out[i]={...spot,removed:false,carrier:null,occupied:null,hiddenAt:null};
-  }
- }finally{playerHeight=previousHeight;}
- return out;
-}
+
 function log(s){$('log').innerHTML=`<div>${new Date().toLocaleTimeString()} ${s.replaceAll('<','&lt;')}</div>`+$('log').innerHTML}
 function player(){return state?.players?.[id]}function phase(){return state?.phase||'lobby'}function players(){return Object.entries(state?.players||{})}function options(el,entries){let v=el.value;el.replaceChildren(...entries.map(([value,label])=>{let o=document.createElement('option');o.value=value;o.textContent=label;return o}));if(entries.some(e=>e[0]===v))el.value=v}
 function syncVoteResultPopup(){paintVoteWall();const popup=$('voteResultsPopup');if(popup)popup.style.display='none';}
@@ -1825,7 +1620,7 @@ function renderWallet(p){
  if(key===walletViewKey)return;walletViewKey=key;
  const cells=[];if(p){for(const [issuer,count] of Object.entries(p.wallet||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])){const cell=document.createElement('span');cell.className='coin-entry';cell.classList.toggle('is-eliminated',state.players?.[issuer]?.initial===true&&state.players[issuer].alive===false);const nm=document.createElement('span');nm.className='coin-name';nm.textContent=(state.players?.[issuer]?.name||'不明')+' ×';const stack=document.createElement('span');stack.className='coin-stack';const icon=walletMedalIcon();const number=document.createElement('span');number.className='coin-stack-number';number.textContent=String(count);stack.append(icon,number);cell.append(nm,stack);cells.push(cell)}}$('wallet').replaceChildren(...cells);
 }
-function renderUI(){if(!state)return;renderLobby();updateMapVisibility();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));renderWallet(p);const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
+function renderUI(){if(!state)return;if(worldReady&&loadedWorldSeed!==Number(state.worldSeed||1))playerPreloadTask=null;renderLobby();updateMapVisibility();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));renderWallet(p);const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
 開票：${Object.entries(state.voteCounts||{}).map(([k,n])=>(state.players[k]?.name||k)+' '+n+'票').join(' / ')||'未開票'}`;if(renderUI.oldPhase!==state.phase&&state.phase){const notices={instructions:'',sitIntro:insideBlackBuilding(me.x,me.z)?'':'着席！',search:'',return:'TIME UP!\n投票に戻れ！',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:'',finished:'ゲーム終了！'};if(renderUI.oldPhase!==undefined&&notices[state.phase])announce(notices[state.phase]);else if(!notices[state.phase]){$('gameNotice').style.display='none';clearTimeout(announce.timer)}renderUI.oldPhase=state.phase}if(renderUI.oldRemoved!==state.lastRemoved&&state.lastRemoved){renderUI.oldRemoved=state.lastRemoved}if(state.phase==='sitIntro'&&insideBlackBuilding(me.x,me.z)){$('gameNotice').style.display='none';clearTimeout(announce.timer)}refreshActions();receiveSharedPin()}
 async function mutate(fn){if(soloMode){if(!state)return;fn(state);renderUI();return;}if(!room)return;let result=await runTransaction(ref(database(),`rooms/${room}`),s=>{if(!s)return;fn(s);return s},{applyLocally:false});if(!result.committed)log('操作できませんでした')}
@@ -1834,7 +1629,7 @@ $('join').onclick=async()=>{if(joiningRoom)return;joiningRoom=true;try{$('join')
 // Same room + same exact name always resolves to the same Firebase player record.
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
 id='U'+Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
-let root=ref(database(),`rooms/${room}`);await runTransaction(root,s=>s||{host:id,hostName:name,phase:'lobby',round:0,chairs:worldReady?seedChairs():{},accessories:initialAccessories(),players:{},votes:{}},{applyLocally:false});
+let root=ref(database(),`rooms/${room}`);await runTransaction(root,s=>s||{host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{},votes:{}},{applyLocally:false});
 const playerPath=ref(database(),`rooms/${room}/players/${id}`);
 const joined=await runTransaction(playerPath,p=>p?{...p,name,online:true,worldReady:false}:{name,worldReady:false,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true},{applyLocally:false});
 const saved=joined.snapshot.val();lastAppliedSpawn=saved?.spawn?.version||null;me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
@@ -1876,7 +1671,7 @@ async function prepareDisconnectChair(p){
  }catch(e){console.warn('切断時のイス配置予約に失敗',e)}
  finally{disconnectChairBusy=false;}
 }
-function launchSolo(){lastAppliedSpawn=null;document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,chairs:worldReady?seedChairs():{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
+function launchSolo(){lastAppliedSpawn=null;document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:Date.now(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
 $('solo').onclick=()=>launchSolo();
 const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=40000, VOTE_MS=30000, ERASE_MS=20000, VOTE_INTRO_MS=7000, RESULTS_MS=7000;
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
@@ -1925,7 +1720,8 @@ function beginGame(s){
   p.spawn={...position,rot:Math.PI,version};
  }
  for(let i=0;i<npcCount;i++)for(let j=i+1;j<npcCount;j++)if(Math.random()<.12){const a=s.players['NPC'+i],b=s.players['NPC'+j];a.trust['NPC'+j]=randBetween(.2,.8);b.trust['NPC'+i]=a.trust['NPC'+j];}
- s.started=Date.now();s.chairs=worldReady?seedChairs():{};s.worldPreparing=!worldReady;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
+ if(s.started||!s.worldSeed)s.worldSeed=Math.floor(Math.random()*4294967295)+1;
+ s.started=Date.now();s.chairs=makeWorldLayout(s.worldSeed).chairs;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
  initRound(s);s.phase='instructions';s.introStarted=Date.now();s.deadline=s.introStarted+54000;
 }
 function createNPC(s,k,i,pt=indoorSpawn(i)){const angle=Math.PI;return {name:'NPC '+(i+1),npc:true,online:true,joined:Date.now(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:randBetween(3.5,6),run:randBetween(8,12),caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
@@ -1988,7 +1784,7 @@ let spotAction=null;
 function beginSpotAction(kind){
  if(spotAction)return;
  const spot=closestSpot(),p=player();if(!spot||!p)return;
- if(kind==='hide'&&!p.carrying)return;
+ if(kind==='hide'&&(!p.carrying||Object.values(state?.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id)))return;
  if(kind==='reveal'&&p.carrying)return;if(kind==='reveal'&&Object.values(state?.players||{}).some(v=>v.npcSpotSearch?.spotId===spot.id&&v.npcSpotSearch?.stage==='searching'))return;
  spotAction={kind,spotId:spot.id,x:me.x,z:me.z,start:performance.now(),chair:p.carrying||0};if(kind==='reveal')mutate(s=>{s.humanSpotSearching??={};s.humanSpotSearching[id]={spotId:spot.id,until:Date.now()+5200};});
 }
@@ -2001,7 +1797,7 @@ function updateSpotAction(t){
  if(t-a.start<5000)return;
  spotAction=null;
  if(a.kind==='hide'){
-  mutate(s=>{const p=s.players[id];if(!p||p.carrying!==a.chair)return;const c=s.chairs[p.carrying];if(!c||c.removed)return;c.hiddenAt=a.spotId;c.x=spot.x;c.z=spot.z;c.carrier=null;p.carrying=0;});
+  mutate(s=>{const p=s.players[id];if(!p||p.carrying!==a.chair)return;const c=s.chairs[p.carrying];if(!c||c.removed||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===a.spotId))return;c.hiddenAt=a.spotId;c.x=spot.x;c.y=0;c.z=spot.z;c.carrier=null;p.carrying=0;});
   recentHiddenChair={number:String(a.chair),x:spot.x,z:spot.z,anchorX:me.x,anchorZ:me.z,y:playerHeight,at:Date.now()};
  }else{
   mutate(s=>{const p=s.players[id];if(!p||p.carrying)return;const found=Object.entries(s.chairs).find(([n,c])=>!c.removed&&c.hiddenAt===a.spotId);if(!found){
@@ -2564,7 +2360,7 @@ $('givePin').onclick=()=>{if(!mapUnlocked)return;const partner=nearestPartner();
 function nearestAction(){for(let b of ['touch','sit','hideChair','revealChair','moveChair','trade'])if(!$(b).hidden)return $(b);return null}
 const actionIcons={"chair": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></svg>", "walk": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"22\" cy=\"6\" r=\"4\" fill=\"#efc29d\"/><path d=\"m19 13 7 7 7 1m-15-7-7 8m8-9-3 12-7 11m8-11 10 11\" fill=\"none\" stroke=\"#387ca1\" stroke-width=\"4\"/></svg>", "pin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></svg>", "lift": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(9 -2) scale(.65)\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "place": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#f1c39c\" d=\"m5 14 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 10 8 3h5\"/><path d=\"M20 25v12m-5-5 5 5 5-5\"/></svg>", "hide": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#52864b\" d=\"M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z\"/><path fill=\"#9b663a\" d=\"M17 24h6v13h-6z\"/></svg>", "search": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m24 24 9 9\" stroke-width=\"6\"/><circle cx=\"16\" cy=\"16\" r=\"11\" fill=\"#aad7e0\"/><path d=\"M10 15a6 6 0 0 1 6-6\" stroke=\"#fff\"/></svg>", "giveCoin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(6 -3) scale(.7)\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "givePin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(8 -1) scale(.6)\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "shirt": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#699ec8\" d=\"m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z\"/></svg>", "hat": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#805b9d\" d=\"m11 7 3-3 12 3 3 23H11Z\"/><path fill=\"#d5a861\" d=\"M11 23h18v6H11z\"/><ellipse cx=\"20\" cy=\"31\" rx=\"17\" ry=\"5\" fill=\"#805b9d\"/></svg>", "glasses": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g fill=\"#b3d9e4\"><circle cx=\"10\" cy=\"24\" r=\"8\"/><circle cx=\"30\" cy=\"24\" r=\"8\"/></g><path d=\"M18 23h4M3 20 6 8m31 12L34 8\"/></svg>", "pickup": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/><path d=\"M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4\"/></svg>", "vote": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#7298ab\" d=\"m5 21 15-7 15 7v15H5Z\"/><path d=\"M13 23h14\"/><path fill=\"#fff3d7\" d=\"m14 3 15 5-6 17-15-5Z\"/><path d=\"m14 13 3 4 7-6\"/></svg>"};
 function setActionIcon(id,kind){const button=$(id);if(button.dataset.icon===kind)return;button.innerHTML=actionIcons[kind];button.dataset.icon=kind;}
-function refreshActions(){if(!state)return;closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=mapChair?.[1]?.occupied===id?null:nearbyHiddenChairForMark(); $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot);$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-Date.now())/1000);}}
+function refreshActions(){if(!state)return;closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=mapChair?.[1]?.occupied===id?null:nearbyHiddenChairForMark(); $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-Date.now())/1000);}}
 function openModal(title,body,mode){$('modalCancel').hidden=false;$('modalConfirm').hidden=false;modalMode=mode;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;modal.classList.add('open');if(mode==='voteButtons')$('touch').hidden=true;}
 function updateTradeAmount(n){const input=$('tradeAmount'),issuer=$('tradeIssuer');if(!input||!issuer)return;const max=Number(player()?.wallet?.[issuer.value]||0);input.value=String(Math.max(1,Math.min(max||1,Math.floor(n)||1)));$('tradeAmountValue').textContent=input.value;}
 function selectTradeCoin(key){$('tradeIssuer').value=key;for(const btn of document.querySelectorAll('#tradeCoinChoices button'))btn.classList.toggle('selected',btn.dataset.issuer===key);updateTradeAmount(1);}
