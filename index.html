@@ -99,8 +99,8 @@ body.playing #actions{left:calc((100vw - 205px)/2);width:min(620px,calc(100vw - 
 @media(max-width:700px){body.playing #actions{left:7px;right:auto;transform:none;width:calc(100vw - 160px);max-width:calc(100vw - 160px);bottom:12px;justify-content:flex-start;gap:5px}body.playing #actions button{flex-shrink:0}}
 @media(max-width:390px){body.playing #actions{width:calc(100vw - 148px);max-width:calc(100vw - 148px)}}
 #tradeCoinChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
-#tradeCoinChoices button{padding:11px 6px;background:#f0dfb7;color:#33291b;border:2px solid transparent;border-radius:12px;box-shadow:0 3px 0 #a48b61}
-#tradeCoinChoices button.selected{background:#b8e8c4;border-color:#328b57;box-shadow:0 2px 0 #328b57}
+#tradeCoinChoices button{padding:11px 6px;background:#e5e5e5;color:#8d8d8d;border:2px solid #dedede;border-radius:12px;box-shadow:0 2px 0 #cecece;opacity:.72;transition:background .12s,color .12s,opacity .12s}
+#tradeCoinChoices button.selected{background:#b8e8c4;color:#23492f;border-color:#328b57;box-shadow:0 2px 0 #328b57;opacity:1}
 #tradeQuantity{display:flex;align-items:center;justify-content:center;gap:9px;margin:12px 0;min-height:54px}
 #tradeQuantity button{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:54px;height:48px;line-height:1;padding:0;font-size:26px;background:#f0dfb7;color:#33291b;vertical-align:middle}
 #tradeQuantity strong{display:flex;align-items:center;justify-content:center;height:48px;min-width:55px;text-align:center;font-size:27px;line-height:1}
@@ -151,7 +151,8 @@ body>canvas{inset:auto;left:var(--view-x);top:var(--view-y);width:var(--view-w)!
 #stackButton.stack-floating{left:calc(var(--edge-l) + 16px);bottom:calc(var(--edge-b) + 20px)}
 #entry,#lobbyScreen,#modal,#miniMapBackdrop{top:var(--view-y);left:var(--view-x);right:var(--view-r);bottom:var(--view-b)}
 @media(max-width:700px){:root{--map-size:135px}#hud{top:calc(var(--edge-t) + 7px);left:calc(var(--edge-l) + 7px)}#clock{top:calc(var(--edge-t) + 7px);right:calc(var(--edge-r) + 7px)}#miniMapPanel{right:calc(var(--edge-r) + 7px);bottom:calc(var(--edge-b) + 7px)}#actions,body.playing #actions{left:calc(var(--view-x) + var(--view-w)/2 + 52px)!important;bottom:calc(var(--edge-b) + clamp(110px,var(--view-h)*.25,210px))!important;width:min(185px,calc(var(--view-w)/2 - env(safe-area-inset-right,0px) - 60px))!important}}
-</style><div id="runtimeError" style="position:fixed;top:0;left:0;z-index:30;color:#fff;background:#8a2323;padding:8px;max-width:100%;pointer-events:none"></div><div id="stickBase"><div id="stickKnob"></div></div><div id="entry"><div class="panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><div class="entry-eyebrow">LET’S PLAY!</div><h1>ISLAND<br><span>CHAIR GAME</span></h1><div class="entry-form"><input id="name" placeholder="なまえ" maxlength="16" aria-label="プレイヤー名"><input id="room" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="ルームコード" maxlength="16" aria-label="ルームコード"><button id="join">あそぶ <span aria-hidden="true">➜</span></button><button id="solo">ひとりでおためし</button></div></div></div><section id="lobbyScreen" hidden aria-label="開始前の待機画面"><div class="lobby-panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><p id="lobbyRoom" class="lobby-room-tag"></p><div class="lobby-roster"><div id="lobbyParticipants"></div></div><div id="lobbyColors" role="group" aria-label="ふくのいろ"></div><button id="start" hidden>開始</button></div></section><div id="hud"><div id="status">未接続</div><div id="players"></div><div id="wallet"></div><div id="log"></div></div><div id="clock" hidden><span id="phaseInstruction"></span><span id="clockSeconds"></span></div><div id="gameNotice" style="white-space:pre-line;position:fixed;top:24%;left:50%;transform:translateX(-50%);background:#10242aee;color:white;padding:18px 26px;border-radius:15px;font-size:22px;font-weight:800;text-align:center;pointer-events:none;display:none;z-index:8"></div><div id="voteResultsPopup" style="display:none;position:fixed;z-index:16;top:22%;left:50%;transform:translateX(-50%);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 24px);max-height:85vh;overflow:hidden;background:rgba(16,36,42,.96);color:white;border:2px solid #e6d39d;border-radius:18px;padding:20px 25px;box-shadow:0 10px 35px #0007;text-align:center;pointer-events:none;font-size:22px;font-weight:800"><div style="font-size:24px;margin-bottom:12px">投票結果</div><div id="voteResultsRows" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;width:100%;box-sizing:border-box"></div></div><div id="gameStats" style="position:fixed;right:12px;top:85px;background:#10242acc;padding:10px;border-radius:10px;font-size:12px;max-width:250px;pointer-events:none"></div><div id="miniMapBackdrop"></div><div id="miniMapPanel"><button id="stackButton" hidden title="空いている位置へ移動" aria-label="黒い建物内の空いている位置へ移動">stack</button><canvas id="miniMapCanvas" width="768" height="768"></canvas><button id="miniEraser" title="この椅子マークを削除" aria-label="消しゴム">🧽</button><div id="mapNumberEditor" hidden><button id="mapNumberCancel" title="閉じる" aria-label="閉じる">×</button><div id="mapNumberDisplay">?</div><div id="mapNumberKeys"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="?">?</button><button data-key="0">0</button><button data-key="back">⌫</button></div><div class="map-editor-actions"><button id="mapNumberSave">✓</button></div></div></div><div id="actions" hidden><button id="touch" data-action-label="とうひょう" hidden title="親を投票" aria-label="親を投票"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#7298ab" d="m5 21 15-7 15 7v15H5Z"/><path d="M13 23h14"/><path fill="#fff3d7" d="m14 3 15 5-6 17-15-5Z"/><path d="m14 13 3 4 7-6"/></svg></button><button id="sit" data-action-label="すわる" hidden title="座る" aria-label="座る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></svg></button><button id="markChair" data-action-label="おぼえる" hidden title="地図に記録" aria-label="地図に記録"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></svg></button><button id="moveChair" data-action-label="はこぶ" hidden title="イスを持ち上げる" aria-label="イスを持ち上げる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(9 -2) scale(.65)"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="hideChair" data-action-label="かくす" hidden title="イスを隠す" aria-label="イスを隠す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#52864b" d="M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z"/><path fill="#9b663a" d="M17 24h6v13h-6z"/></svg></button><button id="revealChair" data-action-label="さがす" hidden title="隠したイスを取り出す" aria-label="隠したイスを取り出す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m24 24 9 9" stroke-width="6"/><circle cx="16" cy="16" r="11" fill="#aad7e0"/><path d="M10 15a6 6 0 0 1 6-6" stroke="#fff"/></svg></button><button id="trade" data-action-label="わたす" hidden title="コインをあげる" aria-label="コインをあげる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(6 -3) scale(.7)"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="givePin" data-action-label="おしえる" hidden title="椅子の位置を共有" aria-label="椅子の位置を共有"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8 -1) scale(.6)"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="pickupShirt" data-action-label="きる" hidden title="Tシャツを着る" aria-label="Tシャツを着る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#699ec8" d="m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z"/></svg></button><button id="pickupAccessory" data-action-label="かぶる" hidden title="帽子をかぶる・眼鏡をつける" aria-label="帽子をかぶる・眼鏡をつける"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#805b9d" d="m11 7 3-3 12 3 3 23H11Z"/><path fill="#d5a861" d="M11 23h18v6H11z"/><ellipse cx="20" cy="31" rx="17" ry="5" fill="#805b9d"/></svg></button><button id="pickupCoin" data-action-label="ひろう" hidden title="コインを拾う" aria-label="コインを拾う"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></svg></button><button id="voteOpen" hidden>親を投票</button><button id="eraseOpen" hidden>イスを消去</button></div><div id="modal"><div class="panel"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="buttons"><button id="modalCancel">閉じる</button><button id="modalConfirm">決定</button></div></div></div><select id="target" hidden></select><select id="issuer" hidden></select><input id="amount" type="number" value="1" hidden><select id="voteTarget" hidden></select><select id="chairNumber" hidden></select><button id="send" hidden></button><button id="vote" hidden></button><button id="erase" hidden></button>
+#introSkipDialog[hidden]{display:none!important}#introSkipDialog{position:fixed;inset:0;z-index:35;display:flex;align-items:center;justify-content:center;background:#06151bc9;padding:16px}.intro-skip-panel{width:min(92vw,390px);padding:26px 20px;background:#fff9eb;color:#314c44;border-radius:22px;text-align:center;box-shadow:0 16px 60px #0008}.intro-skip-panel h2{font-size:21px;margin:0 0 24px}.intro-skip-choices{display:flex;gap:12px}.intro-skip-choices button{flex:1;min-height:54px;font-size:19px}.intro-skip-choices #introSkipNo{background:#d9e3e6;color:#26383d}.intro-skip-choices #introSkipYes{background:#e4ba78;color:#3a2c19}
+</style><div id="runtimeError" style="position:fixed;top:0;left:0;z-index:30;color:#fff;background:#8a2323;padding:8px;max-width:100%;pointer-events:none"></div><div id="stickBase"><div id="stickKnob"></div></div><div id="entry"><div class="panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><div class="entry-eyebrow">LET’S PLAY!</div><h1>ISLAND<br><span>CHAIR GAME</span></h1><div class="entry-form"><input id="name" placeholder="なまえ" maxlength="16" aria-label="プレイヤー名"><input id="room" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="ルームコード" maxlength="16" aria-label="ルームコード"><button id="join">あそぶ <span aria-hidden="true">➜</span></button><button id="solo">ひとりでおためし</button></div></div></div><section id="lobbyScreen" hidden aria-label="開始前の待機画面"><div class="lobby-panel"><div class="entry-art" aria-hidden="true"><span class="entry-star">✦</span><span class="entry-chair">🪑</span><span class="entry-star entry-star-r">✧</span></div><p id="lobbyRoom" class="lobby-room-tag"></p><div class="lobby-roster"><div id="lobbyParticipants"></div></div><div id="lobbyColors" role="group" aria-label="ふくのいろ"></div><button id="start" hidden>開始</button></div></section><div id="hud"><div id="status">未接続</div><div id="players"></div><div id="wallet"></div><div id="log"></div></div><div id="clock" hidden><span id="phaseInstruction"></span><span id="clockSeconds"></span></div><div id="gameNotice" style="white-space:pre-line;position:fixed;top:24%;left:50%;transform:translateX(-50%);background:#10242aee;color:white;padding:18px 26px;border-radius:15px;font-size:22px;font-weight:800;text-align:center;pointer-events:none;display:none;z-index:8"></div><div id="voteResultsPopup" style="display:none;position:fixed;z-index:16;top:22%;left:50%;transform:translateX(-50%);box-sizing:border-box;width:max-content;min-width:230px;max-width:calc(100vw - 24px);max-height:85vh;overflow:hidden;background:rgba(16,36,42,.96);color:white;border:2px solid #e6d39d;border-radius:18px;padding:20px 25px;box-shadow:0 10px 35px #0007;text-align:center;pointer-events:none;font-size:22px;font-weight:800"><div style="font-size:24px;margin-bottom:12px">投票結果</div><div id="voteResultsRows" style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;width:100%;box-sizing:border-box"></div></div><div id="gameStats" style="position:fixed;right:12px;top:85px;background:#10242acc;padding:10px;border-radius:10px;font-size:12px;max-width:250px;pointer-events:none"></div><div id="miniMapBackdrop"></div><div id="miniMapPanel"><button id="stackButton" hidden title="空いている位置へ移動" aria-label="黒い建物内の空いている位置へ移動">stack</button><canvas id="miniMapCanvas" width="768" height="768"></canvas><button id="miniEraser" title="この椅子マークを削除" aria-label="消しゴム">🧽</button><div id="mapNumberEditor" hidden><button id="mapNumberCancel" title="閉じる" aria-label="閉じる">×</button><div id="mapNumberDisplay">?</div><div id="mapNumberKeys"><button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button><button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button><button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button><button data-key="?">?</button><button data-key="0">0</button><button data-key="back">⌫</button></div><div class="map-editor-actions"><button id="mapNumberSave">✓</button></div></div></div><div id="actions" hidden><button id="soloThreeSeconds" data-action-label="3びょう" title="ひとりモード：残り時間を3秒にする" aria-label="残り時間を3秒にする" hidden>⏱️</button><button id="touch" data-action-label="とうひょう" hidden title="親を投票" aria-label="親を投票"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#7298ab" d="m5 21 15-7 15 7v15H5Z"/><path d="M13 23h14"/><path fill="#fff3d7" d="m14 3 15 5-6 17-15-5Z"/><path d="m14 13 3 4 7-6"/></svg></button><button id="sit" data-action-label="すわる" hidden title="座る" aria-label="座る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></svg></button><button id="markChair" data-action-label="おぼえる" hidden title="地図に記録" aria-label="地図に記録"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></svg></button><button id="moveChair" data-action-label="はこぶ" hidden title="イスを持ち上げる" aria-label="イスを持ち上げる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(9 -2) scale(.65)"><path fill="#a76b3d" d="M10 5h16v17H10zM7 23h26v6H7z"/><path d="M10 29v8m20-8v8M13 9h10v10H13"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="hideChair" data-action-label="かくす" hidden title="イスを隠す" aria-label="イスを隠す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#52864b" d="M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z"/><path fill="#9b663a" d="M17 24h6v13h-6z"/></svg></button><button id="revealChair" data-action-label="さがす" hidden title="隠したイスを取り出す" aria-label="隠したイスを取り出す"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m24 24 9 9" stroke-width="6"/><circle cx="16" cy="16" r="11" fill="#aad7e0"/><path d="M10 15a6 6 0 0 1 6-6" stroke="#fff"/></svg></button><button id="trade" data-action-label="わたす" hidden title="コインをあげる" aria-label="コインをあげる"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(6 -3) scale(.7)"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="givePin" data-action-label="おしえる" hidden title="椅子の位置を共有" aria-label="椅子の位置を共有"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8 -1) scale(.6)"><path fill="#e45d50" d="M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z"/><circle cx="20" cy="14" r="4" fill="#fff3cf"/></g><path fill="#f1c39c" d="m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z"/><path d="m13 24 8 3h5"/></svg></button><button id="pickupShirt" data-action-label="きる" hidden title="Tシャツを着る" aria-label="Tシャツを着る"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#699ec8" d="m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z"/></svg></button><button id="pickupAccessory" data-action-label="かぶる" hidden title="帽子をかぶる・眼鏡をつける" aria-label="帽子をかぶる・眼鏡をつける"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path fill="#805b9d" d="m11 7 3-3 12 3 3 23H11Z"/><path fill="#d5a861" d="M11 23h18v6H11z"/><ellipse cx="20" cy="31" rx="17" ry="5" fill="#805b9d"/></svg></button><button id="pickupCoin" data-action-label="ひろう" hidden title="コインを拾う" aria-label="コインを拾う"><svg class="action-icon" viewBox="0 0 40 40" aria-hidden="true" focusable="false" fill="none" stroke="#3d352b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="20" cy="18" r="10" fill="#efc24f"/><path d="M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3"/></svg></button><button id="voteOpen" hidden>親を投票</button><button id="eraseOpen" hidden>イスを消去</button></div><div id="modal"><div class="panel"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="buttons"><button id="modalCancel">閉じる</button><button id="modalConfirm">決定</button></div></div></div><select id="target" hidden></select><select id="issuer" hidden></select><input id="amount" type="number" value="1" hidden><select id="voteTarget" hidden></select><select id="chairNumber" hidden></select><button id="send" hidden></button><button id="vote" hidden></button><button id="erase" hidden></button>
 <script type="text/plain" id="deferredGameCode">
 let THREE;
 let firebaseModules=null;
@@ -243,7 +244,7 @@ function startMotionChannel(){
 }
 function flushMotionPackets(t){
  const localMoving=Math.hypot(localMotionVelocity.x,localMotionVelocity.y,localMotionVelocity.z)>.05;
- if(soloMode||joiningRoom||!roomTransportConnected||!motionChannelReady||motionChannelRoom!==room||!state||state.phase==='lobby'||motionWritesInFlight>=32||localMoving===lastLocalMotionMoving&&t-lastMotionFlush<90)return;
+ if(soloMode||joiningRoom||!roomTransportConnected||!motionChannelReady||motionChannelRoom!==room||!state||state.phase==='lobby'||motionWritesInFlight>=32||localMoving===lastLocalMotionMoving&&t-lastMotionFlush<40)return;
  const now=roomNow(),values={};lastMotionFlush=t;lastLocalMotionMoving=localMoving;
  for(const [key,p] of Object.entries(state.players||{})){
   if(p.online===false||key!==id&&(!host||!p.npc))continue;
@@ -292,7 +293,7 @@ function captureRemoteMotion(s,now=roomNow()){
    const base=((s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run||9:p.walk||5)*(p.carrying?.5:1);
    if(length>.15){vx=dx/length*base;vz=dz/length*base;}
   }
-  const limit=p.npc?Math.max(p.walk||5,p.run||9):13,speed=Math.hypot(vx,vz);
+  const limit=13,speed=Math.hypot(vx,vz);
   if(speed>limit*1.25){vx*=limit*1.25/speed;vz*=limit*1.25/speed;}
   if(sample.moving===false||p.online===false){vx=0;vy=0;vz=0;}
   track.previous=last;track.last=sample;track.vx=vx;track.vy=Math.max(-16,Math.min(16,vy));track.vz=vz;
@@ -303,7 +304,7 @@ function captureRemoteMotion(s,now=roomNow()){
 function remoteMotionPose(key,p,now=roomNow()){
  const track=remoteMotionHistory.get(key),last=track?.last;
  if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0,vx:0,vy:0,vz:0,moving:false};
- const horizon=last.stream ? .18 : p.npc ? .3 : .18,age=Math.max(0,Math.min(horizon,(now-last.at)/1000));
+ const horizon=last.stream ? .35 : p.npc ? .75 : .35,age=Math.max(0,Math.min(horizon,(now-last.at)/1000));
  const moving=last.moving!==false&&p.online!==false&&(now-last.at)<(last.stream?650:p.npc?1100:650);
  const vx=moving?track.vx:0,vy=moving?track.vy:0,vz=moving?track.vz:0;
  let x=last.x+vx*age,z=last.z+vz*age,y=last.y+vy*age;
@@ -326,15 +327,17 @@ function moveRemoteAvatar(avatar,key,p,dt,now){
  else{
   const speed=Math.hypot(pose.vx,pose.vz),direction=speed>.05?{x:pose.vx/speed,z:pose.vz/speed}:memory.remoteDirection;
   let dx=pose.vx*dt+errorX*Math.min(1,dt*7),dz=pose.vz*dt+errorZ*Math.min(1,dt*7);
-  // Remote avatars are visual replicas: their authoritative position comes
-  // from the owning client (or NPC host), not this viewer's local collision map.
-  // Always converge to the transmitted position, including when correcting
-  // overshoot or a direction reversal.
-  const distance=Math.hypot(dx,dz);
-  const maxStep=Math.max(3.5,speed*1.5,Math.hypot(errorX,errorZ)*8)*dt;
+  // Being a little ahead is corrected by slowing down, never by walking backwards.
+  // A real reversal changes direction with the next velocity packet.
+  if(direction){const forward=dx*direction.x+dz*direction.z;if(forward<0){dx-=forward*direction.x;dz-=forward*direction.z;}}
+  const distance=Math.hypot(dx,dz),maxStep=Math.max(speed,direction?memory.remoteSpeed||2:7)*dt*1.35;
   if(distance>maxStep&&distance>.0001){dx*=maxStep/distance;dz*=maxStep/distance;}
-  avatar.position.x+=dx;
-  avatar.position.z+=dz;
+  const nextX=avatar.position.x+dx,nextZ=avatar.position.z+dz;
+  // Only the host resolves NPC visual terrain. Guests follow that same motion stream.
+  const hostGround=p.npc&&host&&!p.npcRoofTrip?.active&&(p.y||0)<1.5;
+  if(!hostGround||npcStaticClearPath(state,avatar.position.x,avatar.position.z,nextX,nextZ)&&!characterMovementBlocked(state,key,avatar.position.x,avatar.position.z,nextX,nextZ,pose.y,true)){
+   avatar.position.x=nextX;avatar.position.z=nextZ;
+  }
   avatar.position.y+=(pose.y-avatar.position.y)*Math.min(1,dt*12);
   if(speed>.05){memory.remoteDirection=direction;memory.remoteSpeed=speed;}
  }
@@ -501,7 +504,7 @@ function makeWorldLayout(seed){
  for(let attempt=0;attempt<5000&&signs.length<40;attempt++){
   const road=paths[Math.floor(random()*paths.length)],t=random(),dx=road.bx-road.ax,dz=road.bz-road.az,len=Math.hypot(dx,dz),off=road.width/2+between(4,9),side=random()<.5?-1:1;
   const x=road.ax+dx*t-dz/len*off*side,z=road.az+dz*t+dx/len*off*side;
-  if(!vacant(x,z,2)||roadDistance(x,z)<3||signs.some(q=>Math.hypot(x-q.x,z-q.z)<PLACEMENT_RULES.signGap))continue;
+  if(!vacant(x,z,2)||roadDistance(x,z)<3||buildings.some(b=>Math.hypot(Math.max(Math.abs(x-b.x)-b.w/2,0),Math.max(Math.abs(z-b.z)-b.d/2,0))<40)||signs.some(q=>Math.hypot(x-q.x,z-q.z)<PLACEMENT_RULES.signGap))continue;
   const p={x,z,r:2,angle:Math.atan2(dx,dz),variant:Math.floor(random()*60)};reserve(p);signs.push(p);
  }
  const trees=[],spots=[];
@@ -1079,6 +1082,9 @@ function crossesClosedIntroDoor(x0,z0,x1,z1,r=.7){
 }
 // Sweep against both shared positions and the meshes currently visible to this client.
 function characterMovementBlocked(s,k,x0,z0,x1,z1,level,includeVisual=false,radius=1.35){
+ // NPCs may pass through all characters within 20m of the main entrance.
+ // Check both ends so an NPC already inside the zone can exit without jamming.
+ if(s?.players?.[k]?.npc && (npcWithinEntrance20m(x0,z0)||npcWithinEntrance20m(x1,z1)))return false;
  const entries=typeof npcActorLists==='function'&&s?npcActorLists(s).players:Object.entries(s?.players||{});
  for(const [other,p] of entries){
   if(other===k||p.online===false)continue;
@@ -1178,6 +1184,7 @@ const INTRO_PAGE_MS=6000,INTRO_PAGE_COUNT=9;
 let introPlayback=null;
 function introSessionKey(s){return room+':'+(s.introStarted||s.started||0);}
 function onlineIntroProgress(s,now=roomNow()){
+ if(s.introSkipped)return {key:introSessionKey(s),page:8,elapsed:INTRO_PAGE_MS,lastFrameAt:null,presented:true,complete:true,waitingForWorld:false};
  const started=Number(s.introStarted||s.started||now),age=Math.max(0,now-started);
  const page=Math.min(INTRO_PAGE_COUNT-1,Math.floor(age/INTRO_PAGE_MS));
  const lastStart=Math.max(started+(INTRO_PAGE_COUNT-1)*INTRO_PAGE_MS,Number(s.introReadyAt)||0);
@@ -1233,6 +1240,7 @@ function pauseIntroPlayback(){if(introPlayback){saveIntroPlayback();introPlaybac
 
 document.addEventListener('visibilitychange',pauseIntroPlayback);
 function introParticipantsReady(s){
+ if(s.introSkipped)return true;
  if(!soloMode)return onlineIntroProgress(s).complete;
  const humans=Object.values(s.players||{}).filter(p=>!p.npc&&p.online!==false);
  return humans.length>0&&humans.every(p=>p.introSeen===introSessionKey(s));
@@ -1609,7 +1617,7 @@ function syncWearable(a,p){const h=a.userData.accessoryHead;if(!h)return;const w
    graphic.position.set(0,.045,0);
    a.userData.torso.add(graphic);a.userData.shirtWear=graphic;
  }else a.userData.torso.material.color.setHex(a.userData.originalTorsoColor);
- for(const kind of ['hat',worn.glasses?'glasses':'sunglasses'])if(worn[kind]){const model=accessoryModel(kind,worn[kind]);if(kind==='hat')model.position.y=.30;else model.position.set(0,0,.02);h.add(model);a.userData.wearables.push(model)}
+ for(const kind of ['hat',worn.glasses?'glasses':'sunglasses'])if(worn[kind]){const model=accessoryModel(kind,worn[kind]);if(kind==='hat')model.position.y=.23;else model.position.set(0,0,.02);h.add(model);a.userData.wearables.push(model)}
 }
 const groundAccessories={};
 function renderGroundAccessories(){const list=state?.accessories||{};for(const [key,item] of Object.entries(list)){
@@ -1643,12 +1651,12 @@ $('pickupShirt').onclick=()=>{const item=nearestAccessory('shirt');if(!item)retu
 const avatars={};const chairs={};const npcNames=['アキ','ユウ','レイ','ミナ','ソラ','カイ','リク','ナオ','ハル','サキ'];for(let i=0;i<24;i++){let a=i*2.399,r=18+rand(i+9000)*170;let npc={id:'NPC'+i,name:npcNames[i%10]+(i+1),x:Math.cos(a)*r,z:Math.sin(a)*r,rot:rand(i+33)*6.28,speed:1+rand(i+99)*4,turn:rand(i+500)*6.28,avatar:null,wallet:23};npcs.push(npc)}function chairObj(c){let g=new THREE.Group();let m=mat(0x8b5331);let seat=new THREE.Mesh(new THREE.BoxGeometry(1.7,.25,1.6),m);seat.position.y=1.1;g.add(seat);let back=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.7,.2),m);back.position.set(0,1.9,-.7);g.add(back);for(let x of [-.65,.65])for(let z of [-.55,.55]){let leg=new THREE.Mesh(new THREE.BoxGeometry(.18,1,.18),m);leg.position.set(x,.5,z);g.add(leg)}// Number is printed on the outward-facing back of the chair.
  const numberCanvas=document.createElement('canvas');numberCanvas.width=256;numberCanvas.height=256;
  const ctx=numberCanvas.getContext('2d');
- ctx.fillStyle='#f5e8c7';ctx.fillRect(12,12,232,232);
- ctx.strokeStyle='#563b29';ctx.lineWidth=12;ctx.strokeRect(12,12,232,232);
- ctx.fillStyle='#30251e';ctx.font='bold 155px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+ // Transparent background: only a gold chair number is printed on the wooden back.
+ ctx.clearRect(0,0,256,256);
+ ctx.fillStyle='#e6b83e';ctx.font='bold 155px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
  ctx.fillText(String(c.number??'?'),128,136);
  const numberTexture=new THREE.CanvasTexture(numberCanvas);
- const label=new THREE.Mesh(new THREE.PlaneGeometry(.95,.95),new THREE.MeshBasicMaterial({map:numberTexture,side:THREE.DoubleSide}));
+ const label=new THREE.Mesh(new THREE.PlaneGeometry(.95,.95),new THREE.MeshBasicMaterial({map:numberTexture,transparent:true,depthWrite:false,side:THREE.DoubleSide}));
  label.position.set(0,1.92,-.815);label.rotation.y=Math.PI;g.add(label);
  scene.add(g);return g}
 
@@ -1807,7 +1815,13 @@ function admitRoomPlayer(s,key,name,now){
   s.players[key]={name,shirtColor,worldReady:false,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:now,online:true};return null;
  }
  if(s.phase==='finished')return 'finished';
- const slot=Object.entries(s.players).find(([k,p])=>p.npc&&p.alive===false);
+ const npcSlots=Object.entries(s.players).filter(([k,p])=>p.npc);
+ // A late joiner takes over an existing NPC, never creates an extra contestant.
+ // Eliminated NPCs first; among equally eligible NPCs, independent extras first.
+ const slot=npcSlots.find(([k,p])=>p.alive===false&&p.team==='ガヤ')
+  ||npcSlots.find(([k,p])=>p.alive===false)
+  ||npcSlots.find(([k,p])=>p.team==='ガヤ')
+  ||npcSlots[0];
  if(!slot)return 'noNpc';
  const [former,p]=slot;
  // Remap references as well as the player: issued coins, votes and chair ownership stay intact.
@@ -1881,14 +1895,8 @@ async function recoverRoomHost(){
  hostRecoveryBusy=true;try{await mutate(claimRoomHost);}catch(error){console.warn('進行役の引き継ぎを再試行します',error);}finally{hostRecoveryBusy=false;}
 }
 let presenceBusy=false;
-// A small network indicator remains visible even when the status HUD is hidden.
-const networkIndicator=document.createElement('div');
-networkIndicator.id='networkIndicator';networkIndicator.setAttribute('role','status');
-networkIndicator.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:18;background:#8a2323;color:white;border-radius:9px;padding:7px 12px;font:700 13px system-ui;display:none;pointer-events:none';
-networkIndicator.textContent='通信が切れています。再接続中…';document.body.append(networkIndicator);
-setInterval(()=>{networkIndicator.style.display=!soloMode&&room&&state&&!roomTransportConnected?'block':'none';},1000);
 async function syncRoomPresence(){
- if(soloMode||joiningRoom||!room||!roomTransportConnected||!state?.players?.[id]||presenceBusy)return;
+ if(soloMode||joiningRoom||!room||!state?.players?.[id]||presenceBusy)return;
  const presenceRoom=room,presenceId=id;presenceBusy=true;
  try{await update(ref(database(),`rooms/${presenceRoom}/players/${presenceId}`),{online:true,lastSeen:roomNow(),hostAvailable:!document.hidden});}
  catch(error){console.warn('接続状態を再確認します',error);}finally{presenceBusy=false;}
@@ -1961,7 +1969,17 @@ function coinPrizeRanks(s){
  return Object.fromEntries(entries.filter(([_,coins])=>coins>0).map(([k,coins])=>[k,1+entries.filter(([_,other])=>other>coins).length]));
 }
 function zeroPrizePlayer(s,p){return s?.phase==='finished'&&p?.initial===true&&prizeCoinCount(s,p)===0;}
+const CHARACTER_WALK_SPEED=7, CHARACTER_RUN_SPEED=13;
 function playerSpeedFactor(s,p){return p?.carrying||zeroPrizePlayer(s,p)?0.5:1;}
+// Each NPC gets one stable speed (11–13 m/s), shared by simulation and rendering.
+// The deterministic name hash avoids speed changes on every frame or device.
+function npcBaseSpeed(p){
+ const name=String(p?.name||p?.npcName||p?.id||'npc');
+ let hash=2166136261;
+ for(let i=0;i<name.length;i++){hash=Math.imul(hash^name.charCodeAt(i),16777619);}
+ return 11+((hash>>>0)/4294967295)*2;
+}
+function npcMovementSpeed(s,p,now){return npcBaseSpeed(p)*playerSpeedFactor(s,p);}
 function updateFinishedPose(avatar,s,p,now){
  const data=avatar.userData,zero=zeroPrizePlayer(s,p),offline=!p.npc&&p.initial===true&&p.online===false,lying=zero||offline;
  const key=lying?'lying:'+String(s.started||s.introStarted||0):null;
@@ -2033,7 +2051,7 @@ for(let attempt=0;attempt<3;attempt++){
  // Refresh even a refusal: the cached room may predate this player's saved record.
  if(attempt<2)await get(root);
 }
-if(!joined.committed)throw new Error(admissionError==='full'?'この部屋は満員です（最大12人）':admissionError==='noNpc'?'交代できる脱落NPCがまだいません':admissionError==='finished'?'このゲームは終了しています':'入室を完了できませんでした。もう一度お試しください');
+if(!joined.committed)throw new Error(admissionError==='full'?'この部屋は満員です（最大12人）':admissionError==='noNpc'?'交代できるNPCがいません':admissionError==='finished'?'このゲームは終了しています':'入室を完了できませんでした。もう一度お試しください');
 const saved=joined.snapshot.val().players[id];lastAppliedSpawn=saved?.spawnApplied===saved?.spawn?.version?saved?.spawn?.version||null:null;lastPositionPacket='';lastPositionSent=0;me.x=Number(saved?.x)||0;me.z=Number.isFinite(Number(saved?.z))?Number(saved.z):12;me.rot=Number(saved?.rot)||0;yaw=me.rot;playerHeight=Number(saved?.y)||0;
 await onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(false);
 // Chair state belongs to the shared room. Preserve sitting and the occupied chair
@@ -2049,7 +2067,7 @@ if(state?.phase==='instructions'&&oldPhase!=='instructions'&&state.players?.[id]
 // Re-arm only when the carried chair or last recorded drop position changes.
 let disconnectChairId=null,disconnectChairPos='',disconnectChairBusy=false;
 async function prepareDisconnectChair(p){
- if(soloMode||!room||!id||disconnectChairBusy||joiningRoom)return;
+ if(soloMode||!room||!id||disconnectChairBusy)return;
  const carrying=Number(p?.carrying)||0;
  const x=Number(p?.x)||0,z=Number(p?.z)||0;
  const y=Number(p?.y)||0;
@@ -2075,6 +2093,19 @@ async function prepareDisconnectChair(p){
 }
 function launchSolo(){stopMotionChannel();lastAppliedSpawn=null;document.getElementById('runtimeError').textContent='';soloMode=true;room='SOLO';host=true;let name=$('name').value.trim()||'プレイヤー';state={host:id,hostName:name,phase:'lobby',round:0,worldSeed:Math.floor(Math.random()*4294967295)+1,chairs:{},accessories:initialAccessories(),players:{[id]:{name,x:0,z:12,rot:0,alive:false,initial:false,wallet:{},touched:false,sitting:0,previous:0,carrying:0,joined:roomNow(),online:true}},votes:{}};$('entry').hidden=true;document.body.classList.add('playing');$('actions').hidden=false;me.x=0;me.z=12;renderUI();$('start').click();log('オフライン練習モード：NPCを補充して合計20人で開始');}
 $('solo').onclick=()=>launchSolo();
+// Solo-only time shortcut. Available in every running phase, including the intro.
+$('soloThreeSeconds').onclick=()=>{
+ if(!soloMode||!state||state.phase==='lobby'||state.phase==='finished')return;
+ const now=roomNow();
+ if(state.phase==='instructions'){
+  state.introSkipped=true;
+  state.introStarted=now-54000;
+  state.introReadyAt=now-6000;
+  if(introPlayback){introPlayback.complete=true;introPlayback.page=8;introPlayback.elapsed=INTRO_PAGE_MS;saveIntroPlayback();}
+ }
+ state.deadline=now+3000;
+ renderUI();
+};
 const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=60000, VOTE_MS=30000, ERASE_MS=20000, VOTE_INTRO_MS=7000, RESULTS_MS=7000;
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
 const randBetween=(a,b)=>a+Math.random()*(b-a);
@@ -2115,7 +2146,7 @@ function beginGame(s){
  if(!positions)return;
  for(const [key,p] of Object.entries(s.players))if(p.npc)delete s.players[key];
  const version='start:'+roomNow();
- for(let i=0;i<npcCount;i++){const key='NPC'+i;s.players[key]=createNPC(s,key,i,positions[i]);s.players[key].spawn={...positions[i],rot:Math.PI,version};}
+ const chosenNPCs=npcBalancedRoster(npcCount);for(let i=0;i<npcCount;i++){const index=chosenNPCs[i],key='NPC'+index;s.players[key]=createNPC(s,key,index,positions[i]);s.players[key].spawn={...positions[i],rot:Math.PI,version};}
  for(let j=0;j<humans.length;j++){
   const [key,p]=humans[j],position=positions[npcCount+j];
   if(!soloMode){p.shirtColor=availableShirtColor(s,key,p.shirtColor);if(p.worn?.shirt)delete p.worn.shirt;}
@@ -2128,13 +2159,119 @@ function beginGame(s){
  initRound(s);s.phase='instructions';s.introReadyAt=!s.worldPreparing?roomNow():null;s.introStarted=roomNow();s.deadline=s.introStarted+54000;
 }
 // Core cast and musical-chairs participants from the manga and Reborn adaptation.
-const NPC_NAMES=['アキヤマ','カンザキ','フクナガ','ヨコヤ','ハリモト','キムラ','ノブテル','サカイ','イケザワ','ミウラ','ヤスカワ','シノミヤ','サルカワ','ツキノ','アカギ','サカマキ','ムラタ','イヌヅカ','サイキ'];
-function normalizeNPCNames(s){
- for(const [key,p] of Object.entries(s.players||{}))if(p.npc&&/^NPC\d+$/.test(key)){
-  const name=NPC_NAMES[Number(key.slice(3))];if(name)p.name=name;
+const NPC_NAMES=['アキヤマ','カンザキ','フクナガ','アカギ','マキゾノ','ヤスカワ','ヨコヤ','イケザワ','オオツカ','ハリモト','キムラ','ミカモト','アベ','サカイ','シマ','カワイ','タニナカ','サエキ','シモハラダ','タジマ'];
+const NPC_TEAMS=['アキヤマ','アキヤマ','アキヤマ','アキヤマ','アキヤマ','アキヤマ','ヨコヤ','ヨコヤ','ヨコヤ','ハリモト','ハリモト','ハリモト','ハリモト','ハリモト','ガヤ','ガヤ','ガヤ','ガヤ','ガヤ','ガヤ'];
+const NPC_TEAM_SHIRTS={アキヤマ:'blue',ヨコヤ:'red',ハリモト:'green'};
+function npcBalancedRoster(count){
+ const pool=NPC_TEAMS.map((team,i)=>({team,i}));
+ // ガヤ are six independent extras, not a team: remove all of them first.
+ // Afterward, trim whichever actual team currently has the most members.
+ const tie=['アキヤマ','ハリモト','ヨコヤ'];
+ while(pool.length>count){
+  let index=pool.map(p=>p.team).lastIndexOf('ガヤ');
+  if(index<0){
+   const sizes={};for(const p of pool)sizes[p.team]=(sizes[p.team]||0)+1;
+   const max=Math.max(...Object.values(sizes));
+   const team=tie.find(t=>sizes[t]===max);index=pool.map(p=>p.team).lastIndexOf(team);
+  }
+  pool.splice(index,1);
+ }
+ return pool.map(p=>p.i);
+}
+function npcMemoryPriority(v){return Number(v?.confidence??(v?.source==='human'?1:3));}
+function npcBestMemory(a,b){
+ if(!a)return b;if(!b)return a;
+ // Physical observations always supersede stale coordinates, regardless of confidence.
+ // Unverified human tips never overwrite an actual observed chair position.
+ const at=Number(a.updatedAt)||0,bt=Number(b.updatedAt)||0;
+ const verified=v=>v.source==='self'||v.source==='observed'||Number(v.confidence)>=3;
+ if(verified(a)!==verified(b))return verified(b)?b:a;
+ if(bt!==at)return bt>at?b:a;
+ return npcMemoryPriority(b)>npcMemoryPriority(a)?b:a;
+}
+function npcEqualizeTeamCoins(s){
+ for(const team of ['アキヤマ','ヨコヤ','ハリモト']){
+  const members=Object.entries(s.players||{}).filter(([k,p])=>p.npc&&p.team===team&&p.alive);
+  if(members.length<2)continue;
+  const issuers=new Set(members.flatMap(([k,p])=>Object.keys(p.wallet||{})));
+  // Preserve issuer identity while distributing each issuer's coins evenly.
+  for(const issuer of issuers){const total=members.reduce((n,[k,p])=>n+Math.max(0,Math.floor(p.wallet?.[issuer]||0)),0);
+   const base=Math.floor(total/members.length),extra=total%members.length;
+   members.forEach(([k,p],i)=>{p.wallet??={};p.wallet[issuer]=base+(i<extra?1:0);});
+  }
  }
 }
-function createNPC(s,k,i,pt=indoorSpawn(i)){const angle=Math.PI;return {name:NPC_NAMES[i%NPC_NAMES.length],npc:true,online:true,joined:roomNow(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:randBetween(3.5,6),run:randBetween(8,12),caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
+function npcTeamVoteOrder(s,team){
+ s.teamVoteOrders??={};const key=s.round+':'+team;
+ if(!s.teamVoteOrders[key])s.teamVoteOrders[key]=Object.entries(s.players||{}).filter(([k,p])=>p.npc&&p.team===team).sort((a,b)=>Number(b[1].alive)-Number(a[1].alive)||a[0].localeCompare(b[0])).map(([k])=>k);
+ return s.teamVoteOrders[key];
+}
+function npcTeamForIndex(i){return NPC_TEAMS[i%NPC_TEAMS.length]||'ガヤ';}
+function npcTeamColor(team,i){return team==='アキヤマ'?0x4a86cf:team==='ヨコヤ'?0xcc5555:team==='ハリモト'?0x58a56d:[0xe3a45b,0x9c79bf,0x5caaa7,0xd38ba3,0x9c9565,0x749bb4][i%6];}
+
+function normalizeNPCNames(s){
+ for(const [key,p] of Object.entries(s.players||{}))if(p.npc&&/^NPC\d+$/.test(key)){
+  const i=Number(key.slice(3)),name=NPC_NAMES[i];if(name){p.name=name;p.team=npcTeamForIndex(i);p.bodyColor=npcTeamColor(p.team,i);if(!p.worn?.shirt)p.shirtColor=null;}
+ }
+}
+// Chairs captured by outsiders are removed from the team's shared pins and
+// become the first erase candidates for that team.
+function npcTeamLostChair(s,team,number){
+ if(!team||team==='ガヤ')return;
+ const n=String(number);
+ s.npcTeamLostChairs??={};s.npcTeamLostChairs[team]??={};
+ s.npcTeamLostChairs[team][n]=s.round||1;
+ for(const member of Object.values(s.players||{})){
+  if(member.npc&&member.team===team&&member.memory)delete member.memory[n];
+ }
+}
+// A verified seat by a team member restores ownership of a previously lost chair.
+// Only an actual successful seat claim can clear the lost-chair exclusion.
+function npcTeamRestoreChairOnSeat(s,playerKey,chairNumber){
+ const p=s.players?.[playerKey],c=s.chairs?.[chairNumber];
+ if(!p?.npc||!p.team||p.team==='ガヤ'||!c||c.removed)return false;
+ if(String(c.occupied)!==String(playerKey)||String(p.sitting)!==String(chairNumber))return false;
+ const n=String(chairNumber),team=p.team;
+ if(s.npcTeamLostChairs?.[team])delete s.npcTeamLostChairs[team][n];
+ const loc={x:c.x,y:c.y||0,z:c.z,source:'self',confidence:4,updatedAt:roomNow()};
+ for(const member of Object.values(s.players||{})){
+  if(!member.npc||member.team!==team)continue;
+  member.memory??={};member.memory[n]={...loc};
+  if(member.npcAvoidChairs)delete member.npcAvoidChairs[n];
+ }
+ return true;
+}
+function npcTeamProtectedChair(s,team,n){
+ if(!team||team==='ガヤ')return false;
+ if(s.npcTeamLostChairs?.[team]?.[String(n)]!=null)return false;
+ return Object.values(s.players||{}).some(v=>v.npc&&v.team===team&&v.memory?.[String(n)]);
+}
+// Team knowledge is shared between members; gaya keep independent memories.
+function npcShareTeamChairMemory(s,sourceKey,chairNumber){
+ const source=s.players?.[sourceKey],info=source?.memory?.[chairNumber];
+ if(!source?.team||source.team==='ガヤ'||!info)return;
+ if(s.npcTeamLostChairs?.[source.team]?.[String(chairNumber)]!=null)return;
+ for(const [key,member] of Object.entries(s.players||{})){
+  if(key===sourceKey||!member.npc||member.team!==source.team)continue;
+  member.memory??={};
+  member.memory[chairNumber]={...npcBestMemory(member.memory[chairNumber],info)};
+ }
+}
+function npcReconcileTeamKnowledge(s){
+ const teams={};
+ for(const [key,p] of Object.entries(s.players||{})){
+  if(!p.npc||!p.team||p.team==='ガヤ')continue;
+  (teams[p.team]??=[]).push(p);
+ }
+ for(const members of Object.values(teams)){
+  const shared={};
+  for(const p of members)for(const [n,loc] of Object.entries(p.memory||{})){
+   if(loc&&Number.isFinite(loc.x)&&Number.isFinite(loc.z)&&s.npcTeamLostChairs?.[p.team]?.[String(n)]==null)shared[n]=npcBestMemory(shared[n],loc);
+  }
+  for(const p of members){p.memory??={};for(const n of Object.keys(p.memory))if(s.npcTeamLostChairs?.[p.team]?.[String(n)]!=null)delete p.memory[n];for(const [n,loc] of Object.entries(shared))p.memory[n]={...loc};}
+ }
+}
+function createNPC(s,k,i,pt=indoorSpawn(i)){const angle=Math.PI;return {name:NPC_NAMES[i%NPC_NAMES.length],team:npcTeamForIndex(i),bodyColor:npcTeamColor(npcTeamForIndex(i),i),npc:true,online:true,joined:roomNow(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:7,run:13,caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
 $('start').onclick=async()=>{await mutate(beginGame);applyAssignedSpawn(state);};
 $('touch').onclick=()=>mutate(s=>{let p=s.players[id];if(s.phase==='search'&&p?.alive&&Math.hypot(p.x-VOTE_X,p.z-VOTE_Z)<6){p.touched=true;p.sitting=0}});
 // Nearby chair is marked at its exact world position, with its existing number.
@@ -2188,7 +2325,7 @@ $('sit').onclick=()=>mutate(s=>{
   p.sitting=0;me.x=p.x;me.z=p.z;playerHeight=p.y||0;return;
  }
  for(const [n,c] of Object.entries(s.chairs))if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&(s.phase!=='search'||Number(n)!==p.previous)&&Math.abs((c.y||0)-(p.y||0))<2.2&&Math.hypot(c.x-p.x,c.z-p.z)<3){p.sitting=Number(n);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=id;break;}
-});
+}).then(()=>{const p=state?.players?.[id],n=p?.sitting,c=state?.chairs?.[n];if(n&&c?.occupied===id)upsertChairNote(n,c.x,c.z);});
 // Five-second hide/search action; cancel if the player moves away or conditions change.
 let spotAction=null;
 function beginSpotAction(kind){
@@ -2209,6 +2346,8 @@ function updateSpotAction(t){
  if(a.kind==='hide'){
   mutate(s=>{const p=s.players[id];if(!p||p.carrying!==a.chair)return;const c=s.chairs[p.carrying];if(!c||c.removed||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===a.spotId))return;c.hiddenAt=a.spotId;c.x=spot.x;c.y=0;c.z=spot.z;c.carrier=null;p.carrying=0;});
   recentHiddenChair={number:String(a.chair),x:spot.x,z:spot.z,anchorX:me.x,anchorZ:me.z,y:playerHeight,at:roomNow()};
+  // The hide action itself records the confirmed location; same number replaces old pin.
+  upsertChairNote(a.chair,spot.x,spot.z);
  }else{
   mutate(s=>{const p=s.players[id];if(!p||p.carrying)return;recordSpotSearch(s,id,spot,roomNow());if(s.humanSpotSearching)delete s.humanSpotSearching[id];const found=Object.entries(s.chairs).find(([n,c])=>!c.removed&&c.hiddenAt===a.spotId);if(!found){
    // An empty hiding spot has a one-in-three chance to release a random costume.
@@ -2228,8 +2367,8 @@ $('send').onclick=()=>{};
 $('vote').onclick=()=>{if(Math.hypot(me.x-VOTE_X,me.z-VOTE_Z)>=11)return;const target=$('voteTarget').value;mutate(s=>{const p=s.players[id];if(!canCastVote(s,id)||!p||Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)>=11||s.votes?.[id]||!s.players[target]?.alive)return;s.votes??={};if(s.votes[id])return;s.votes[id]=target;p.voted=true;if(soloMode){s.deadline=roomNow();advanceState(s,s.deadline);}})};
 function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=true;c.carrier=null;c.occupied=null;s.noChairErased=false;s.lastRemoved=n;s.selectedEraseChair=n;s.phase='eraseReveal';s.deadline=roomNow()+7000}
 $('erase').onclick=()=>{const n=$('chairNumber').value;mutate(s=>{if(s.phase!=='erase'||s.parent!==id)return;finishErase(s,n)})};
-function chooseNPCVote(s,k){const p=s.players[k],candidates=Object.entries(s.players).filter(([_,v])=>v.alive);if(!candidates.length)return null;let best=null,score=-Infinity;for(const [key,c] of candidates){let value=Math.random()*2.4+(p.trust?.[key]||0)*3+(key===k?(p.personality==='積極型'?2:0):0);if(p.personality==='追従型')value+=(p.trust?.[key]||0)*3;if(p.personality==='独立型'&&key===k)value+=1.8;if(p.personality==='戦略型')value+=(s.lastVoteCounts?.[key]||0)*.2;if(p.personality==='気まぐれ型')value+=Math.random()*3;if(value>score){score=value;best=key}}return best}
-function chooseErase(s,k){const p=s.players[k]||{},available=Object.entries(s.chairs).filter(([_,c])=>!c.removed);if(!available.length)return null;const scored=available.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
+function chooseNPCVote(s,k){const team=s.players[k]?.team;if(team&&team!=='ガヤ'){const order=npcTeamVoteOrder(s,team);return order.find(candidate=>s.players[candidate]?.alive)||null;}const p=s.players[k],candidates=Object.entries(s.players).filter(([_,v])=>v.alive);if(!candidates.length)return null;let best=null,score=-Infinity;for(const [key,c] of candidates){let value=Math.random()*2.4+(p.trust?.[key]||0)*3+(key===k?(p.personality==='積極型'?2:0):0);if(p.team&&p.team!=='ガヤ'&&s.players?.[key]?.team===p.team)value+=2.7;if(p.personality==='追従型')value+=(p.trust?.[key]||0)*3;if(p.personality==='独立型'&&key===k)value+=1.8;if(p.personality==='戦略型')value+=(s.lastVoteCounts?.[key]||0)*.2;if(p.personality==='気まぐれ型')value+=Math.random()*3;if(value>score){score=value;best=key}}return best}
+function chooseErase(s,k){const p=s.players[k]||{},team=p.team&&p.team!=='ガヤ'?p.team:null;const available=Object.entries(s.chairs).filter(([n,c])=>!c.removed&&(!team||!npcTeamProtectedChair(s,team,n)));if(!available.length)return null;const lost=team?s.npcTeamLostChairs?.[team]||{}:{};const priority=available.filter(([n])=>lost[String(n)]!=null);const pool=priority.length?priority:available;const scored=pool.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
 function prepareSoloNPCVotes(s){
  if(!soloMode||s.phase!=='vote'||s.soloVotesPreparedRound===s.round)return;
  s.votes??={};
@@ -2245,12 +2384,12 @@ function advanceState(s,now){const phase=s.phase;
   s.phase='sitIntro';s.deadline=now+3000;return;
  }
  if(now<s.deadline)return;
- if(phase==='sitIntro'){s.phase='search';s.deadline=now+SEARCH_MS}
+ if(phase==='sitIntro'){npcPrepareDepartureRoutes(s,now);s.phase='search';s.deadline=now+SEARCH_MS}
 else if(phase==='search'){for(const p of Object.values(s.players)){p.wasAliveBeforeSearch=!!p.alive;if(p.alive&&!p.sitting)p.alive=false;if(p.sitting)p.previous=p.sitting;p.returned=false}const newlyOut=Object.entries(s.players).filter(([_,p])=>p.wasAliveBeforeSearch&&!p.alive);
  s.eliminatedNames=newlyOut.map(([_,p])=>p.name);
  s.eliminationOrder??=[];for(const [k,p] of newlyOut){p.eliminatedRound=s.round;if(!s.eliminationOrder.includes(k))s.eliminationOrder.push(k);}
  s.phase='return';s.deadline=now+RETURN_MS}
-else if(phase==='return'){for(const p of Object.values(s.players))p.returned=Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)<11;s.phase='voteIntro';s.deadline=now+VOTE_INTRO_MS;s.votes={};s.voteEligible={}}
+else if(phase==='return'){for(const p of Object.values(s.players))p.returned=Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)<11;npcPrepareNextRoundTargets(s,now);s.phase='voteIntro';s.deadline=now+VOTE_INTRO_MS;s.votes={};s.voteEligible={}}
 else if(phase==='voteIntro'){
  const alive=Object.entries(s.players).filter(([_,p])=>p.alive);
  if(alive.length<=1){s.phase='finished';s.winner=alive[0]?.[0]||null;
@@ -2286,8 +2425,8 @@ async function advance(){
    const before=s.phase;
    if(before==='instructions'){
     if(!worldReady||s.worldPreparing||!introParticipantsReady(s))break;
-    const end=Math.max((s.introStarted||s.started)+54000,(s.introReadyAt||0)+6000);
-    advanceState(s,soloMode?now:Math.min(now,end));
+    const end=soloMode&&s.introSkipped&&s.deadline?s.deadline:s.introSkipped?now:Math.max((s.introStarted||s.started)+54000,(s.introReadyAt||0)+6000);
+    if(now>=end)advanceState(s,soloMode?now:Math.min(now,end));
    }else if(s.deadline<=now)advanceState(s,soloMode?now:s.deadline);else break;
    if(soloMode||s.phase===before)break;
   }
@@ -2295,7 +2434,7 @@ async function advance(){
  finally{advancing=false;}
 }
 setInterval(advance,250);
-setInterval(()=>{syncRoomPresence();recoverRoomHost();},6000);
+setInterval(()=>{syncRoomPresence();recoverRoomHost();},4000);
 document.addEventListener('visibilitychange',()=>{syncRoomPresence();if(!document.hidden)recoverRoomHost();});
 // Host alone simulates all NPC decisions; the shared database is authoritative.
 function npcRoofForChair(c){
@@ -2308,7 +2447,7 @@ function npcRoofBusy(s,k,roof){
  const {b,st}=roof;
  return Object.entries(s.players||{}).some(([other,v])=>{
   if(other===k||v.online===false)return false;
-  if(v.npcRoofTrip?.building===roof.i)return true;
+  if(v.npcRoofTrip?.building===roof.i&&v.npcRoofTrip.active&&!v.npcRoofTrip.complete)return true;
   const x=other===id?me.x:v.x,z=other===id?me.z:v.z,y=other===id?playerHeight:v.y||0;
   const onRoof=y>st.top-2&&Math.abs(x-b.x)<b.w/2+1.5&&Math.abs(z-b.z)<b.d/2+1.5;
   const onStairs=x>=st.minX-.8&&x<=st.maxX+.8&&z>=st.turnZ0-.8&&z<=st.bridgeZ1+2;
@@ -2326,7 +2465,7 @@ function npcRoofPoints(roof,c){
 function npcChairGoal(s,k,p,n){
  const c=s.chairs[n],roof=npcRoofForChair(c);
  if(!roof)return {x:c.x,z:c.z};
- if(!p.npcRoofTrip)p.npcRoofTrip={building:roof.i,chair:String(n),points:npcRoofPoints(roof,c),index:1,active:false,travel:0};
+ if(!p.npcRoofTrip||(!p.npcRoofTrip.active&&String(p.npcRoofTrip.chair)!==String(n)))p.npcRoofTrip={building:roof.i,chair:String(n),points:npcRoofPoints(roof,c),index:1,active:false,travel:0};
  return {...p.npcRoofTrip.points[0]};
 }
 function npcRoofStepClear(s,k,p,q){
@@ -2345,7 +2484,15 @@ function npcUpdateRoofTrip(s,k,p,dt,now){
   trip.points=[{x:p.x,z:p.z,y:p.y||0},...trip.points.slice(0,trip.index).reverse()];trip.index=1;trip.travel=0;trip.descending=true;
  }
  if(!trip.active){
-  const roof=npcRoofForChair(chair);if(!roof||npcRoofBusy(s,k,roof)){p.npcRoofTrip=null;p.targetChair=null;p.goal=null;p.decisionAt=0;return false;}
+  const roof=npcRoofForChair(chair);if(!roof){p.npcRoofTrip=null;p.targetChair=null;p.goal=null;p.decisionAt=0;return false;}
+  // Keep the assigned rooftop chair and the preselected stair route while another actor uses the stairs.
+  // Releasing the assignment here caused repeated reassignment and jams at the stair entrance.
+  if(npcRoofBusy(s,k,roof)){
+   // Do not abandon a roof assignment, but also do not queue forever at
+   // the foot of the stairs when a stale actor claims the staircase.
+   trip.busySince??=now;
+   if(now-trip.busySince<3500)return false;
+  }else trip.busySince=0;
   const entry=trip.points[0];if(Math.hypot(p.x-entry.x,p.z-entry.z)>.65)return false;
   trip.points[0]={x:p.x,z:p.z,y:0};trip.active=true;p.y=0;
  }
@@ -2355,14 +2502,33 @@ function npcUpdateRoofTrip(s,k,p,dt,now){
   const target=trip.points[trip.index],dx=target.x-p.x,dz=target.z-p.z,dy=target.y-(p.y||0),length=Math.hypot(dx,dz,dy);
   if(length<.001){trip.index++;continue;}
   const step=Math.min(.3,distance,length),f=step/length,q={x:p.x+dx*f,z:p.z+dz*f,y:(p.y||0)+dy*f};
-  if(!npcRoofStepClear(s,k,p,q))break;
-  Object.assign(p,q);p.rot=Math.atan2(dx,dz);trip.travel+=step;distance-=step;
+  if(!npcRoofStepClear(s,k,p,q)){
+   // A stairway is a one-dimensional reserved route. If the static collision
+   // mesh slightly overlaps its centreline, don't let that permanently stop
+   // the NPC. Other characters still wait for their turn before entry.
+   const route=trip.points,st=stairways.find(st=>Math.abs(st.top-(route[route.length-2]?.y||0))<.5&&Math.abs(st.outerX-route[0].x)<2);
+   const onReservedStair=!!st&&trip.index<route.length-1&&q.x>=st.minX-1.3&&q.x<=st.maxX+1.3&&q.z>=Math.min(st.front,st.back)-3&&q.z<=Math.max(st.front,st.back)+3;
+   if(!onReservedStair){
+    trip.stuckSince??=now;
+    if(now-trip.stuckSince>1800){
+     // Recover from an impossible rail/corner collision without resetting
+     // the entire staircase route to its first waypoint.
+     const safe=trip.points[trip.index];
+     if(safe&&trip.index<trip.points.length-1){
+      p.x=safe.x;p.z=safe.z;p.y=safe.y;trip.index++;
+      trip.stuckSince=0;continue;
+     }
+    }
+    break;
+   }
+  }
+  trip.stuckSince=0;Object.assign(p,q);p.rot=Math.atan2(dx,dz);trip.travel+=step;distance-=step;
   if(step>=length-.0001)trip.index++;
  }
  if(trip.index>=trip.points.length){
   if(trip.descending){p.y=0;trip.complete=true;p.targetChair=null;p.goal=null;p.decisionAt=0;return true;}
   if(usable&&!chair.occupied&&!characterMovementBlocked(s,k,p.x,p.z,chair.x,chair.z,chair.y)){
-   p.sitting=Number(trip.chair);p.x=chair.x;p.z=chair.z;p.y=chair.y;chair.occupied=k;p.memory??={};p.memory[trip.chair]={x:chair.x,y:chair.y,z:chair.z};
+   p.sitting=Number(trip.chair);p.x=chair.x;p.z=chair.z;p.y=chair.y;chair.occupied=k;p.memory??={};p.memory[trip.chair]={x:chair.x,y:chair.y,z:chair.z,source:'self',confidence:4,updatedAt:roomNow()};npcTeamRestoreChairOnSeat(s,k,trip.chair);npcShareTeamChairMemory(s,k,trip.chair);
   }
  }
  return true;
@@ -2391,8 +2557,305 @@ function npcDecision(s,k,p,now){
   (current&&p.memory?.[current[0]]?current:null)||nearest(remembered)||current;
  if(!choice){if(p.targetChair)npcClearSearchTarget(k,p);return;}
  const n=choice[0];
+ if(Math.hypot(choice[1].x-p.x,choice[1].z-p.z)<=30){p.memory??={};const c=choice[1];p.memory[n]=npcBestMemory(p.memory[n],{x:c.x,y:c.y||0,z:c.z,source:'observed',confidence:4,updatedAt:now});npcShareTeamChairMemory(s,k,n);}
  if(String(p.targetChair)===String(n)&&p.goal){const goal=npcChairGoal(s,k,p,n);if(Math.hypot(goal.x-p.goal.x,goal.z-p.goal.z)<.5)return;p.goal=goal;p.waypoint=null;npcNavigation.delete(room+':'+k);return;}
  npcClearSearchTarget(k,p);p.targetChair=n;p.goal=npcChairGoal(s,k,p,n);p.npcChairPriority=nearby.some(([key])=>key===n)?'nearby':'memory';
+}
+// Initial chair allocation is independent of visibility: hidden chairs are valid
+// assignments, but occupied, carried, removed and previously used chairs are not.
+function npcInitialChairEligible(s,k,p,n){
+ const c=s.chairs?.[n];
+ return !!(c&&!c.removed&&!c.carrier&&!c.occupied&&Number(n)!==Number(p.previous)&&
+  !Object.entries(s.players||{}).some(([other,v])=>other!==k&&Number(v.sitting)===Number(n))&&
+  !(p.npcAvoidChairs?.[n]>roomNow()));
+}
+// One fixed first-round destination per NPC. Assign chairs without requiring
+// visibility or checking whether they are hidden; remaining NPCs get dispersed sites.
+// No forward 150m detection: each NPC keeps its assigned local search region.
+function npcAssignFirstRound(s,now){
+ if(s.npcFirstAssignmentsRound===s.round)return;
+ const actors=Object.entries(s.players||{}).filter(([k,p])=>p.npc&&p.alive&&!p.sitting);
+ npcReconcileTeamKnowledge(s);
+ // All available chairs, including hidden ones, are eligible. No chair may be
+ // reserved by two NPCs. Previous-round seating is a preference, not a veto.
+ const chairs=Object.entries(s.chairs||{}).filter(([n,c])=>c&&!c.removed&&!c.carrier&&!c.occupied&&
+  !Object.values(s.players||{}).some(v=>Number(v.sitting)===Number(n)));
+ for(let i=chairs.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[chairs[i],chairs[j]]=[chairs[j],chairs[i]];}
+ const assignments=new Map(),used=new Set();
+ const claim=(k,p,prefer)=>{
+  const pair=chairs.find(([n])=>!used.has(String(n))&&(!prefer||!!p.memory?.[n])&&
+   !(p.npcAvoidChairs?.[n]>now));
+  if(pair){assignments.set(k,pair);used.add(String(pair[0]));return true;}
+  return false;
+ };
+ // Allocate remembered chairs for ALL NPCs, including independent gaya.
+ // An NPC with no valid remembered chairs must search a random area.
+ for(const [k,p] of actors)if(Object.keys(p.memory||{}).length)claim(k,p,true);
+ // After return, an NPC with zero recorded chairs must explore a random area.
+ for(const [k,p] of actors)if(!assignments.has(k)&&s.round===1)claim(k,p,false);
+ // Avoidance/previous ownership must not strand an NPC while a chair is free.
+ for(const [k,p] of actors)if(!assignments.has(k)&&s.round===1){
+  const pair=chairs.find(([n])=>!used.has(String(n)));
+  if(pair){assignments.set(k,pair);used.add(String(pair[0]));}
+ }
+ const arrival=(k,p,c)=>{
+  const known=p.memory?.[String(Object.entries(s.chairs||{}).find(([n,v])=>v===c)?.[0])];
+  const spot=c.hiddenAt?hidingSpots.find(v=>v.id===c.hiddenAt):null;
+  const center={x:spot?.x??c.x,z:spot?.z??c.z};
+  if(!c.hiddenAt)return {center,dest:{x:c.x,z:c.z},exactSpotId:null};
+  // A team-shared exact hiding-object ID is a direct search target, never a 30m area.
+  if(spot&&known?.hiddenAt===spot.id){
+   const approach=npcSpotApproachGoal(s,p,spot);
+   return {center,dest:approach||{x:spot.x,z:spot.z},exactSpotId:spot.id};
+  }
+  let best=null,bestCost=Infinity;
+  for(let i=0;i<192;i++){
+   const angle=i*2.399963229728653,rad=29.5*Math.sqrt((i+.5)/192);
+   const q={x:center.x+Math.cos(angle)*rad,z:center.z+Math.sin(angle)*rad};
+   if(!npcOutdoorDestination(q.x,q.z,3)||npcWorldBlocked(s,q.x,q.z,1.1))continue;
+   const reachable=npcGoalReachable(s,k,p,q);
+   const cost=Math.hypot(q.x-p.x,q.z-p.z)+(reachable?0:100000);
+   if(cost<bestCost){best=q;bestCost=cost;}
+  }
+  if(!best&&npcOutdoorDestination(center.x,center.z,3)&&!npcWorldBlocked(s,center.x,center.z,1.1))best={...center};
+  return {center,dest:best,exactSpotId:null};
+ };
+ for(const [k,p] of actors){
+  npcEnsureRoundSearchMemory(p,s.round);
+  const pair=assignments.get(k);
+  if(!pair){
+   p.npcFixedAssignment=null;p.goal=null;p.targetChair=null;p.npcSpotSearch=null;
+   if(!npcChooseFreshArea(s,k,p,now))p.npcSpotDecisionAt=now+3000;
+   continue;
+  }
+  const [chair,c]=pair,{center,dest,exactSpotId}=arrival(k,p,c);
+  // Retain the chair reservation even if the outdoor arrival cannot yet be
+  // found. Retry the same chair instead of switching to a random region.
+  p.npcFixedAssignment={round:s.round,chair,exactSpotId,initiallyVisible:!c.hiddenAt,
+   x:dest?.x??center.x,z:dest?.z??center.z,centerX:center.x,centerZ:center.z,
+   arrived:false,pendingArrival:!dest};
+  p.goal=dest?{...dest}:null;p.targetChair=null;p.npcSpotSearch=null;
+  npcNavigation.delete(room+':'+k);
+  if(dest)npcPreloadAssignedRoute(s,k,p);
+ }
+ // Commit only after all living NPCs have either a distinct chair or a
+ // validated random-area fallback (when chairs are fewer than NPCs).
+ s.npcFirstAssignmentsRound=s.round;
+}
+
+// An unhidden chair discovered within 30m takes priority over the assigned destination.
+// Its previous reservation holder is sent to a new random search region.
+// Search history is round-scoped. Never clear it on a change of assignment.
+function npcEnsureRoundSearchMemory(p,round){
+ if(p.npcSearchedRound!==round){p.npcSearchedRound=round;p.npcSearchedSpots={};p.npcVisitedAreas=[];}
+ p.npcSearchedSpots??={};p.npcVisitedAreas??=[];
+}
+// Search destinations must never be inside a building or its doorway buffer.
+// Applies to random regions, hidden-chair arrival points, and search spots.
+function npcOutdoorDestination(x,z,margin=3){
+ if(!Number.isFinite(x)||!Number.isFinite(z))return false;
+ return !buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+margin&&Math.abs(z-b.z)<b.d/2+margin);
+}
+function npcAreaHasSearchableSpot(s,k,p,q){
+ // An area is valid only when it contains a real, unsearched and currently
+ // available hiding spot (bush OR searchable tree), with an approach position.
+ return npcOutdoorDestination(q.x,q.z,4)&&hidingSpots.some(spot=>npcOutdoorDestination(spot.x,spot.z,2)&&Math.hypot(spot.x-q.x,spot.z-q.z)<=40&&
+  !p.npcSearchedSpots?.[spot.id]&&!npcSpotBusy(s,k,spot)&&
+  npcSpotApproachGoal(s,p,spot));
+}
+// Reserve the 40m search region against other NPC destinations.
+// Chair assignments are unique by chair number, but their search regions
+// can overlap; random regions must not stack on an existing destination.
+function npcAreaClaimedByOther(s,k,q,radius=40){
+ return Object.entries(s.players||{}).some(([other,v])=>{
+  if(other===k||!v.npc||!v.alive||v.sitting)return false;
+  const a=v.npcFixedAssignment;
+  // Include both fixed chair destinations and random-area destinations.
+  if(a?.round===s.round){
+   const x=Number.isFinite(a.centerX)?a.centerX:a.x;
+   const z=Number.isFinite(a.centerZ)?a.centerZ:a.z;
+   if(Number.isFinite(x)&&Number.isFinite(z)&&Math.hypot(x-q.x,z-q.z)<radius)return true;
+  }
+  // Also reserve the destination of NPCs which switched to a visible chair.
+  const c=v.targetChair!=null?s.chairs?.[v.targetChair]:null;
+  if(c&&!c.removed&&Math.hypot(c.x-q.x,c.z-q.z)<radius)return true;
+  return false;
+ });
+}
+function npcChooseFreshArea(s,k,p,now){
+ npcEnsureRoundSearchMemory(p,s.round);
+ const visited=p.npcVisitedAreas;
+ // Generate regions FROM actual searchable spots, never from empty map points.
+ // A-star handles routes around buildings; a straight-line visibility test here
+ // incorrectly rejected good outdoor destinations from inside the lobby.
+ const candidates=hidingSpots.filter(spot=>npcOutdoorDestination(spot.x,spot.z,2)&&!p.npcSearchedSpots?.[spot.id]&&!npcSpotBusy(s,k,spot));
+ for(let i=candidates.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[candidates[i],candidates[j]]=[candidates[j],candidates[i]];}
+ let validAreas=[];
+ const building=buildingSites[3];
+ for(const spot of candidates){
+  const q=npcSpotApproachGoal(s,p,spot);
+  if(!q||!npcOutdoorDestination(q.x,q.z,4)||npcWorldBlocked(s,q.x,q.z,1.1))continue;
+  if(Math.hypot(q.x-p.x,q.z-p.z)<40)continue;
+  if(visited.some(v=>Math.hypot(v.x-q.x,v.z-q.z)<40))continue;
+  if(npcAreaClaimedByOther(s,k,q,40))continue;
+  const previous=p.npcFixedAssignment;
+  if(previous?.round===s.round&&Math.hypot(previous.centerX-q.x,previous.centerZ-q.z)<40)continue;
+  // Do not use the lobby entrance or the dispersal area as a search region.
+  if(Math.abs(q.x-building.x)<building.w/2+14&&Math.abs(q.z-building.z)<building.d/2+24)continue;
+  if(!npcAreaHasSearchableSpot(s,k,p,q))continue;
+  const count=hidingSpots.filter(v=>Math.hypot(v.x-q.x,v.z-q.z)<=40&&!p.npcSearchedSpots?.[v.id]&&!npcSpotBusy(s,k,v)).length;
+  const spacing=visited.length?Math.min(...visited.map(v=>Math.hypot(v.x-q.x,v.z-q.z))):120;
+  const score=count*15+Math.min(spacing,120)+Math.random()*30;
+  validAreas.push({q,score});
+ }
+ if(!validAreas.length)return false;
+ // Avoid choosing the same dense cluster for every NPC. Randomize among viable regions.
+ validAreas.sort((a,b)=>b.score-a.score);
+ const shortlist=validAreas.slice(0,Math.min(12,validAreas.length));
+ const best=shortlist[Math.floor(Math.random()*shortlist.length)].q;
+ npcClearSearchTarget(k,p);
+ p.npcFixedAssignment={round:s.round,chair:null,initiallyVisible:false,x:best.x,z:best.z,centerX:best.x,centerZ:best.z,arrived:false};
+ p.goal={...best};p.npcSpotDecisionAt=0;p.decisionAt=now;
+ npcPreloadAssignedRoute(s,k,p);
+ return true;
+}
+function npcRandomReassignment(s,k,p,now){
+ npcEnsureRoundSearchMemory(p,s.round);
+ npcChooseFreshArea(s,k,p,now);
+}
+function npcClaimNearbyVisibleChair(s,k,p,now){
+ if(s.phase!=='search'||!p.alive||p.sitting||p.carrying||!p.departureDone)return false;
+ const nearby=Object.entries(s.chairs||{}).filter(([n,c])=>npcChairUsable(s,k,p,n)&&Math.hypot(c.x-p.x,c.z-p.z)<=30&&Math.abs((c.y||0)-(p.y||0))<2.2);
+ if(!nearby.length)return false;
+ nearby.sort((a,b)=>Math.hypot(a[1].x-p.x,a[1].z-p.z)-Math.hypot(b[1].x-p.x,b[1].z-p.z));
+ const [number,chair]=nearby[0];
+ // Preserve the actual walk to the chair; sit only when physically close.
+ if(p.targetChair&&npcChairUsable(s,k,p,p.targetChair)&&Math.hypot(s.chairs[p.targetChair].x-p.x,s.chairs[p.targetChair].z-p.z)<=30)return true;
+ if(String(p.targetChair)!==String(number)){
+  for(const [other,v] of Object.entries(s.players||{})){
+   if(other===k||!v.npc||!v.alive||v.sitting||v.npcFixedAssignment?.round!==s.round)continue;
+   if(String(v.npcFixedAssignment.chair)===String(number))npcRandomReassignment(s,other,v,now);
+  }
+  p.npcFixedAssignment=null;p.npcSpotSearch=null;p.targetChair=number;
+  p.goal=npcChairGoal(s,k,p,number);p.waypoint=null;p.decisionAt=now;
+  npcNavigation.delete(room+':'+k);
+ }
+ return true;
+}
+// Abandon a specifically assigned/remembered chair when another player occupies it
+// and this NPC comes within 60m of that chair. Do not treat random-area search
+// centers as chair assignments.
+function npcAbandonOccupiedDestination(s,k,p,now){
+ if(s.phase!=='search'||!p.alive||p.sitting)return false;
+ const a=p.npcFixedAssignment;
+ const number=p.targetChair || (a?.round===s.round?a.chair:null);
+ if(number==null||number==='')return false;
+ const c=s.chairs?.[number];
+ if(!c||Math.hypot(c.x-p.x,c.z-p.z)>60)return false;
+ const occupied=!!(c.occupied&&c.occupied!==k)||Object.entries(s.players||{}).some(([other,v])=>other!==k&&String(v.sitting)===String(number));
+ if(!occupied)return false;
+ // A non-team player taking a team-assigned chair invalidates that pin for
+ // the whole team, and makes the chair a priority erase candidate.
+ if(p.team&&p.team!=='ガヤ'){
+  const occupants=Object.entries(s.players||{}).filter(([other,v])=>other!==k&&(c.occupied===other||String(v.sitting)===String(number)));
+  if(occupants.some(([other,v])=>v.team!==p.team))npcTeamLostChair(s,p.team,number);
+ }
+ // This chair must not immediately be reselected from team knowledge.
+ p.npcAvoidChairs??={};p.npcAvoidChairs[number]=now+600000;
+ npcClearSearchTarget(k,p);p.npcFixedAssignment=null;
+ p.npcSpotDecisionAt=0;
+ // Reconcile memories first; teammates must not select an occupied chair,
+ // a chair already assigned to another living teammate, or the old chair.
+ if(p.team&&p.team!=='ガヤ'){
+  npcReconcileTeamKnowledge(s);
+  const claimed=new Set(Object.entries(s.players||{}).filter(([other,v])=>other!==k&&v.npc&&v.alive&&v.team===p.team&&!v.sitting).flatMap(([other,v])=>[v.targetChair,v.npcFixedAssignment?.chair].filter(n=>n!=null).map(String)));
+  const options=Object.entries(p.memory||{}).filter(([n])=>!claimed.has(String(n))&&npcChairUsable(s,k,p,n));
+  options.sort((a,b)=>Math.hypot(s.chairs[a[0]].x-p.x,s.chairs[a[0]].z-p.z)-Math.hypot(s.chairs[b[0]].x-p.x,s.chairs[b[0]].z-p.z));
+  if(options.length){
+   const n=options[0][0],chair=s.chairs[n];
+   const spot=chair.hiddenAt?hidingSpots.find(v=>v.id===chair.hiddenAt):null;
+   const center={x:spot?.x??chair.x,z:spot?.z??chair.z};
+   if(chair.hiddenAt){
+    p.npcFixedAssignment={round:s.round,chair:n,initiallyVisible:false,x:center.x,z:center.z,centerX:center.x,centerZ:center.z,arrived:false};
+    p.goal={...center};
+   }else{p.npcFixedAssignment={round:s.round,chair:n,initiallyVisible:true,x:chair.x,z:chair.z,centerX:chair.x,centerZ:chair.z,arrived:false};p.goal=npcChairGoal(s,k,p,n);}
+   return true;
+  }
+ }
+ if(!npcChooseFreshArea(s,k,p,now))p.npcSpotDecisionAt=now+3000;
+ return true;
+}
+function npcFollowFirstAssignment(s,k,p,now){
+ const a=p.npcFixedAssignment;if(!a||a.round!==s.round)return false;
+ npcEnsureRoundSearchMemory(p,s.round);
+ // Exact object memory takes precedence over radius-based area exploration.
+ if(a.exactSpotId){
+  const spot=hidingSpots.find(v=>v.id===a.exactSpotId);
+  const chair=s.chairs?.[a.chair];
+  if(!spot||!chair||chair.removed||chair.carrier||chair.hiddenAt!==spot.id){
+   // The object no longer contains this chair: discard stale location and explore.
+   if(p.memory?.[a.chair]?.hiddenAt===a.exactSpotId)delete p.memory[a.chair];
+   p.npcFixedAssignment=null;p.npcSpotSearch=null;p.goal=null;
+   npcChooseFreshArea(s,k,p,now);return true;
+  }
+  if(!p.npcSpotSearch||p.npcSpotSearch.spotId!==spot.id){
+   const approach=npcSpotApproachGoal(s,p,spot);
+   p.npcSpotSearch={spotId:spot.id,stage:'approach',until:0,startedAt:now,progressAt:now,anchorX:p.x,anchorZ:p.z,exactChair:String(a.chair)};
+   p.goal=approach||{x:spot.x,z:spot.z};
+  }
+  npcUpdateSpot(s,k,p,now);
+  if(!p.npcSpotSearch){
+   // Exact inspection completed; let normal chair acquisition take over.
+   p.npcFixedAssignment=null;p.npcSpotDecisionAt=0;
+  }
+  return true;
+ }
+ if(a.pendingArrival){
+  const c=s.chairs?.[a.chair];
+  if(c){
+   const center={x:a.centerX,z:a.centerZ};
+   for(let i=0;i<96;i++){
+    const angle=(i+Math.floor(now/3000)*13)*2.399963229728653;
+    const r=29.5*Math.sqrt((i+.5)/96);
+    const q={x:center.x+Math.cos(angle)*r,z:center.z+Math.sin(angle)*r};
+    if(npcOutdoorDestination(q.x,q.z,3)&&!npcWorldBlocked(s,q.x,q.z,1.1)){
+     a.x=q.x;a.z=q.z;a.pendingArrival=false;p.goal={...q};npcPreloadAssignedRoute(s,k,p);break;
+    }
+   }
+  }
+  if(a.pendingArrival)return true;
+ }
+ const center={x:a.centerX,z:a.centerZ};
+ if(!a.arrived){
+  p.targetChair=null;
+  if(!p.goal||Math.hypot(p.goal.x-a.x,p.goal.z-a.z)>1)p.goal={x:a.x,z:a.z};
+  if(Math.hypot(p.x-a.x,p.z-a.z)>(a.initiallyVisible?3.4:4))return true;
+  a.arrived=true;p.goal=null;p.waypoint=null;npcNavigation.delete(room+':'+k);
+ }
+ // Only chairs actually found in this area may be used. A chair found earlier by
+ // another NPC or a human does not terminate local searching.
+ if(p.targetChair){
+  const c=s.chairs?.[p.targetChair];
+  if(c&&!c.hiddenAt&&npcChairUsable(s,k,p,p.targetChair)&&Math.hypot(c.x-center.x,c.z-center.z)<=30){
+   p.goal=npcChairGoal(s,k,p,p.targetChair);return true;
+  }
+  p.targetChair=null;p.goal=null;p.waypoint=null;
+ }
+ if(p.npcSpotSearch){npcUpdateSpot(s,k,p,now);return true;}
+ const visible=Object.entries(s.chairs||{}).filter(([n,c])=>npcChairUsable(s,k,p,n)&&Math.hypot(c.x-center.x,c.z-center.z)<=30&&Math.hypot(c.x-p.x,c.z-p.z)<=18);
+ if(visible.length){visible.sort((a,b)=>Math.hypot(a[1].x-p.x,a[1].z-p.z)-Math.hypot(b[1].x-p.x,b[1].z-p.z));p.targetChair=visible[0][0];p.goal=npcChairGoal(s,k,p,p.targetChair);return true;}
+ if((p.npcSpotDecisionAt||0)<=now && (!p.goal || Math.hypot(p.x-p.goal.x,p.z-p.goal.z)<3 || p.npcBlockedFrames>5)){
+  let candidates=hidingSpots.filter(spot=>npcOutdoorDestination(spot.x,spot.z,2)&&Math.hypot(spot.x-center.x,spot.z-center.z)<=30&&!p.npcSearchedSpots?.[spot.id]&&!npcSpotBusy(s,k,spot));
+  while(candidates.length){const i=Math.floor(Math.random()*candidates.length),spot=candidates.splice(i,1)[0],goal=npcSpotApproachGoal(s,p,spot);
+   if(!goal)continue;
+   p.npcSpotSearch={spotId:spot.id,stage:'approach',until:0,startedAt:now,progressAt:now,anchorX:p.x,anchorZ:p.z};p.goal=goal;p.npcSpotDecisionAt=now+1200;return true;
+  }
+  // Area exhausted: remember it and relocate to a different unsearched area.
+  if(!p.npcVisitedAreas.some(v=>Math.hypot(v.x-center.x,v.z-center.z)<8))p.npcVisitedAreas.push(center);
+  if(!npcChooseFreshArea(s,k,p,now)){p.npcSpotDecisionAt=now+3000;p.goal=null;}
+
+ }
+ return true;
 }
 // NPCs try to collect fallen costumes. Each NPC/item encounter gets one 1-in-3 roll.
 function npcTryCostume(s,k,p){
@@ -2597,95 +3060,327 @@ function npcAdvanceSearch(s,job,limit=256){
  }
  if(!job.heap.length||job.visited>=16000){job.done=true;job.path=[];job.heap=[];job.nodes.clear();}
 }
+// Preload an obstacle-safe shortest A* route to each NPC's own assigned goal.
+// The initial building exit remains a separate mandatory transit segment.
+function npcPreloadAssignedRoute(s,k,p){
+ const a=p.npcFixedAssignment;
+ if(!a||!p.goal)return;
+ const goal={x:a.x,z:a.z};
+ const b=buildingSites[3];
+ const doorFront=b.z+b.d/2;
+ const lane=((npcDepartureSlot(k)%3)-1)*1.45;
+ const start=insideBlackBuilding(p.x,p.z)?{x:b.x+lane,z:doorFront+11}:{x:p.x,z:p.z};
+ p.npcPreloadedRoute={round:s.round,goal,from:start,path:null,job:null};
+ if(npcStaticClearPath(s,start.x,start.z,goal.x,goal.z,.78))p.npcPreloadedRoute.path=[goal];
+ else p.npcPreloadedRoute.job=npcCreateSearch(s,start,goal);
+}
+function npcAdvancePreloadedRoute(s,p){
+ const r=p.npcPreloadedRoute;
+ if(!r||r.round!==s.round||!r.job)return;
+ npcAdvanceSearch(s,r.job,1024);
+ if(r.job.done){r.path=r.job.path?.length?r.job.path:null;r.job=null;}
+}
+// Plan the complete outdoor routes during the seating countdown, before
+// any NPC is permitted to step through the entrance. Do not store A* jobs
+// in Firebase: these are local host-only caches.
+function npcPrepareNextRoundTargets(s,now){
+ // Team memory becomes authoritative as soon as the return phase ends.
+ npcReconcileTeamKnowledge(s);
+ const next=(s.round||0)+1;
+ s.npcPreplannedRound=next;
+ for(const [k,p] of Object.entries(s.players||{})){
+  if(!p.npc)continue;
+  p.npcPreplannedNoMemory=!Object.keys(p.memory||{}).some(n=>{const c=s.chairs?.[n];return c&&!c.removed&&!c.carrier&&!c.occupied&&!Object.values(s.players||{}).some(v=>Number(v.sitting)===Number(n));});
+  p.npcFixedAssignment=null;p.npcPreloadedRoute=null;p.npcSpotSearch=null;
+  p.npcSearchedSpots={};p.npcSearchMemoryRound=next;
+ }
+ // Temporarily use next round for assignment and route precomputation.
+ const current=s.round,oldPhase=s.phase;
+ s.round=next;s.phase='sitIntro';
+ s.npcFirstAssignmentsRound=null;
+ npcEnsureGrid(s);npcNavDeadline=performance.now()+65;npcNavNodesLeft=35000;
+ npcAssignFirstRound(s,now);
+ s.round=current;s.phase=oldPhase;
+}
+function npcPrepareDepartureRoutes(s,now){
+ npcEnsureGrid(s);
+ npcNavDeadline=performance.now()+65;
+ npcNavNodesLeft=35000;
+ npcAssignFirstRound(s,now);
+ for(const [k,p] of Object.entries(s.players||{})){
+  if(!p.npc||!p.alive||p.sitting)continue;
+  // Random-area assignments must be preloaded as well as chair assignments.
+  if(p.goal&&!p.npcFixedAssignment){
+   const g=p.goal,r=p.npcPreloadedRoute;
+   if(!r||r.round!==s.round||Math.hypot(r.goal.x-g.x,r.goal.z-g.z)>.75){
+    const b=buildingSites[3],start={x:b.x+((npcDepartureSlot(k)%3)-1)*1.45,z:b.z+b.d/2+11};
+    p.npcPreloadedRoute={round:s.round,goal:{...g},from:start,path:null,job:null};
+    if(npcStaticClearPath(s,start.x,start.z,g.x,g.z,.78))p.npcPreloadedRoute.path=[{...g}];
+    else p.npcPreloadedRoute.job=npcCreateSearch(s,start,g);
+   }
+  }
+  npcAdvancePreloadedRoute(s,p);
+ }
+}
 function npcReturnGoal(k){const b=buildingSites[3],n=Number(String(k).replace(/\D/g,''))||0;return {x:b.x+((n%5)-2)*7,z:b.z+3+(Math.floor(n/5)%4)*4.2};}
 function npcReturning(s){return ['return','voteIntro','vote','results','erase','eraseReveal'].includes(s.phase)}
 function npcDepartureSlot(k){let n=0;for(const ch of String(k))n=(n*31+ch.charCodeAt(0))%997;return n%16;}
 function npcGoalReachable(s,k,p,goal){
  return npcStaticClearPath(s,p.x,p.z,goal.x,goal.z);
 }
-// Precompute the outdoor path while the NPC is still walking to the exit.
-// This cache is host-local; only the host makes NPC decisions.
-const npcExitPrefetch=new Map();
-function npcPrefetchOutdoor(s,k,p,goal,spread,now){
- const key=room+':'+k,old=npcExitPrefetch.get(key);
- if(!old||Math.hypot(old.goal.x-goal.x,old.goal.z-goal.z)>.75||Math.hypot(old.start.x-spread.x,old.start.z-spread.z)>1){
-  const origin={x:spread.x,z:spread.z};
-  const direct=npcStaticClearPath(s,origin.x,origin.z,goal.x,goal.z,.78);
-  const job=direct?null:npcCreateSearch(s,origin,goal);
-  npcExitPrefetch.set(key,{goal:{...goal},start:origin,path:direct?[{...goal}]:[],job,ready:direct,retryAt:0});
+function npcDoorTransitTarget(s,k,p,now){
+ // Strict 3-stage portal: reach a safe staging plane, align with the opening,
+ // then cross straight. Never start a turn on the threshold.
+ const outbound=s.phase==='search'&&p.departureDone&&!!p.goal;
+ const inbound=npcReturning(s)&&!!p.goal&&!p.carrying&&!p.sitting&&!p.npcSpotHide&&!p.npcReturnChairGoal;
+ if(!outbound&&!inbound){p.npcExitPending=false;p.npcExitStage=null;return null;}
+ const b=buildingSites[3],line=b.z+b.d/2,direction=outbound?1:-1;
+ const token=String(s.round)+':'+(outbound?'out':'in');
+ if(p.npcDoorFinishedToken===token){
+  if(inbound&&!insideBlackBuilding(p.x,p.z))p.npcDoorFinishedToken=null;
+  else return null;
  }
- const cache=npcExitPrefetch.get(key);
- if(cache.job){
-  npcAdvanceSearch(s,cache.job);
-  if(cache.job.done){cache.path=cache.job.path||[];cache.ready=cache.path.length>0;cache.job=null;cache.retryAt=now+1500;}
- }else if(!cache.ready&&now>=cache.retryAt){
-  cache.job=npcCreateSearch(s,cache.start,cache.goal);cache.retryAt=now+1500;
+ // For departure, a character may have been pushed just outside the wall
+ // while still in the doorway. Do not hand off to normal navigation early.
+ const nearPortal=Math.abs(p.x-b.x)<(largeBuildings[3]?.doorW||13)/2+3&&Math.abs(p.z-line)<11;
+ if(!p.npcExitPending){
+  if(outbound&&!insideBlackBuilding(p.x,p.z)&&!nearPortal){p.npcDoorFinishedToken=token;return null;}
+  if(inbound&&insideBlackBuilding(p.x,p.z)&&p.z<=line-10){p.npcDoorFinishedToken=token;return null;}
+  p.npcExitPending=true;p.npcExitStage='approach';p.npcDoorSince=now;
+  p.npcDoorDirection=direction;p.npcDoorToken=token;p.npcReturnCornerGate=null;p.npcReturnCornerCleared=false;
+  // The actual door opening is 13m wide. Keep every NPC in its middle 3m.
+  p.npcDoorLane=b.x+((npcDepartureSlot(k)%3)-1)*1.1;
+  p.npcDoorBlockedAt=0;
  }
- return cache;
+ if(p.npcDoorToken!==token){p.npcExitPending=false;return npcDoorTransitTarget(s,k,p,now);}
+ if((p.z-line)*direction>=10&&(outbound||insideBlackBuilding(p.x,p.z)&&Math.abs(p.x-b.x)<(largeBuildings[3]?.doorW||13)/2)){
+  p.npcExitPending=false;p.npcExitStage=null;p.npcDoorFinishedToken=token;p.npcReturnCornerGate=null;p.npcReturnCornerCleared=false;
+  p.npcCrowdDetour=null;p.npcCornerPassage=null;return null;
+ }
+ const stagingZ=line-direction*8;
+ // RETURN: the seating position is NOT a navigation waypoint until the
+ // complete doorway crossing has finished. Approach from outside first.
+ if(p.npcExitStage==='approach'){
+  // On return, reaching the front staging plane is not enough: the actor
+  // must also be in front of the actual opening before moving toward the wall.
+  if(direction===-1){
+   // The four corner zones already permit phasing. Never send a returning
+   // NPC on an exterior corner detour: head to the entrance staging plane.
+   p.npcReturnCornerGate=null;
+   p.npcReturnCornerCleared=true;
+   // Move outward to a clear plane BEFORE any horizontal alignment.
+   if(p.z<stagingZ-.35)return {x:p.x,z:stagingZ,doorAxis:'z'};
+   if(Math.abs(p.z-stagingZ)>.35)return {x:p.x,z:stagingZ,doorAxis:'z'};
+  }else if(Math.abs(p.z-stagingZ)>.35)return {x:p.x,z:stagingZ,doorAxis:'z'};
+  p.npcExitStage='align';
+ }
+ if(p.npcExitStage==='align'){
+  // Never leave the staging plane to chase an indoor seat.
+  if(Math.abs(p.z-stagingZ)>.35){p.npcExitStage='approach';return {x:p.x,z:stagingZ,doorAxis:'z'};}
+  if(Math.abs(p.x-p.npcDoorLane)>.25)return {x:p.npcDoorLane,z:stagingZ,doorAxis:'x'};
+  p.npcExitStage='straight';
+ }
+ // The indoor seating goal becomes active only after crossing 10m past door.
+ return {x:p.npcDoorLane,z:line+direction*11,doorAxis:'z'};
+}
+// Four outside corner gates per building. Avoid wall midpoints as routing
+// waypoints; select a reachable corner on the shortest viable forward route.
+function npcFourCornerPassage(s,p,goal){
+ const obstacles=buildingSites.filter(b=>{
+  const hx=b.w/2+2.4,hz=b.d/2+2.4;
+  const outside=Math.abs(p.x-b.x)>hx||Math.abs(p.z-b.z)>hz;
+  return outside&&npcSegmentBoxBlocked(p.x,p.z,goal.x,goal.z,b.x,b.z,hx,hz,0);
+ });
+ if(!obstacles.length)return null;
+ let best=null,bestCost=Infinity;
+ for(const b of obstacles){
+  const pad=12; // wide corner clearance: avoid door frames and wall edges
+  const corners=[[-1,-1],[-1,1],[1,-1],[1,1]].map(([sx,sz])=>({x:b.x+sx*(b.w/2+pad),z:b.z+sz*(b.d/2+pad)}));
+  for(const q of corners){
+   if(!npcStaticClearPath(s,p.x,p.z,q.x,q.z,.78)||npcDetourIntoBuilding(p.x,p.z,q.x,q.z)||!npcStaticClearPath(s,q.x,q.z,goal.x,goal.z,.78))continue;
+   const travel=Math.hypot(q.x-p.x,q.z-p.z),remaining=Math.hypot(goal.x-q.x,goal.z-q.z);
+   const progress=(q.x-p.x)*(goal.x-p.x)+(q.z-p.z)*(goal.z-p.z);
+   if(progress<0)continue;
+   const cost=travel+remaining;
+   if(cost<bestCost){best=q;bestCost=cost;}
+  }
+ }
+ return best;
+}
+// Stable, deterministic detour around building corners and exterior stair footprints.
+// Route candidates are computed once per blocked goal; no moving radial targets.
+function npcFixedObstacleRoute(s,p,goal){
+ const boxes=[];
+ for(const b of buildingSites)boxes.push({x:b.x,z:b.z,hx:b.w/2+3.5,hz:b.d/2+3.5});
+ for(const st of stairways){
+  const xs=[st.minX,st.maxX,st.bridgeX0,st.bridgeX1,...st.flights.map(f=>f.x-f.width/2),...st.flights.map(f=>f.x+f.width/2)];
+  const zs=[st.turnZ0,st.turnZ1,st.bridgeZ0,st.bridgeZ1,...st.flights.map(f=>f.z0),...st.flights.map(f=>f.z1)];
+  boxes.push({x:(Math.min(...xs)+Math.max(...xs))/2,z:(Math.min(...zs)+Math.max(...zs))/2,hx:(Math.max(...xs)-Math.min(...xs))/2+2.5,hz:(Math.max(...zs)-Math.min(...zs))/2+2.5});
+ }
+ const candidates=[];
+ for(const b of boxes){
+  if(!npcSegmentBoxBlocked(p.x,p.z,goal.x,goal.z,b.x,b.z,b.hx,b.hz,0))continue;
+  for(const sx of [-1,1])for(const sz of [-1,1]){
+   const q={x:b.x+sx*(b.hx+4),z:b.z+sz*(b.hz+4)};
+   if(q.x*q.x+q.z*q.z<288*288&&!npcWorldBlocked(s,q.x,q.z,.85))candidates.push(q);
+  }
+ }
+ const nodes=[{x:p.x,z:p.z},...candidates,goal],end=nodes.length-1;
+ if(end===1||end>42)return null;
+ const costs=Array(nodes.length).fill(Infinity),prev=Array(nodes.length).fill(-1),used=new Set();costs[0]=0;
+ for(let step=0;step<nodes.length;step++){
+  let u=-1;for(let i=0;i<nodes.length;i++)if(!used.has(i)&&(u<0||costs[i]<costs[u]))u=i;
+  if(u<0||!Number.isFinite(costs[u]))break;
+  if(u===end)break;used.add(u);
+  for(let v=1;v<nodes.length;v++){
+   if(v===u||used.has(v))continue;
+   const a=nodes[u],b=nodes[v],d=Math.hypot(a.x-b.x,a.z-b.z);
+   if(d>430||!npcStaticClearPath(s,a.x,a.z,b.x,b.z,.78))continue;
+   const score=costs[u]+d;
+   if(score<costs[v]){costs[v]=score;prev[v]=u;}
+  }
+ }
+ if(!Number.isFinite(costs[end]))return null;
+ const path=[];for(let i=end;i>0;i=prev[i]){if(i<0)return null;path.push({...nodes[i]});}
+ path.reverse();return path;
+}
+// The front wall is not a shortcut from inside to outside. NPCs must leave
+// through the real door opening, even in a ghost/corner relief zone.
+function npcForbiddenFrontExit(x0,z0,x1,z1){
+ const b=buildingSites[3],line=b.z+b.d/2;
+ if(!(z0<line-.001&&z1>=line-.001))return false;
+ const t=(line-z0)/(z1-z0);
+ if(t<0||t>1)return false;
+ const crossX=x0+(x1-x0)*t;
+ return Math.abs(crossX-b.x)>(largeBuildings[3]?.doorW||13)/2-.85;
 }
 function npcNavigationTarget(s,k,p,now){
  let goal=p.goal;if(!goal)return null;
- // Start moving through the actual doorway before planning a long outdoor journey.
- // Keep this short route until the actor clears the open door leaves as well as the room.
- const b=buildingSites[3];
- if(s.phase==='search'&&p.departureDone&&!insideBlackBuilding(goal.x,goal.z)&&(p.npcExitPending||insideBlackBuilding(p.x,p.z))){
-  const front=b.z+b.d/2,index=Number(String(k).replace(/\D/g,''))||0;
-  if(!p.npcExitPending||!p.npcExitStage)p.npcExitStage=p.z>=front+2?'spread':'door';
-  if(p.npcExitStage==='door'&&p.z>=front+2&&Math.abs(p.x-b.x)<(largeBuildings[3]?.doorW||13)/2-1.2)p.npcExitStage='spread';
-  const spread={x:b.x+(index%5-2)*4.5,z:front+12+Math.floor(index/5)%4*3};
-  // Start A* before reaching the door, not after the exit pause.
-  const prefetched=npcPrefetchOutdoor(s,k,p,goal,spread,now);
-
-  // Use the real destination as soon as it is directly reachable. For longer
-  // plans, disperse outside the door before waiting for A-star, rather than
-  // stopping every NPC in the same narrow opening. Neither target follows a person.
-  const clear=p.npcExitStage==='spread'&&(npcStaticClearPath(s,p.x,p.z,goal.x,goal.z,.78)||Math.hypot(p.x-spread.x,p.z-spread.z)<1.5);
-  if(clear){
-   p.npcExitPending=false;
-   if(prefetched.ready&&prefetched.path.length){
-    const navKey=room+':'+k;
-    npcNavigation.set(navKey,{goal:{...goal},path:prefetched.path.map(q=>({...q})),cursor:0,job:null,retryAt:0,failures:0});
-   }
-   npcExitPrefetch.delete(room+':'+k);
-  }
-  else{p.npcExitPending=true;goal=p.npcExitStage==='door'?{x:b.x,z:front+4}:spread;}
- }else{p.npcExitPending=false;npcExitPrefetch.delete(room+':'+k);}
+ const transit=npcDoorTransitTarget(s,k,p,now);
+ if(transit)return transit;
+ // Straight-first navigation: when terrain between the NPC and its assigned
+ // goal is clear, go directly there. Nearby characters are handled by the
+ // movement step, never by stopping for a long-distance crowd/path query.
+ if(npcStaticClearPath(s,p.x,p.z,goal.x,goal.z,.78)){
+  npcNavigation.delete(room+':'+k);
+  return goal;
+ }
+ // Do not steer toward a single building corner as a persistent goal.
+ // Such a corner can become unreachable when NPCs block the last metres,
+ // leading to oscillation and repeated backtracking. Let the grid planner
+ // find a continuous route around the whole building instead.
+ p.npcCornerPassage=null;
+ p.npcCornerGoal=null;
+ // Static visibility alone is not enough: an NPC/chair can still block
+ // the line. Preserve the A* route instead of toggling between it and direct.
  const key=room+':'+k;let nav=npcNavigation.get(key);
  if(!nav||Math.hypot(nav.goal.x-goal.x,nav.goal.z-goal.z)>.75){
   const direct=npcStaticClearPath(s,p.x,p.z,goal.x,goal.z,.78);
-  nav={goal:{...goal},path:direct?[{...goal}]:[],cursor:0,job:null,retryAt:0,failures:0};npcNavigation.set(key,nav);
+  nav={goal:{...goal},path:direct?[{...goal}]:[],cursor:0,job:null,retryAt:0,failures:0};
+  const pre=p.npcPreloadedRoute;
+  if(!direct&&pre?.round===s.round&&pre.path?.length&&
+     Math.hypot(pre.goal.x-goal.x,pre.goal.z-goal.z)<.75&&
+     !insideBlackBuilding(p.x,p.z)&&
+     npcStaticClearPath(s,p.x,p.z,pre.path[0].x,pre.path[0].z,.78)){
+    nav.path=pre.path.map(q=>({...q}));
+  }
+  npcNavigation.set(key,nav);
+ }
+ if(!nav.path.length&&!nav.job){
+  const fixed=npcFixedObstacleRoute(s,p,goal);
+  if(fixed){nav.path=fixed;nav.cursor=0;nav.retryAt=0;}
  }
  if(!nav.path.length&&!nav.job&&now>=nav.retryAt)nav.job=npcCreateSearch(s,p,goal);
  if(nav.job){
   npcAdvanceSearch(s,nav.job);
   if(nav.job.done){
    nav.path=nav.job.path;nav.cursor=0;nav.job=null;
-   if(!nav.path.length){nav.failures++;nav.retryAt=now+Math.min(30000,2000*2**Math.min(nav.failures,4));}
+   if(!nav.path.length){nav.failures++;nav.retryAt=now+Math.min(2200,350*nav.failures);}
   }
  }
- if(!nav.path.length)return null;
- while(nav.cursor<nav.path.length-1&&Math.hypot(p.x-nav.path[nav.cursor].x,p.z-nav.path[nav.cursor].z)<.4)nav.cursor++;
+ if(!nav.path.length){
+  if(npcStaticClearPath(s,p.x,p.z,goal.x,goal.z,.78)){nav.path=[{...goal}];nav.cursor=0;nav.retryAt=0;}
+  else {
+   // Never invent a temporary radial waypoint at a building corner.
+   // Such points change every tick and cause circling / backtracking.
+   // Keep the assigned destination and wait for the actual route search.
+   return null;
+
+  }
+ }
+ // Monotonic path progress: once a waypoint is passed it is never selected
+ // again. Skip grid points already behind the direction of travel, provided
+ // the new segment is genuinely clear of both terrain and actors.
+ while(nav.cursor<nav.path.length-1&&Math.hypot(p.x-nav.path[nav.cursor].x,p.z-nav.path[nav.cursor].z)<2.4)nav.cursor++;
  let furthest=nav.cursor;
- for(let i=nav.cursor+1;i<Math.min(nav.path.length,nav.cursor+5);i++){
-  const q=nav.path[i];if(!npcStaticClearPath(s,p.x,p.z,q.x,q.z,.78))break;furthest=i;
+ for(let i=nav.cursor+1;i<Math.min(nav.path.length,nav.cursor+10);i++){
+  const q=nav.path[i];
+  if(!npcStaticClearPath(s,p.x,p.z,q.x,q.z,.78)||!npcMovementClear(s,k,p,q.x,q.z))continue;
+  furthest=i;
  }
- const target=nav.path[furthest];
+ // If a corner waypoint becomes blocked by a crowd, rebuild the route from
+ // the CURRENT position rather than circling the old corner indefinitely.
+ const candidate=nav.path[furthest];
+ if(!npcMovementClear(s,k,p,candidate.x,candidate.z)){
+  nav.blockedSince??=now;
+  if(now-nav.blockedSince>1600){
+   nav.path=[];nav.cursor=0;nav.job=npcCreateSearch(s,p,goal);
+   nav.blockedSince=0;nav.retryAt=now+400;
+  }
+  return null;
+ }
+ nav.blockedSince=0;
+ const target=candidate;
  const length=Math.hypot(target.x-p.x,target.z-p.z),t=length?Math.min(6,length)/length:0;
- if(!npcStaticClearPath(s,p.x,p.z,p.x+(target.x-p.x)*t,p.z+(target.z-p.z)*t,.78)){
-  nav.path=[];nav.job=null;nav.retryAt=now+250;return null;
+ if(!(p.npcGhostUntil>now)&&!npcNearDoorOrCorner(p)&&!npcStaticClearPath(s,p.x,p.z,p.x+(target.x-p.x)*t,p.z+(target.z-p.z)*t,.78)){
+  // Preserve the route until the replanner can produce a complete replacement.
+  nav.retryAt=now+350;return null;
  }
- nav.cursor=furthest;return target;
+ // Commit only when the next segment is actually traversable.
+ if(furthest>nav.cursor&&npcMovementClear(s,k,p,target.x,target.z))nav.cursor=furthest;
+ return target;
 }
 function npcSegmentDistance2(x,z,x0,z0,x1,z1){
  const dx=x1-x0,dz=z1-z0,d=dx*dx+dz*dz,t=d?Math.max(0,Math.min(1,((x-x0)*dx+(z-z0)*dz)/d)):0;
  return (x-x0-t*dx)**2+(z-z0-t*dz)**2;
 }
+// Local collision relief around doorway and four outside building corners.
+// Only NPC movement ignores walls/other actors here; assigned goals and
+// door-transit stage targets remain unchanged.
+// Central entrance corridor: permit NPC passage through walls and actors
+// across the whole doorway approach, not just at the four corner gates.
+function npcWithinEntrance20m(x,z){
+ const b=buildingSites[3];if(!b)return false;
+ return Math.hypot(x-b.x,z-(b.z+b.d/2))<=20;
+}
+function npcInEntranceCorridor(x,z){
+ const b=buildingSites[3];if(!b)return false;
+ const line=b.z+b.d/2;
+ const halfWidth=(largeBuildings[3]?.doorW||13)/2+4;
+ return Math.abs(x-b.x)<=halfWidth&&Math.abs(z-line)<=20;
+}
+function npcNearDoorOrCorner(p,x=p.x,z=p.z){
+ if(npcInEntranceCorridor(x,z)||npcInEntranceCorridor(p.x,p.z))return true;
+ for(const b of buildingSites){
+  const corners=[[-1,-1],[-1,1],[1,-1],[1,1]];
+  for(const [sx,sz] of corners){
+   const cx=b.x+sx*(b.w/2+12),cz=b.z+sz*(b.d/2+12);
+   if(Math.hypot(x-cx,z-cz)<9||Math.hypot(p.x-cx,p.z-cz)<9)return true;
+  }
+ }
+ const b=buildingSites[3],line=b.z+b.d/2;
+ return (Math.abs(x-b.x)<(largeBuildings[3]?.doorW||13)/2+9&&Math.abs(z-line)<15)||
+        (Math.abs(p.x-b.x)<(largeBuildings[3]?.doorW||13)/2+9&&Math.abs(p.z-line)<15);
+}
 function npcMovementClear(s,k,p,x,z){
+ if(npcForbiddenFrontExit(p.x,p.z,x,z))return false;
+ if((p.npcGhostUntil||0)>roomNow()||npcNearDoorOrCorner(p,x,z))return true;
  if(!npcStaticClearPath(s,p.x,p.z,x,z,.78))return false;
  const actors=npcActorLists(s);
  if(characterMovementBlocked(s,k,p.x,p.z,x,z,p.y||0))return false;
  for(const [chairId,c] of actors.chairs){
   if(c.removed||c.hiddenAt||c.carrier||Math.abs((c.y||0)-(p.y||0))>2.2)continue;
+  if(Object.values(s.players||{}).some(v=>Number(v.sitting)===Number(chairId)))continue;
   const radius=String(s.players[k]?.targetChair)===chairId ? .9 : 1.8;
   const ox=p.x-c.x,oz=p.z-c.z,before=ox*ox+oz*oz;
   if(before<radius*radius&&(ox*(x-p.x)+oz*(z-p.z)>0||before<1e-8))continue;
@@ -2693,26 +3388,51 @@ function npcMovementClear(s,k,p,x,z){
  }
  return true;
 }
+// Outside a building, never choose an avoidance step that enters its
+// exterior safety envelope or moves toward the building instead of around it.
+function npcDetourIntoBuilding(x0,z0,x1,z1){
+ if(npcForbiddenFrontExit(x0,z0,x1,z1))return true;
+ // The middle of the entrance is a permitted NPC passage, including approach.
+ if(npcInEntranceCorridor(x0,z0)&&npcInEntranceCorridor(x1,z1))return false;
+ for(const b of buildingSites){
+  const hx=b.w/2+2.4,hz=b.d/2+2.4;
+  const inside=(x,z)=>Math.abs(x-b.x)<hx&&Math.abs(z-b.z)<hz;
+  if(inside(x0,z0))continue; // Interior doorway transit is handled separately.
+  if(npcSegmentBoxBlocked(x0,z0,x1,z1,b.x,b.z,hx,hz,0))return true;
+  // Reject a detour pointing at the building when already close to its wall.
+  const cx=Math.max(b.x-hx,Math.min(b.x+hx,x0));
+  const cz=Math.max(b.z-hz,Math.min(b.z+hz,z0));
+  const dx=cx-x0,dz=cz-z0,dist=Math.hypot(dx,dz);
+  if(dist<10&&dist>.01){
+   const stepX=x1-x0,stepZ=z1-z0,stepLen=Math.hypot(stepX,stepZ);
+   if(stepLen>.01&&(stepX*dx+stepZ*dz)/(stepLen*dist)>.35)return true;
+  }
+ }
+ return false;
+}
 function npcMove(s,k,p,target,speed,dt){
  let distance=speed*dt,moved=0;
  const side=p.npcPassSide||1;
- const turns=[0,side*.4,side*.8,side*1.2,side*1.45,-side*.4,-side*.8,-side*1.2,-side*1.45];
+ const turns=[0,side*.35,-side*.35,side*.7,-side*.7,side*1.05,-side*1.05,side*1.4,-side*1.4];
  while(distance>.01){
   const dx=target.x-p.x,dz=target.z-p.z,d=Math.hypot(dx,dz);if(d<.15)break;
   const step=Math.min(.45,distance,d),heading=Math.atan2(dx,dz);
   let best=null,bestScore=-Infinity;
   for(const turn of turns){
    const a=heading+turn,x=p.x+Math.sin(a)*step,z=p.z+Math.cos(a)*step;
-   if(d-Math.hypot(target.x-x,target.z-z)<=.001||!npcMovementClear(s,k,p,x,z))continue;
+   if((!p.npcRoofTrip||p.npcRoofTrip.active)&&npcDetourIntoBuilding(p.x,p.z,x,z)||!npcMovementClear(s,k,p,x,z))continue;
+   const progress=d-Math.hypot(target.x-x,target.z-z);
+   if(progress<-.02)continue;
    // Prefer progress, then a consistent right-hand passing side. A small
    // clearance probe starts going around a person before physical contact.
    const aheadX=x+Math.sin(a)*.65,aheadZ=z+Math.cos(a)*.65;
    const clear=npcMovementClear(s,k,{...p,x,z},aheadX,aheadZ);
-   const score=(d-Math.hypot(target.x-x,target.z-z))/step+(clear ? .45 : 0)-Math.abs(turn)*.04+(Math.sign(turn)===side ? .12 : 0);
+   const score=progress/step+(clear ? .45 : 0)-Math.abs(turn)*.04+(Math.sign(turn)===side ? .12 : 0);
    if(score>bestScore){bestScore=score;best={x,z,a,turn};}
    if(turn===0&&clear)break;
   }
-  if(!best)break;
+  if(!best){p.npcBlockedFrames=(p.npcBlockedFrames||0)+1;break;}
+  p.npcBlockedFrames=0;
   p.x=best.x;p.z=best.z;p.rot=best.a;if(best.turn)p.npcPassSide=Math.sign(best.turn);distance-=step;moved+=step;
  }
  return moved;
@@ -2727,7 +3447,7 @@ function recordSpotSearch(s,k,spot,now){
   if(!p.npc||p.online===false)continue;
   if(other!==k&&p.npcSpotSearch?.spotId===spot.id&&p.npcSpotSearch.stage==='approach'){p.npcSearchOrigin={x:p.x,z:p.z};npcClearSearchTarget(other,p);p.npcSearchedSpots??={};p.npcSearchedSpots[spot.id]=true;}
   if(other!==k&&(Math.hypot(p.x-actor.x,p.z-actor.z)>NPC_SEARCH_OBSERVE_RADIUS||Math.abs((p.y||0)-(actor.y||0))>2))continue;
-  p.npcSearchedSpots??={};p.npcSearchedSpots[spot.id]=true;
+  npcEnsureRoundSearchMemory(p,s.round);p.npcSearchedSpots[spot.id]=true;
  }
 }
 function npcDropCarriedChair(s,k,p){
@@ -2737,40 +3457,47 @@ function npcDropCarriedChair(s,k,p){
 }
 function npcUpdateReturnHide(s,k,p,now){
  // Retry while returning; only a successful hide consumes this round's attempt.
- if(s.phase!=='return'){
-  if(p.npcSpotHide||p.carrying)npcDropCarriedChair(s,k,p);
-  return false;
- }
+ if(!npcReturning(s))return false; // Continue a pending hide after the return timer expires; never drop the chair merely because the phase changed.
  if(!p.npcSpotHide){
-  if(p.npcHideRound===s.round||p.npcHideRetryAt>now)return false;p.npcHideRetryAt=now+1800;
-  const nearby=Object.entries(s.chairs||{}).filter(([n,c])=>!c.removed&&!c.hiddenAt&&!c.carrier&&!c.occupied&&!Object.values(s.players||{}).some(v=>Number(v.sitting)===Number(n))&&Math.abs((c.y||0)-(p.y||0))<2&&Math.hypot(c.x-p.x,c.z-p.z)<3).sort((a,b)=>Math.hypot(a[1].x-p.x,a[1].z-p.z)-Math.hypot(b[1].x-p.x,b[1].z-p.z))[0];
+  if(p.npcHideRound===s.round&&!p.carrying&&!p.sitting)return false;
+  if(p.npcHideRetryAt>now)return !!(p.carrying||p.sitting||p.npcReturnChairGoal);p.npcHideRetryAt=now+1800;
+  // An empty-handed NPC must first acquire a free, visible chair before returning.
+  const nearby=Object.entries(s.chairs||{}).filter(([n,c])=>!c.removed&&!c.hiddenAt&&!c.carrier&&!c.occupied&&!Object.values(s.players||{}).some(v=>Number(v.sitting)===Number(n))&&Math.abs((c.y||0)-(p.y||0))<2&&npcWorldBlocked(s,c.x,c.z,.78)===false).sort((a,b)=>Math.hypot(a[1].x-p.x,a[1].z-p.z)-Math.hypot(b[1].x-p.x,b[1].z-p.z))[0];
   const number=Number(p.carrying||p.sitting||nearby?.[0]),c=s.chairs?.[number];
-  if(!c||c.removed||c.hiddenAt||c.carrier&&c.carrier!==k||c.occupied&&c.occupied!==k)return false;
-  const home=npcReturnGoal(k),speed=Math.max(1,(p.run||9)*.5),remaining=(s.deadline-now)/1000;
+  if(!c||c.removed||c.hiddenAt||c.carrier&&c.carrier!==k||c.occupied&&c.occupied!==k){
+   // No free chair exists: returning without one is allowed.
+   p.npcReturnChairGoal=null;return !!p.carrying;
+  }
+  if(!p.carrying&&!p.sitting&&Math.hypot(c.x-p.x,c.z-p.z)>2.6){
+   p.npcReturnChairGoal=number;p.goal={x:c.x,z:c.z};p.npcHideRetryAt=now+300;return true;
+  }
+  p.npcReturnChairGoal=null;
+  const home=npcReturnGoal(k),speed=6.5,remaining=(s.deadline-now)/1000;
   let best=null,bestCost=Infinity;
   for(const spot of hidingSpots){
    if(Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===spot.id)||npcSpotBusy(s,k,spot))continue;
-   const distance=Math.hypot(p.x-spot.x,p.z-spot.z);if(distance>45)continue;
+   const distance=Math.hypot(p.x-spot.x,p.z-spot.z);// Hiding is mandatory for NPCs carrying a chair; do not discard distant hiding places.
    const homeDistance=Math.hypot(spot.x-home.x,spot.z-home.z),direct=Math.hypot(p.x-home.x,p.z-home.z);
-   if(distance+homeDistance-direct>40||distance/speed+homeDistance/(p.run||9)+8>remaining)continue;
+   // Keep the hiding target even when the remaining return timer is short.
    const goal=npcSpotApproachGoal(s,p,spot);if(!goal)continue;
-   const cost=distance+homeDistance*.25;if(cost>=bestCost)continue;
+   const cost=distance;if(cost>=bestCost)continue;
    best={spotId:spot.id,chair:number,stage:'approach',until:0,startedAt:now,progressAt:now,anchorX:p.x,anchorZ:p.z};bestCost=cost;
   }
-  if(!best){if(p.carrying)npcDropCarriedChair(s,k,p);return false;}
+  if(!best){p.npcHideRetryAt=now+1000;return !!(p.carrying||p.sitting||p.npcReturnChairGoal);}
   if(c.occupied===k)c.occupied=null;p.sitting=0;p.carrying=number;c.carrier=k;
   p.npcSpotHide=best;p.targetChair=null;p.goal=null;p.returned=false;
+  p.npcExitPending=false;p.npcExitStage=null;p.npcDoorToken=null;p.npcCrowdDetour=null;
  }
  const job=p.npcSpotHide,spot=hidingSpots.find(q=>q.id===job.spotId),c=s.chairs?.[job.chair],home=npcReturnGoal(k);
- if(!spot||!c||c.removed||c.carrier!==k||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===job.spotId)||npcSpotBusy(s,k,spot)||s.deadline-now<(job.stage==='hiding'?Math.max(0,job.until-now):5000)+Math.hypot(p.x-home.x,p.z-home.z)/(p.run||9)*1000||job.stage==='approach'&&npcSpotStalled(p,job,now)){
-  npcDropCarriedChair(s,k,p);p.goal=null;return false;
+ if(!spot||!c||c.removed||c.carrier!==k||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===job.spotId)||npcSpotBusy(s,k,spot)||job.stage==='approach'&&npcSpotStalled(p,job,now)){
+  p.npcSpotHide=null;p.goal=null;p.npcHideRetryAt=now+1000;return !!p.carrying;
  }
  if(job.stage==='approach'){
   if(Math.hypot(p.x-spot.x,p.z-spot.z)<=6.4){job.stage='hiding';job.until=now+5000;p.goal=null;}
-  else{p.goal??=npcSpotApproachGoal(s,p,spot);if(!p.goal){npcDropCarriedChair(s,k,p);return false;}}
+  else{if(!p.goal||Math.hypot(p.goal.x-spot.x,p.goal.z-spot.z)>10)p.goal=npcSpotApproachGoal(s,p,spot);if(!p.goal){p.npcSpotHide=null;p.npcHideRetryAt=now+1000;return true;}}
  }else if(now>=job.until){
   Object.assign(c,{x:spot.x,y:0,z:spot.z,hiddenAt:spot.id,carrier:null,occupied:null});
-  p.carrying=0;p.npcSpotHide=null;p.npcHideRound=s.round;p.goal=null;return false;
+  p.carrying=0;p.npcSpotHide=null;p.npcHideRound=s.round;p.goal=null;p.memory??={};p.memory[job.chair]={x:spot.x,z:spot.z,hiddenAt:spot.id,source:'self',confidence:4,updatedAt:now};npcShareTeamChairMemory(s,k,job.chair);return false;
  }
  return true;
 }
@@ -2778,7 +3505,7 @@ function npcSpotBusy(s,k,spot){
  for(const [other,v] of Object.entries(s.players||{})){
   if(other===k)continue;
   if(v.online===false)continue;
-  if(v.npcSpotSearch?.spotId===spot.id&&v.npcSpotSearch.stage==='searching'||v.npcSpotHide?.spotId===spot.id)return true;
+  if(v.npcSpotSearch?.spotId===spot.id&&['approach','searching'].includes(v.npcSpotSearch.stage)||v.npcSpotHide?.spotId===spot.id)return true;
   // Another reservation blocks only its own spot, not every nearby bush.
   // A human visibly searching here also reserves the area.
   if(!v.npc&&v.online!==false&&s.humanSpotSearching?.[other]?.spotId===spot.id&&s.humanSpotSearching[other].until>roomNow())return true;
@@ -2788,7 +3515,7 @@ function npcSpotBusy(s,k,spot){
 function npcSpotApproachGoal(s,p,spot){
  let best=null,distance=Infinity;
  for(let i=0;i<16;i++){const a=i*Math.PI/8,q={x:spot.x+Math.cos(a)*6,z:spot.z+Math.sin(a)*6};
-  if(npcWorldBlocked(s,q.x,q.z,.78)||Object.values(s.players||{}).some(v=>v!==p&&v.online!==false&&Math.hypot(v.x-q.x,v.z-q.z)<1.8)||Object.values(s.chairs||{}).some(c=>!c.removed&&!c.hiddenAt&&!c.carrier&&Math.hypot(c.x-q.x,c.z-q.z)<2))continue;
+  if(!npcOutdoorDestination(q.x,q.z,2)||npcWorldBlocked(s,q.x,q.z,.78)||Object.values(s.players||{}).some(v=>v!==p&&v.online!==false&&Math.hypot(v.x-q.x,v.z-q.z)<1.8)||Object.values(s.chairs||{}).some(c=>!c.removed&&!c.hiddenAt&&!c.carrier&&Math.hypot(c.x-q.x,c.z-q.z)<2))continue;
   const d=Math.hypot(q.x-p.x,q.z-p.z);if(d<distance){distance=d;best=q;}
  }
  return best;
@@ -2801,7 +3528,7 @@ function npcSpotHasInvestigator(s,k,spot,now,since=0){
 }
 function npcChooseSpot(s,k,p,now){
  if(s.phase!=='search'||p.sitting||p.carrying||p.npcSpotSearch||p.targetChair)return;
- let candidates=hidingSpots.filter(spot=>!npcSpotBusy(s,k,spot)&&!p.npcSearchedSpots?.[spot.id]&&!(p.npcSpotRetry?.[spot.id]>now));
+ let candidates=hidingSpots.filter(spot=>npcOutdoorDestination(spot.x,spot.z,2)&&!npcSpotBusy(s,k,spot)&&!p.npcSearchedSpots?.[spot.id]&&!(p.npcSpotRetry?.[spot.id]>now));
  if(!candidates.length){p.npcSpotDecisionAt=now+1000;return;}
  // First intention samples the whole island. Later empty searches expand locally.
  if(p.npcSearchStartedRound===s.round){
@@ -2818,6 +3545,7 @@ function npcChooseSpot(s,k,p,now){
   const point=npcSpotApproachGoal(s,p,candidate);if(point){spot=candidate;approach=point;break;}
  }
  if(!spot){p.npcSpotDecisionAt=now+1000;return;}
+ npcEnsureRoundSearchMemory(p,s.round);
  p.npcSearchStartedRound=s.round;p.npcSpotDecisionAt=0;
  p.npcSpotSearch={spotId:spot.id,stage:'approach',until:0,startedAt:now,progressAt:now,anchorX:p.x,anchorZ:p.z};
  p.goal=approach;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;npcNavigation.delete(room+':'+k);
@@ -2832,10 +3560,11 @@ function npcUpdateSpot(s,k,p,now){
  const spot=hidingSpots.find(v=>v.id===job.spotId);
  if(!spot||s.phase!=='search'||p.sitting||p.carrying||p.npcSearchedSpots?.[job.spotId]){p.npcSpotSearch=null;p.goal=null;return false;}
  if(job.stage==='approach'&&npcSpotHasInvestigator(s,k,spot,now,job.startedAt)){
-  p.npcSearchedSpots??={};p.npcSearchedSpots[spot.id]=true;p.npcSearchOrigin={x:p.x,z:p.z};
+  npcEnsureRoundSearchMemory(p,s.round);p.npcSearchedSpots[spot.id]=true;p.npcSearchOrigin={x:p.x,z:p.z};
   npcClearSearchTarget(k,p);return false;
  }
  if(job.stage==='approach'){
+  if(npcSpotStalled(p,job,now)&&job.exactChair){const next=npcSpotApproachGoal(s,p,spot);job.progressAt=now;job.anchorX=p.x;job.anchorZ=p.z;if(next)p.goal=next;return true;}
   if(npcSpotStalled(p,job,now)){p.npcSpotRetry??={};p.npcSpotRetry[spot.id]=now+20000;p.npcSpotSearch=null;p.npcExploreAfterSearch=true;p.goal=null;p.decisionAt=0;return false;}
   if(!p.goal)p.goal=npcSpotApproachGoal(s,p,spot);
   if(Math.hypot(p.x-spot.x,p.z-spot.z)<6.4){job.stage='searching';job.until=now+5000;p.goal=null;p.waypoint=null;p.localBypass=null;}
@@ -2846,7 +3575,7 @@ function npcUpdateSpot(s,k,p,now){
  const found=Object.entries(s.chairs||{}).find(([_,c])=>!c.removed&&c.hiddenAt===spot.id);
  if(found){
   const [n,c]=found;const landing=accessibleCostumeDrop(p.x,p.z,spot);c.hiddenAt=null;c.x=landing.x;c.z=landing.z;
-  p.memory??={};p.memory[n]={x:c.x,z:c.z};
+  p.memory??={};p.memory[n]={x:c.x,y:c.y||0,z:c.z,source:'observed',confidence:4,updatedAt:now};npcShareTeamChairMemory(s,k,n);
  }else if(Math.random()<1/3&&accessoryCatalog.length){
   const chosen=accessoryCatalog[Math.floor(Math.random()*accessoryCatalog.length)];
   s.accessories??={};
@@ -2858,7 +3587,7 @@ function npcUpdateSpot(s,k,p,now){
 // Update decisions and local motion on the existing host tick; spread terrain work across ticks.
 function npcSimulate(s,dt,now){
  const beforeMotion=new Map(Object.entries(s.players||{}).filter(([k,p])=>p.npc).map(([k,p])=>[k,{x:p.x,y:p.y||0,z:p.z,rot:p.rot||0}]));
- if(typeof normalizeNPCNames==='function')normalizeNPCNames(s);
+ if(typeof normalizeNPCNames==='function')normalizeNPCNames(s);npcReconcileTeamKnowledge(s);npcEqualizeTeamCoins(s);
  // Reconcile seat claims before any movement, including legacy stale occupancy flags.
  for(const [n,c] of Object.entries(s.chairs||{})){
   const claims=Object.entries(s.players||{}).filter(([k,v])=>Number(v.sitting)===Number(n)&&!c.removed&&!c.carrier&&!c.hiddenAt);
@@ -2866,38 +3595,52 @@ function npcSimulate(s,dt,now){
   c.occupied=owner?owner[0]:null;
   for(const [k,v] of claims)if(k!==owner?.[0]){v.sitting=0;v.targetChair=null;v.goal=null;v.decisionAt=0;}
  }
- npcEnsureGrid(s);npcNavDeadline=performance.now()+5;npcNavNodesLeft=2048;
+ // Repair restored team chair ownership after authoritative seat reconciliation.
+ for(const [key,member] of Object.entries(s.players||{})){
+  if(member.npc&&member.sitting)npcTeamRestoreChairOnSeat(s,key,member.sitting);
+ }
+ npcEnsureGrid(s);npcNavDeadline=performance.now()+18;npcNavNodesLeft=9000;if(s.phase==='search')npcAssignFirstRound(s,now);
  if(npcNavRoom!==room){npcNavigation.clear();npcNavRoom=room;}
  npcActorState=s;npcActors=Object.entries(s.players);npcChairActors=Object.entries(s.chairs||{});
  const entries=npcActors.filter(([_,p])=>p.npc),offset=npcNavOrder++%Math.max(1,entries.length);
  const npcEntries=entries.slice(offset).concat(entries.slice(0,offset));
  const departureOrder=s.phase==='search'&&entries.some(([k,p])=>p.searchIntentRound!==s.round)?entries.slice().sort(([ak,a],[bk,b])=>b.z-a.z||Math.abs(a.x-buildingSites[3].x)-Math.abs(b.x-buildingSites[3].x)||ak.localeCompare(bk)):[];
  for(const [k,p] of npcEntries){
+ if(s.phase==='search')npcAdvancePreloadedRoute(s,p);
  p.z=screenSafeZ(p.x,p.z,p.y||0);
  if(s.phase==='search'&&p.npcSearchPolicyVersion!==1){
   p.npcSearchPolicyVersion=1;p.npcSpotDecisionAt=0;
   const legacy=s.chairs?.[p.targetChair];
-  if(!p.npcRoofTrip?.active&&legacy&&!p.memory?.[p.targetChair]&&Math.hypot(legacy.x-p.x,legacy.z-p.z)>30)npcClearSearchTarget(k,p);
-  if(!p.targetChair&&!p.npcSpotSearch)p.goal=null;
+  if(!p.npcRoofTrip&&legacy&&!p.memory?.[p.targetChair]&&Math.hypot(legacy.x-p.x,legacy.z-p.z)>30)npcClearSearchTarget(k,p);
+  if(!p.targetChair&&!p.npcSpotSearch&&!p.npcFixedAssignment)p.goal=null;
  }
  if(p.npcRoofTrip&&npcUpdateRoofTrip(s,k,p,dt,now))continue;
  if(s.phase==='search')npcTryCostume(s,k,p);if(s.phase==='search'&&p.alive&&p.sitting)continue;if(!soloMode&&s.phase==='vote'&&insideBlackBuilding(p.x,p.z)){if(canCastVote(s,k)&&!s.votes?.[k]&&now>s.deadline-VOTE_MS+randBetween(2500,15000)){const choice=chooseNPCVote(s,k);if(choice){s.votes[k]=choice;p.voted=true}}}if(s.phase==='finished')continue;// A chair-search intention is independent of alive/sitting status. Only willing NPCs exit.
 if(s.phase==='search'&&p.searchIntentRound!==s.round){
- p.searchIntentRound=s.round;p.searchIntent=true;p.npcSpotSearch=null;p.npcSearchedSpots={};p.npcSearchStartedRound=null;p.npcSearchOrigin=null;p.targetChair=null;p.npcSpotDecisionAt=0;p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
+ p.npcTipGoal=null;p.searchIntentRound=s.round;p.searchIntent=true;p.npcSpotSearch=null;npcEnsureRoundSearchMemory(p,s.round);p.npcSearchStartedRound=null;p.npcSearchOrigin=null;p.targetChair=null;p.npcSpotDecisionAt=0;p.goal=p.npcFixedAssignment?.round===s.round?{x:p.npcFixedAssignment.x,z:p.npcFixedAssignment.z}:null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
  // The front rows depart first; waiting NPCs stay clear of the doorway.
  const departureRank=Math.max(0,departureOrder.findIndex(([key])=>key===k));
- p.departureAt=now+departureRank*1000;
+ p.departureAt=now+departureRank*850;
  p.departureDone=false;
 }
 // Hide a carried/seated chair on a short, time-limited detour during gathering.
 if(npcReturning(s)){p.searchIntent=false;p.npcSpotSearch=null;}
+// Arrival is terminal for this return cycle: never walk out and back in.
+if(npcReturning(s)&&p.returned&&insideBlackBuilding(p.x,p.z)){
+ p.goal=null;p.waypoint=null;p.npcExitPending=false;p.npcExitStage=null;
+ p.npcReturnCornerGate=null;npcNavigation.delete(room+':'+k);
+ continue;
+}
+
 const hidingOnReturn=npcReturning(s)&&npcUpdateReturnHide(s,k,p,now);
+if(npcReturning(s)&&(hidingOnReturn||p.carrying||p.sitting||p.npcSpotHide)){p.npcExitPending=false;p.npcExitStage=null;p.npcDoorToken=null;p.npcCornerPassage=null;}
 if(hidingOnReturn&&p.npcSpotHide?.stage==='hiding')continue;
+if(npcReturning(s)&&(p.carrying||p.sitting||p.npcReturnChairGoal)&&!p.npcSpotHide&&!hidingOnReturn){p.goal=null;p.waypoint=null;continue;}
 if(npcReturning(s)&&!hidingOnReturn){
  if(p.sitting){const c=s.chairs?.[p.sitting];if(c?.occupied===k)c.occupied=null;p.sitting=0;}
  p.searchIntent=false;p.npcSpotSearch=null;
  const home=npcReturnGoal(k);
- if(Math.hypot(p.x-home.x,p.z-home.z)<1.5&&npcGoalReachable(s,k,p,home)){
+ if(insideBlackBuilding(p.x,p.z)&&Math.hypot(p.x-home.x,p.z-home.z)<1.5&&npcGoalReachable(s,k,p,home)){
   p.returned=true;p.returnDoorStep=false;p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
   continue; // Stay indoors until the next seating round.
  }
@@ -2913,20 +3656,36 @@ if(npcReturning(s)&&!hidingOnReturn){
 // door collisions. Non-searchers stay inside and do not block the threshold.
 // Stagger intentions; navigation discovers the doorway from collision geometry.
 if(s.phase==='search'&&!p.departureDone){
+ // Finish route planning BEFORE exiting, never stop at the entrance to compute.
+ if(p.npcPreloadedRoute?.round===s.round&&p.npcPreloadedRoute.job){npcAdvancePreloadedRoute(s,p);continue;}
  if(!p.searchIntent||insideBlackBuilding(p.x,p.z)&&now<(p.departureAt||0)){
   // Preserve each actor's distinct starting/return position while its exit slot is pending.
   // Moving every waiting actor to a shared staging area created a second bottleneck.
-  p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
+  p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
   npcNavigation.delete(room+':'+k);continue;
  }
- p.departureDone=true;p.goal=null;p.decisionAt=0;
+ p.departureDone=true;p.goal=p.npcFixedAssignment?{x:p.npcFixedAssignment.x,z:p.npcFixedAssignment.z}:(p.goal||null);p.decisionAt=0;
  p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
 }
-if(!npcReturning(s)&&s.phase==='search'){
- // Chair priority is evaluated while walking too; otherwise retain the same spot.
- npcDecision(s,k,p,now);
- if(!p.targetChair&&p.npcSpotSearch){npcUpdateSpot(s,k,p,now);if(!p.npcSpotSearch)npcDecision(s,k,p,now);}
- if(!p.targetChair&&!p.npcSpotSearch&&(p.npcSpotDecisionAt||0)<=now)npcChooseSpot(s,k,p,now);
+if(!npcReturning(s)&&s.phase==='search'&&p.npcTipGoal?.round===s.round){
+ const tip=p.npcTipGoal;
+ if(Math.hypot(p.x-tip.x,p.z-tip.z)<3.5){
+  p.npcTipGoal=null;p.goal=null;p.npcSpotDecisionAt=0;
+  if(tip.truth&&npcChairUsable(s,k,p,tip.number)){
+   p.targetChair=tip.number;p.goal=npcChairGoal(s,k,p,tip.number);
+  }
+ }else{p.goal={x:tip.x,z:tip.z};}
+}
+if(!npcReturning(s)&&s.phase==='search'&&!p.npcTipGoal){
+ npcAbandonOccupiedDestination(s,k,p,now);
+ const nearbyVisibleClaim=npcClaimNearbyVisibleChair(s,k,p,now);
+ if(!nearbyVisibleClaim&&!p.npcFixedAssignment&&!p.targetChair&&s.phase==='search'&&(!p.npcSpotDecisionAt||now>=p.npcSpotDecisionAt)){
+  if(!npcChooseFreshArea(s,k,p,now))p.npcSpotDecisionAt=now+3000;
+ }
+ if(!nearbyVisibleClaim&&p.npcFixedAssignment?.round===s.round){npcFollowFirstAssignment(s,k,p,now);}
+ else if(!nearbyVisibleClaim)npcDecision(s,k,p,now);
+ if(!p.npcFixedAssignment&&!p.targetChair&&p.npcSpotSearch){npcUpdateSpot(s,k,p,now);if(!p.npcSpotSearch)npcDecision(s,k,p,now);}
+ if(!p.npcFixedAssignment&&!p.targetChair&&!p.npcSpotSearch&&(p.npcSpotDecisionAt||0)<=now)npcChooseSpot(s,k,p,now);
 }
 const inspectingSpot=!npcReturning(s)&&!!p.npcSpotSearch;
 if(inspectingSpot&&p.npcSpotSearch.stage==='searching')continue;
@@ -2936,30 +3695,124 @@ if(!p.goal){p.waypoint=null;continue;}
 if(p.npcRoofTrip&&!p.npcRoofTrip.active&&Math.hypot(p.x-p.goal.x,p.z-p.goal.z)<.65){npcUpdateRoofTrip(s,k,p,dt,now);continue;}
 const distToGoal=Math.hypot(p.goal.x-p.x,p.goal.z-p.z);
 if(!p.npcRoofTrip&&!hidingOnReturn&&!inspectingSpot&&distToGoal<(npcReturning(s)?1.4:2.45)&&npcGoalReachable(s,k,p,p.goal)){
- if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&Math.abs((p.y||0)-(c.y||0))<2.2&&npcChairUsable(s,k,p,p.targetChair)&&!characterMovementBlocked(s,k,p.x,p.z,c.x,c.z,c.y||0)&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=k;p.memory??={};p.memory[p.targetChair]={x:c.x,z:c.z};continue;}}
- if(!p.targetChair||!npcChairUsable(s,k,p,p.targetChair)){p.goal=null;p.decisionAt=0;npcNavigation.delete(room+":"+k);continue;}
+ if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&Math.abs((p.y||0)-(c.y||0))<2.2&&npcChairUsable(s,k,p,p.targetChair)&&!characterMovementBlocked(s,k,p.x,p.z,c.x,c.z,c.y||0)&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=k;p.memory??={};p.memory[p.targetChair]={x:c.x,y:c.y||0,z:c.z,source:'self',confidence:4,updatedAt:now};npcTeamRestoreChairOnSeat(s,k,p.targetChair);npcShareTeamChairMemory(s,k,p.targetChair);continue;}}
+ if(!p.targetChair||!npcChairUsable(s,k,p,p.targetChair)){if(!p.npcFixedAssignment)p.goal=null;else {p.goal=null;p.npcSpotDecisionAt=0;}p.decisionAt=0;npcNavigation.delete(room+":"+k);continue;}
 }
 p.npcMotionWatch??={x:p.x,z:p.z,at:now};
 if(Math.hypot(p.x-p.npcMotionWatch.x,p.z-p.npcMotionWatch.z)>1.5)p.npcMotionWatch={x:p.x,z:p.z,at:now};
-else if(now-p.npcMotionWatch.at>10000&&(p.targetChair||p.npcExploreAfterSearch)&&!npcReturning(s)&&!inspectingSpot){
- if(p.targetChair){p.npcAvoidChairs??={};p.npcAvoidChairs[p.targetChair]=roomNow()+15000;}
- p.npcRoofTrip=null;p.targetChair=null;p.goal=null;p.decisionAt=0;p.npcMotionWatch={x:p.x,z:p.z,at:now};npcNavigation.delete(room+':'+k);continue;
+else if(now-p.npcMotionWatch.at>5000&&(p.goal||p.targetChair||p.npcExploreAfterSearch)&&!npcReturning(s)&&!inspectingSpot){
+ // A navigation stall is NOT a search-area completion or a reason to
+ // discard a chair claim, spot investigation, or fixed assignment.
+ // Rebuild the path and make a temporary lateral escape while retaining the goal.
+ p.npcPassSide=-(p.npcPassSide||1);
+ p.npcGhostUntil=now+5000;
+ p.npcEscapeUntil=p.npcExitPending?0:now+2600;p.npcEscapeTarget=null;
+ p.npcMotionWatch={x:p.x,z:p.z,at:now};
+ p.waypoint=null;npcNavigation.delete(room+':'+k);
+ // Continue immediately: do not introduce a full stopped simulation tick.
 }
-const destination=npcNavigationTarget(s,k,p,now);
+let destination=npcNavigationTarget(s,k,p,now);
+const crossingDoor=!!p.npcExitPending;
+// The ordinary crowd detour must NEVER override the door transit corridor.
+if(crossingDoor){
+ p.npcCrowdDetour=null;p.npcEscapeTarget=null;p.npcEscapeUntil=0;
+ // NPCs queue instead of pushing each other into the door jambs.
+ // When a queue persists, use the existing 5-second ghost escape without
+ // changing the assigned chair or search area.
+ if(destination){
+  const dx=destination.x-p.x,dz=destination.z-p.z,d=Math.hypot(dx,dz);
+  if(d>.01){
+   const step=Math.min(1.6,d),nx=p.x+dx/d*step,nz=p.z+dz/d*step;
+   if(!npcMovementClear(s,k,p,nx,nz)&&now-(p.npcDoorSince||now)>5000){
+    p.npcGhostUntil=now+5000;
+    p.npcDoorSince=now;
+   }
+  }
+ }
+}else{
+ if(p.npcCrowdDetour&&destination&&npcMovementClear(s,k,p,destination.x,destination.z))p.npcCrowdDetour=null;
+ if(p.npcCrowdDetour&&now<(p.npcCrowdDetourUntil||0)&&
+    Math.hypot(p.x-p.npcCrowdDetour.x,p.z-p.npcCrowdDetour.z)>1.1&&
+    !npcDetourIntoBuilding(p.x,p.z,p.npcCrowdDetour.x,p.npcCrowdDetour.z)&&
+    npcMovementClear(s,k,p,p.npcCrowdDetour.x,p.npcCrowdDetour.z)){
+  destination=p.npcCrowdDetour;
+ }else{
+  p.npcCrowdDetour=null;
+  if(destination){
+   const d=Math.hypot(destination.x-p.x,destination.z-p.z);
+   if(d>.01){
+    const step=Math.min(2.8,d),nx=p.x+(destination.x-p.x)*step/d,nz=p.z+(destination.z-p.z)*step/d;
+    if(!npcMovementClear(s,k,p,nx,nz) && !npcMovementClear(s,k,p,p.x+(p.goal.x-p.x)/Math.max(.001,Math.hypot(p.goal.x-p.x,p.goal.z-p.z))*step,p.z+(p.goal.z-p.z)/Math.max(.001,Math.hypot(p.goal.x-p.x,p.goal.z-p.z))*step)){
+     // Side-step relative to the intended travel direction. Never select a
+     // waypoint behind the NPC: the old arc search could turn almost 90deg
+     // and the distance-to-goal score could produce backwards detours.
+     const ux=(destination.x-p.x)/d,uz=(destination.z-p.z)/d;
+     const preferred=p.npcPassSide||1;
+     let best=null,bestScore=Infinity;
+     const mainBuilding=buildingSites[3],doorZ=mainBuilding.z+mainBuilding.d/2;
+     const nearDoorOutside=p.z>=doorZ-1&&p.z<doorZ+18&&Math.abs(p.x-mainBuilding.x)<mainBuilding.w/2+12;
+     for(const forward of [4,6,8])for(const lateral of [2,3.5,5.5,8])for(const side of [preferred,-preferred]){
+      const q={x:p.x+ux*forward-uz*lateral*side,z:p.z+uz*forward+ux*lateral*side};
+      // At the outside doorway, detours must lead outward (+Z), never into the building.
+      if(nearDoorOutside&&q.z<p.z+.2)continue;
+      if(npcDetourIntoBuilding(p.x,p.z,q.x,q.z)||!npcMovementClear(s,k,p,q.x,q.z))continue;
+      // Require that the candidate is ahead of the current position.
+      if((q.x-p.x)*ux+(q.z-p.z)*uz<.5)continue;
+      const score=Math.hypot(destination.x-q.x,destination.z-q.z)+
+        lateral*.18+forward*.05+(side===preferred?0:.6);
+      if(score<bestScore){best=q;bestScore=score;}
+     }
+     if(best){p.npcCrowdDetour=best;p.npcCrowdDetourUntil=now+2400;destination=best;}
+     // If neither side is open, retain the assigned route and allow the
+     // existing stuck/ghost logic to recover without a backwards waypoint.
+    }
+   }
+  }
+ }
+}
 if(!destination){p.waypoint=null;continue;}
 p.waypoint={x:destination.x,z:destination.z};
-const speed=((s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run:p.walk)*(p.carrying?.5:1);
-npcMove(s,k,p,destination,speed,dt);
+const speed=npcMovementSpeed(s,p,now);
+if(crossingDoor){
+ // DOOR RULE: align before the line; then move strictly along Z in either direction.
+ const b=buildingSites[3],line=b.z+b.d/2;
+ let remaining=Math.min(speed*dt,12);
+ while(remaining>.01){
+  const step=Math.min(.35,remaining);
+  const direction=p.npcDoorDirection||1;
+  // Follow the explicit staging-axis command; do not infer the stage from
+  // distance to the door line (that previously caused premature turns).
+  const axis=destination.doorAxis||'z';
+  let vx=axis==='x'||axis==='free'?destination.x-p.x:0;
+  let vz=axis==='z'||axis==='free'?destination.z-p.z:0;
+  const mag=Math.hypot(vx,vz);if(mag<.001)break;
+  const actualStep=Math.min(step,mag);
+  const nx=p.x+vx/mag*actualStep,nz=p.z+vz/mag*actualStep;
+  if(!npcMovementClear(s,k,p,nx,nz)&&!(direction===-1&&p.npcExitPending)){
+   if(!p.npcDoorBlockedAt)p.npcDoorBlockedAt=now;
+   // No lateral detour at the threshold: phase straight through a jam.
+   if(now-p.npcDoorBlockedAt>=1200)p.npcGhostUntil=now+5000;
+   else break;
+  }else p.npcDoorBlockedAt=0;
+  p.x=nx;p.z=nz;p.rot=Math.atan2(vx,vz);
+  remaining-=actualStep;
+  if((p.z-line)*direction>=10&&(direction===1||insideBlackBuilding(p.x,p.z)&&Math.abs(p.x-b.x)<(largeBuildings[3]?.doorW||13)/2)){
+   p.npcExitPending=false;p.npcExitStage=null;
+   p.npcDoorFinishedToken=p.npcDoorToken;p.npcDoorBlockedAt=0;
+   p.npcCrowdDetour=null;break;
+  }
+ }
+}else npcMove(s,k,p,destination,speed,dt);
 
 }
 let anyMoving=false;
 for(const [k,p] of npcEntries){const before=beforeMotion.get(k);p.motionMoving=!!before&&Math.hypot(p.x-before.x,p.z-before.z,(p.y||0)-before.y)>.001;anyMoving||=p.motionMoving;}
 if(anyMoving||s.npcMoving)s.npcFrameAt=now;s.npcMoving=anyMoving;
 if(!soloMode&&s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
-let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=roomNow();const tickEvery=soloMode?280:650;if(tickNow-npcLastTick<tickEvery)return;const tickDt=soloMode?.28:Math.max(.05,Math.min(.85,(tickNow-npcLastTick)/1000));npcLastTick=tickNow;if(!worldReady||!host||!state||joiningRoom||npcBusy||!['search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=roomNow();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,tickDt,now)})}finally{npcBusy=false}},140);
+let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=roomNow();const tickEvery=soloMode?280:400;if(tickNow-npcLastTick<tickEvery)return;const tickDt=Math.max(.05,Math.min(.85,(tickNow-npcLastTick)/1000));npcLastTick=tickNow;if(!worldReady||!host||!state||joiningRoom||npcBusy||!['sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=roomNow();if(s.phase==='sitIntro')npcPrepareDepartureRoutes(s,now);else if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,tickDt,now)})}finally{npcBusy=false}},140);
 const modal=$('modal');$('modalCancel').onclick=()=>{modal.classList.remove('open');$('modalConfirm').textContent='決定';$('modalCancel').textContent='キャンセル';syncGiftInteraction();};
-function nearbyPickup(){if(!state?.coinDrops)return null;const now=roomNow();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(now-d.created>=10000||d.recipient===id||d.owner===id)).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
-$('pickupCoin').onclick=()=>{const nearest=nearbyPickup();if(!nearest)return;mutate(s=>{const d=s.coinDrops?.[nearest[0]],p=s.players?.[id];if(!d||!p||Math.hypot(p.x-d.x,p.z-d.z)>3||roomNow()-d.created<10000&&d.recipient!==id&&d.owner!==id)return;p.wallet??={};p.wallet[d.issuer]=(p.wallet[d.issuer]||0)+d.count;delete s.coinDrops[nearest[0]];})};
+function nearbyPickup(){if(!state?.coinDrops)return null;const now=roomNow();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(coinDropCanPick(d,id,now))).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
+$('pickupCoin').onclick=()=>{const nearest=nearbyPickup();if(!nearest)return;mutate(s=>{const d=s.coinDrops?.[nearest[0]],p=s.players?.[id];if(!d||!p||Math.hypot(p.x-d.x,p.z-d.z)>3||!coinDropCanPick(d,id,roomNow()))return;p.wallet??={};p.wallet[d.issuer]=(p.wallet[d.issuer]||0)+d.count;delete s.coinDrops[nearest[0]];})};
 const coinMeshes={};
 // All drops share this small texture, materials and geometry: no extra draw calls.
 const coinFaceCanvas=document.createElement('canvas');coinFaceCanvas.width=coinFaceCanvas.height=128;
@@ -3007,21 +3860,90 @@ function syncGiftInteraction(){
  }
  document.body.classList.toggle('gift-overlay',!!(trading||pinShareTarget));return true;
 }
+function npcDealTeamKey(p,key){return p.team&&p.team!=='ガヤ'?'team:'+p.team:'person:'+key;}
+function npcDealIssuer(s){const ids=Object.keys(s.players||{}).filter(k=>s.players[k]?.alive);return ids.length?ids[Math.floor(Math.random()*ids.length)]:null;}
+function npcDealPay(s,receiver,count){const issuer=npcDealIssuer(s);if(issuer&&count>0){receiver.wallet??={};receiver.wallet[issuer]=(receiver.wallet[issuer]||0)+count;}return count;}
+function npcDealGiveKnowledge(s,receiver){const entries=Object.entries(s.chairs||{}).filter(([n,c])=>!c.removed&&!c.carrier&&Number.isFinite(c.x)&&Number.isFinite(c.z));if(!entries.length)return null;const [n,c]=entries[Math.floor(Math.random()*entries.length)];receiver.pinInbox={number:String(n),x:c.x,z:c.z,from:'NPC',stamp:roomNow()+Math.random()};return n;}
+function npcDealLied(s,sender,scope){
+ sender.npcDealLieScopes??={};
+ if(sender.npcDealLieScopes[scope]==null)sender.npcDealLieScopes[scope]=s.round||0;
+}
+function npcDealBlacklisted(s,sender,scope){
+ const first=sender.npcDealLieScopes?.[scope];
+ return first!=null&&(s.round||0)>first;
+}
+function npcDealHasAvailableChair(s,target){
+ return !Object.entries(target.memory||{}).some(([n,m])=>{
+  const c=s.chairs?.[n];return c&&!c.removed&&!c.carrier&&!c.occupied&&Number.isFinite(m?.x)&&Number.isFinite(m?.z);
+ });
+}
+function npcDealSetTipDestination(s,targetKey,number,x,z,truth){
+ const p=s.players[targetKey];
+ if(!p||!p.npc||!p.alive||p.sitting||s.phase!=='search'||!npcDealHasAvailableChair(s,p))return;
+ // A paid tip becomes a persistent travel goal, not a transient memory entry.
+ // Even a false location is visited before the NPC resumes normal searching.
+ p.npcTipGoal={round:s.round,number:String(number),x,z,truth,arrived:false};
+ p.npcFixedAssignment=null;p.targetChair=null;p.npcSpotSearch=null;
+ p.goal={x,z};p.waypoint=null;p.decisionAt=roomNow();
+ p.npcSpotDecisionAt=roomNow()+120000;
+ npcNavigation.delete(room+':'+targetKey);
+}
+function npcDealPin(s,senderKey,targetKey,number,x,z){
+ const sender=s.players[senderKey],target=s.players[targetKey];if(!sender||!target?.npc)return null;
+ const c=s.chairs?.[number],truth=!!c&&!c.removed&&!c.carrier&&Math.hypot(c.x-x,c.z-z)<12;
+ const solo=!sender.alive,independent=!solo&&(!target.team||target.team==='ガヤ');
+ const scope=npcDealTeamKey(target,targetKey);s.npcDealSeen??={};const seen=s.npcDealSeen[scope]??={};
+ let response='pay';if(independent){const r=Math.random();response=truth?(r<.5?'knowledge':'pay'):(r<.5?'pay':r<.75?'falseKnowledge':'knowledge');}
+ // Duplicate truth and false information are both checked by team/person.
+ const tipKey=String(number)+'@'+Math.round(x/12)+','+Math.round(z/12);
+ if(seen[tipKey])return 'このチーム・NPCには同じイス情報を伝えている';
+ seen[tipKey]=true;
+ target.memory??={};target.memory[number]=npcBestMemory(target.memory[number],{x,z,source:'human',confidence:truth?1:.3,updatedAt:roomNow()});npcShareTeamChairMemory(s,targetKey,number);
+ if(!truth)npcDealLied(s,sender,scope);
+ if(response==='knowledge'){const n=npcDealGiveKnowledge(s,sender);return n?'本当のイス'+n+'の情報を受け取った':'共有できるイス情報がない';}
+ if(response==='falseKnowledge'){const n=String(1+Math.floor(Math.random()*Math.max(1,Object.keys(s.chairs||{}).length)));sender.pinInbox={number:n,x:Math.random()*360-180,z:Math.random()*360-180,from:'NPC',stamp:roomNow()+Math.random()};return 'NPCからイス'+n+'の情報を受け取った（真偽不明）';}
+ const amount=npcDealBlacklisted(s,sender,scope)?0:truth?2+Math.floor(Math.random()*3):Math.floor(Math.random()*3);
+ npcDealPay(s,sender,amount);
+ if(amount>0)npcDealSetTipDestination(s,targetKey,number,x,z,truth);
+ return '生存者コインを'+amount+'枚受け取った';
+}
+function createCoinGroundDrop(s,senderKey,recipientKey,issuer,count,exclusiveOwner){
+ const a=s.players?.[senderKey];if(!a||count<1)return false;
+ s.coinDrops??={};
+ const now=roomNow(),dropId='coin_'+senderKey+'_'+now+'_'+Math.floor(Math.random()*1e7);
+ const baseX=a.x+Math.sin(a.rot||0)*1.1,baseZ=a.z+Math.cos(a.rot||0)*1.1;
+ const existing=Object.values(s.coinDrops).filter(d=>d.count>0);
+ let dropX=baseX,dropZ=baseZ;
+ for(let k=0;k<48;k++){
+  const angle=k*2.399963229728653,radius=k===0?0:0.65*Math.sqrt(k);
+  const cx=baseX+Math.cos(angle)*radius,cz=baseZ+Math.sin(angle)*radius;
+  if(existing.every(d=>Math.hypot(cx-d.x,cz-d.z)>=0.85)){dropX=cx;dropZ=cz;break;}
+ }
+ s.coinDrops[dropId]={issuer,count,x:dropX,z:dropZ,y:a.y||0,
+  recipient:recipientKey,owner:senderKey,exclusiveTo:exclusiveOwner,created:now};
+ return true;
+}
+function coinDropCanPick(d,playerKey,now){
+ return now-d.created>=5000||d.exclusiveTo===playerKey;
+}
+function npcDealCoin(s,senderKey,targetKey,issuer,count){const sender=s.players[senderKey],target=s.players[targetKey];if(!sender||!target?.npc||!(sender.wallet?.[issuer]>=count)||s.players?.[issuer]?.alive===false)return null;
+ const refusal=npcDealBlacklisted(s,sender,npcDealTeamKey(target,targetKey))
+  ?'以前の嘘が知られているため、交換を拒否された'
+  :(target.team&&target.team!=='ガヤ')?'チーム所属NPCはコインを受け取らない':null;
+ if(refusal){
+  sender.wallet[issuer]-=count;
+  createCoinGroundDrop(s,senderKey,targetKey,issuer,count,senderKey);
+  return refusal+'。コインは地面に落ちた（5秒間は自分だけ拾える）';
+ }
+ const knowledge=sender.alive&&Math.random()<.5;
+ if(knowledge){const n=npcDealGiveKnowledge(s,sender);return n?'本当のイス'+n+'の情報を受け取った':'共有できるイス情報がない';}
+ sender.wallet[issuer]-=count;npcDealPay(s,sender,count);return 'コイン'+count+'枚を交換した';}
 async function shareChairPin(recipient,number,x,z){
- if(!state||!state.players?.[recipient])return;
- const target=state.players[recipient];
- if(!canGiveTo(state,{...me,y:playerHeight},target))return;
- const partner={id:recipient,name:target.name};
- if(soloMode){log(partner.name+'にイス'+number+'の場所を共有（NPC）');return;}
- const stamp=roomNow();
- try{
-  await mutate(s=>{
-   const sender=s.players?.[id],target=s.players?.[recipient];
-   if(!canGiveTo(s,sender,target)||target.pinInbox?.stamp>=stamp)return;
-   target.pinInbox={number,x,z,from:id,stamp};
-  });
-  log(partner.name+'にイス'+number+'の場所を共有');
- }catch(err){alert('位置の共有に失敗しました：'+(err.message||err));}
+ if(!state?.players?.[recipient]||!canGiveTo(state,{...me,y:playerHeight},state.players[recipient]))return;
+ let result='';await mutate(s=>{const sender=s.players[id],target=s.players[recipient];if(!canGiveTo(s,sender,target))return;
+ if(target.npc)result=npcDealPin(s,id,recipient,String(number),x,z)||'';
+ else{target.pinInbox={number,x,z,from:id,stamp:roomNow()};result='イス'+number+'の位置を共有した';}});
+ if(result)log(result);if(result)alert(result);
 }
 let lastPinInboxStamp=0;
 function receiveSharedPin(){const v=player()?.pinInbox;if(!v||!v.stamp||v.from===id||v.stamp<=lastPinInboxStamp)return;lastPinInboxStamp=v.stamp;
@@ -3032,11 +3954,14 @@ $('givePin').onclick=()=>{if(!mapUnlocked)return;const partner=nearestPartner();
 function nearestAction(){if(document.body.classList.contains('gift-overlay'))return null;for(let b of ['touch','sit','hideChair','revealChair','moveChair','trade'])if(!$(b).hidden)return $(b);return null}
 const actionIcons={"chair": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></svg>", "walk": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"22\" cy=\"6\" r=\"4\" fill=\"#efc29d\"/><path d=\"m19 13 7 7 7 1m-15-7-7 8m8-9-3 12-7 11m8-11 10 11\" fill=\"none\" stroke=\"#387ca1\" stroke-width=\"4\"/></svg>", "pin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></svg>", "lift": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(9 -2) scale(.65)\"><path fill=\"#a76b3d\" d=\"M10 5h16v17H10zM7 23h26v6H7z\"/><path d=\"M10 29v8m20-8v8M13 9h10v10H13\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "place": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#f1c39c\" d=\"m5 14 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 10 8 3h5\"/><path d=\"M20 25v12m-5-5 5 5 5-5\"/></svg>", "hide": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#52864b\" d=\"M8 24a8 8 0 0 1-1-15 10 10 0 0 1 19-2 9 9 0 0 1 7 17Z\"/><path fill=\"#9b663a\" d=\"M17 24h6v13h-6z\"/></svg>", "search": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m24 24 9 9\" stroke-width=\"6\"/><circle cx=\"16\" cy=\"16\" r=\"11\" fill=\"#aad7e0\"/><path d=\"M10 15a6 6 0 0 1 6-6\" stroke=\"#fff\"/></svg>", "giveCoin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(6 -3) scale(.7)\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "givePin": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g transform=\"translate(8 -1) scale(.6)\"><path fill=\"#e45d50\" d=\"M20 3a11 11 0 0 0-11 11c0 9 11 20 11 20s11-11 11-20A11 11 0 0 0 20 3Z\"/><circle cx=\"20\" cy=\"14\" r=\"4\" fill=\"#fff3cf\"/></g><path fill=\"#f1c39c\" d=\"m5 28 8-7 7 1 5 3h9c4 0 3 4 0 5l-13 6-10-3-6 3Z\"/><path d=\"m13 24 8 3h5\"/></svg>", "shirt": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#699ec8\" d=\"m12 5-9 9 7 7 3-3v18h14V18l3 3 7-7-9-9-4 4h-8Z\"/></svg>", "hat": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#805b9d\" d=\"m11 7 3-3 12 3 3 23H11Z\"/><path fill=\"#d5a861\" d=\"M11 23h18v6H11z\"/><ellipse cx=\"20\" cy=\"31\" rx=\"17\" ry=\"5\" fill=\"#805b9d\"/></svg>", "glasses": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><g fill=\"#b3d9e4\"><circle cx=\"10\" cy=\"24\" r=\"8\"/><circle cx=\"30\" cy=\"24\" r=\"8\"/></g><path d=\"M18 23h4M3 20 6 8m31 12L34 8\"/></svg>", "pickup": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"20\" cy=\"18\" r=\"10\" fill=\"#efc24f\"/><path d=\"M20 11v14m4-11c-8-5-11 5-4 4s5 8-4 3\"/><path d=\"M6 5v8m-4-4 4 4 4-4M30 3v8m-4-4 4 4 4-4\"/></svg>", "vote": "<svg class=\"action-icon\" viewBox=\"0 0 40 40\" aria-hidden=\"true\" focusable=\"false\" fill=\"none\" stroke=\"#3d352b\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"#7298ab\" d=\"m5 21 15-7 15 7v15H5Z\"/><path d=\"M13 23h14\"/><path fill=\"#fff3d7\" d=\"m14 3 15 5-6 17-15-5Z\"/><path d=\"m14 13 3 4 7-6\"/></svg>"};
 function setActionIcon(id,kind){const button=$(id);if(button.dataset.icon===kind)return;button.innerHTML=actionIcons[kind];button.dataset.icon=kind;}
-function refreshActions(){if(!state)return;syncGiftInteraction();closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=mapChair?.[1]?.occupied===id?null:nearbyHiddenChairForMark(); $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||ph==='sitIntro'||ph==='instructions'||ph==='erase';if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-roomNow())/1000);}}
+function refreshActions(){if(!state)return;$('soloThreeSeconds').hidden=!soloMode||state.phase==='lobby'||state.phase==='finished';syncGiftInteraction();closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');
+ const introDoorNearby=ph==='instructions'&&Math.abs(me.x-buildingSites[3].x)<11&&Math.abs(me.z-(buildingSites[3].z+buildingSites[3].d/2))<12;
+ if(introDoorNearby){$('touch').hidden=false;$('touch').dataset.actionLabel='スキップ';$('touch').title='ドアにタッチして説明をスキップ';}else{$('touch').dataset.actionLabel='とうひょう';}
+ let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=closestBackChair();const hiddenRecord=mapChair?.[1]?.occupied===id?null:nearbyHiddenChairForMark(); $('markChair').hidden=!mapChair&&!hiddenRecord;if(hiddenRecord){setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='隠したイス'+recentHiddenChair.number+'を地図に記録・更新';}else if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||(!soloMode&&(ph==='sitIntro'||ph==='instructions'||ph==='erase'));if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-roomNow())/1000);}}
 function openModal(title,body,mode){$('modalCancel').hidden=false;$('modalConfirm').hidden=false;modalMode=mode;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;modal.classList.add('open');if(mode==='voteButtons')$('touch').hidden=true;syncGiftInteraction();}
 function updateTradeAmount(n){const input=$('tradeAmount'),issuer=$('tradeIssuer');if(!input||!issuer)return;const max=Number(player()?.wallet?.[issuer.value]||0);input.value=String(Math.max(1,Math.min(max||1,Math.floor(n)||1)));$('tradeAmountValue').textContent=input.value;}
 function selectTradeCoin(key){$('tradeIssuer').value=key;for(const btn of document.querySelectorAll('#tradeCoinChoices button'))btn.classList.toggle('selected',btn.dataset.issuer===key);updateTradeAmount(1);}
-$('trade').onclick=()=>{tradePartner=nearestPartner();if(!tradePartner)return;const coins=Object.entries(player()?.wallet||{}).filter(([k,v])=>v>0);if(!coins.length){log('落とせるコインがありません');return;}
+$('trade').onclick=()=>{tradePartner=nearestPartner();if(!tradePartner)return;const coins=Object.entries(player()?.wallet||{}).filter(([k,v])=>v>0&&state.players?.[k]?.alive!==false);if(!coins.length){log('渡せる生存者コインがありません');return;}
 const opts=coins.map(([k,v])=>`<option value="${k}">${state.players[k]?.name||'コイン'}（${v}枚）</option>`).join('');
 openModal('コインをわたす',`<div style="text-align:center">${tradePartner.name} にわたすコインを選んでね</div><select id="tradeIssuer" hidden>${opts}</select><div id="tradeCoinChoices"></div><div id="tradeQuantity"><button type="button" id="tradeMinus">−</button><strong id="tradeAmountValue">1</strong><button type="button" id="tradePlus">＋</button><button type="button" id="tradeAll">ALL</button></div><input id="tradeAmount" type="number" min="1" value="1" hidden>`,'trade');
 $('modalTitle').prepend(walletMedalIcon('medal-icon'));
@@ -3076,7 +4001,13 @@ function openParentVote(){
   if(area.scrollHeight>area.clientHeight+2)area.classList.add('three-columns');
  });
 }
-$('touch').onclick=openParentVote;
+const introSkipDialog=document.createElement('div');
+introSkipDialog.id='introSkipDialog';introSkipDialog.hidden=true;
+introSkipDialog.innerHTML='<div class="intro-skip-panel"><h2>説明をスキップしますか？</h2><div class="intro-skip-choices"><button id="introSkipYes">はい</button><button id="introSkipNo">いいえ</button></div></div>';
+document.body.appendChild(introSkipDialog);
+$('introSkipNo').onclick=()=>{introSkipDialog.hidden=true;};
+$('introSkipYes').onclick=async()=>{introSkipDialog.hidden=true;if(phase()!=='instructions')return;await mutate(s=>{if(s.phase!=='instructions')return;s.introSkipped=true;if(s.players?.[id])s.players[id].introSeen=introSessionKey(s);});if(soloMode&&introPlayback){introPlayback.complete=true;introPlayback.page=8;introPlayback.elapsed=INTRO_PAGE_MS;saveIntroPlayback();}if(host)advance();};
+$('touch').onclick=()=>{if(phase()==='instructions'&&Math.abs(me.x-buildingSites[3].x)<11&&Math.abs(me.z-(buildingSites[3].z+buildingSites[3].d/2))<12){introSkipDialog.hidden=false;return;}openParentVote();};
 $('voteOpen').onclick=openParentVote;
 $('eraseOpen').onclick=()=>{
  if(phase()!=='erase'||state?.parent!==id)return;
@@ -3103,16 +4034,7 @@ $('modalConfirm').onclick=async()=>{if(!syncGiftInteraction())return;if(modalMod
  }catch(e){alert('投票の通信に失敗しました：'+(e.message||e));}
  finally{confirm.disabled=false;}
  return;
- }if(modalMode==='trade'){const n=Math.floor(Number($('tradeAmount').value)),issuer=$('tradeIssuer').value,partner=tradePartner;if(!partner||!Number.isInteger(n)||n<1||!canGiveTo(state,{...me,y:playerHeight},state.players?.[partner.id])){alert('相手の近くで操作してください');return;}await mutate(s=>{const a=s.players[id],b=s.players[partner.id];if(!canGiveTo(s,a,b)||!(a.wallet?.[issuer]>=n))return;a.wallet[issuer]-=n;s.coinDrops??={};const dropId='coin_'+id+'_'+roomNow()+'_'+Math.floor(Math.random()*1e7);const baseX=a.x+Math.sin(a.rot||0)*1.1,baseZ=a.z+Math.cos(a.rot||0)*1.1;
-const existing=Object.values(s.coinDrops).filter(d=>d.count>0);
-let dropX=baseX,dropZ=baseZ;
-// Place repeated drops in a small spiral so separate coins stay visible and collectible.
-for(let k=0;k<48;k++){
- const angle=k*2.399963229728653, radius=k===0?0:0.65*Math.sqrt(k);
- const cx=baseX+Math.cos(angle)*radius,cz=baseZ+Math.sin(angle)*radius;
- if(existing.every(d=>Math.hypot(cx-d.x,cz-d.z)>=0.85)){dropX=cx;dropZ=cz;break;}
-}
-s.coinDrops[dropId]={issuer,count:n,x:dropX,z:dropZ,y:a.y||0,recipient:partner.id,owner:id,created:roomNow()}})}else if(modalMode==='vote'){$('voteTarget').value=$('modalVote').value;$('vote').click()}else if(modalMode==='erase'){const n=$('eraseNumberDisplay')?.dataset.value;if(!n||!state?.chairs?.[n]||state.chairs[n].removed){alert('消去できるイス番号を入力してください');return;}$('chairNumber').value=n;$('erase').click()}modal.classList.remove('open');syncGiftInteraction()};
+ }if(modalMode==='trade'){const n=Math.floor(Number($('tradeAmount').value)),issuer=$('tradeIssuer').value,partner=tradePartner;if(!partner||!Number.isInteger(n)||n<1||!canGiveTo(state,{...me,y:playerHeight},state.players?.[partner.id])){alert('相手の近くで操作してください');return;}let npcDealResult='';await mutate(s=>{const a=s.players[id],b=s.players[partner.id];if(!canGiveTo(s,a,b)||!(a.wallet?.[issuer]>=n)||s.players?.[issuer]?.alive===false)return;if(b.npc){npcDealResult=npcDealCoin(s,id,partner.id,issuer,n)||'';return;}a.wallet[issuer]-=n;createCoinGroundDrop(s,id,partner.id,issuer,n,partner.id);});if(npcDealResult){log(npcDealResult);alert(npcDealResult);}}else if(modalMode==='vote'){$('voteTarget').value=$('modalVote').value;$('vote').click()}else if(modalMode==='erase'){const n=$('eraseNumberDisplay')?.dataset.value;if(!n||!state?.chairs?.[n]||state.chairs[n].removed){alert('消去できるイス番号を入力してください');return;}$('chairNumber').value=n;$('erase').click()}modal.classList.remove('open');syncGiftInteraction()};
 // Action buttons are refreshed by the animation loop; no duplicate interval.
 const stick=document.getElementById('stickBase'),knob=document.getElementById('stickKnob');let joyX=0,joyY=0,stickPointer=null,viewPointer=null,viewX=0,viewY=0,pitch=0;
 function setStick(e){const r=stick.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),radius=48,l=Math.hypot(dx,dy),scale=l>radius?radius/l:1;joyX=dx*scale/radius;joyY=-dy*scale/radius;knob.style.transform=`translate(${joyX*radius}px,${-joyY*radius}px)`}
@@ -3183,7 +4105,7 @@ $('stackButton').onclick=async event=>{
   applyAssignedSpawn(state);resetStackIdle(performance.now());
  }finally{relocating=false;$('stackButton').disabled=false;}
 };
-let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(!state||joiningRoom||isOnlineLobby()){pauseIntroPlayback();previous=t;return;}me.z=screenSafeZ(me.x,me.z,playerHeight);syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<30)return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}const frameElapsed=Math.max(.001,(t-previous)/1000);let dt=Math.min(frameElapsed,.06);previous=t;const frameX=me.x,frameY=playerHeight,frameZ=me.z;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
+let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(!state||joiningRoom||isOnlineLobby()){pauseIntroPlayback();previous=t;return;}me.z=screenSafeZ(me.x,me.z,playerHeight);syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<30)return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}const frameElapsed=Math.max(.001,(t-previous)/1000);let dt=Math.min(frameElapsed,.06);previous=t;const frameX=me.x,frameY=playerHeight,frameZ=me.z;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?CHARACTER_RUN_SPEED:CHARACTER_WALK_SPEED;speed*=playerSpeedFactor(state,player());let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
  // Never step off the rooftop slab, including the stair-side entrance corner.
  // A descent is permitted only onto a real stair flight or its bridge.
  if(current>2.5 && playerHeight>2.5){
@@ -3221,7 +4143,7 @@ localMotionVelocity.x=(me.x-frameX)/frameElapsed;localMotionVelocity.y=(playerHe
  if(a.userData.roofVisualKey!==key){a.userData.roofVisualKey=key;a.userData.roofTravel=0;}
  const visualTravel=Math.min(trip.travel,(a.userData.roofTravel||0)+(v.run||9)*dt*1.15);
  const point=npcRoofVisualPoint(trip,visualTravel);
- if(!soloMode||!characterMovementBlocked(state,k,a.position.x,a.position.z,point.x,point.z,point.y,true)){a.userData.roofTravel=visualTravel;a.position.set(point.x,point.y,point.z);}a.rotation.y=tr;a.userData.smoothReady=false;
+ a.userData.roofTravel=visualTravel;a.position.set(point.x,point.y,point.z);a.rotation.y=tr;a.userData.smoothReady=false;
  }
  else if(!a.userData.smoothReady||Math.hypot(tx-a.position.x,tz-a.position.z)>28){a.position.set(tx,ty,tz);a.rotation.y=tr;a.userData.smoothReady=true;}
  else{
@@ -3233,7 +4155,7 @@ localMotionVelocity.x=(me.x-frameX)/frameElapsed;localMotionVelocity.y=(playerHe
    const motion=a.userData.npcMotion||(a.userData.npcMotion={x:tx,z:tz,stamp:t,velocity:0});
    if(motion.x!==tx||motion.z!==tz){
     const changedDistance=Math.hypot(tx-motion.x,tz-motion.z);
-    const elapsed=Math.max(.5,Math.min(2,(t-motion.stamp)/1000));
+    const elapsed=Math.max(.12,Math.min(2,(t-motion.stamp)/1000));
     motion.velocity=changedDistance/elapsed;
     motion.x=tx;motion.z=tz;motion.stamp=t;
    }
@@ -3243,11 +4165,11 @@ localMotionVelocity.x=(me.x-frameX)/frameElapsed;localMotionVelocity.y=(playerHe
    const canPredict=committed&&!v.npcSpotSearch?.stage&&!v.npcSpotHide&&!v.sitting&&
      (state.phase==='search'||state.phase==='return')&&
      Math.hypot(committed.x-tx,committed.z-tz)>1.5;
-   const age=Math.min(.48,Math.max(0,(t-motion.stamp)/1000));
-   const baseSpeed=((state.phase==='return'||state.phase==='search'&&state.deadline-roomNow()<35000)?(v.run||9):(v.walk||5))*(v.carrying?.5:1);
-   let aimX=canPredict?tx+(committed.x-tx)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.hypot(committed.x-tx,committed.z-tz)-.8):tx;
-   let aimZ=canPredict?tz+(committed.z-tz)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.hypot(committed.x-tx,committed.z-tz)-.8):tz;
-   if(canPredict&&(!npcStaticClearPath(state,tx,tz,aimX,aimZ)||characterMovementBlocked(state,k,tx,tz,aimX,aimZ,ty,true))){aimX=tx;aimZ=tz;}
+   const age=Math.min(1.15,Math.max(0,(t-motion.stamp)/1000));
+   const baseSpeed=npcMovementSpeed(state,v,roomNow());
+   let aimX=canPredict?tx+(committed.x-tx)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.max(0,Math.hypot(committed.x-tx,committed.z-tz)-.25)):tx;
+   let aimZ=canPredict?tz+(committed.z-tz)/Math.hypot(committed.x-tx,committed.z-tz)*Math.min(baseSpeed*age,Math.max(0,Math.hypot(committed.x-tx,committed.z-tz)-.25)):tz;
+   if(canPredict&&!npcNearDoorOrCorner(v,aimX,aimZ)&&(!npcStaticClearPath(state,tx,tz,aimX,aimZ)||characterMovementBlocked(state,k,tx,tz,aimX,aimZ,ty,true))){aimX=tx;aimZ=tz;}
    const deltaX=aimX-a.position.x,deltaZ=aimZ-a.position.z;
    const remaining=Math.hypot(deltaX,deltaZ);
    if(remaining>.0001){
@@ -3257,7 +4179,7 @@ localMotionVelocity.x=(me.x-frameX)/frameElapsed;localMotionVelocity.y=(playerHe
     // Follow a safe short arc when interpolation encounters a seated body.
     for(const turn of [0,.65,-.65,1.2,-1.2,1.7,-1.7]){
      const angle=Math.atan2(deltaX,deltaZ)+turn,qx=a.position.x+Math.sin(angle)*distance,qz=a.position.z+Math.cos(angle)*distance;
-     if(npcStaticClearPath(state,a.position.x,a.position.z,qx,qz)&&!characterMovementBlocked(state,k,a.position.x,a.position.z,qx,qz,ty,true)){a.position.x=qx;a.position.z=qz;break;}
+     if(npcNearDoorOrCorner(v,qx,qz)||(npcStaticClearPath(state,a.position.x,a.position.z,qx,qz)&&!characterMovementBlocked(state,k,a.position.x,a.position.z,qx,qz,ty,true))){a.position.x=qx;a.position.z=qz;break;}
     }
    }
    a.position.y+=(ty-a.position.y)*Math.min(1,dt*12);
