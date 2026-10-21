@@ -22,7 +22,7 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    document.addEventListener('click',event=>{if(event.target.closest('#solo')&&!window.bootClick)window.bootClick=performance.now();},{capture:true});
    const code=document.querySelector('#deferredGameCode');
-   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.bootTest={status:()=>({ready:worldReady,outdoorVisible:outdoorWorld.visible,outdoorMeshes:outdoorWorld.children.length,obstacles:obstacles.length,hidingSpots:hidingSpots.length,stairs:stairways.length,clearingClean:hidingSpots.every(p=>!nearBlackBuildingVegetation(p.x,p.z))&&obstacles.every(o=>![.85,1.65,.65].includes(o.r)||!nearBlackBuildingVegetation(o.x,o.z))}),getState:()=>state,advanceState,pauseHostForTest:()=>{host=false;},introPage:()=>introPlaybackFor(state)?.page,completeIntroForTest:async()=>{introPlayback=null;let now=performance.now();for(let i=0;i<=9;i++){tickIntroPlayback(state,now+i*6001,true,true);paintVoteWall();renderer.render(scene,camera);markIntroFramePresented(state,now+i*6001);}await syncIntroCompletion(performance.now());},npcSimulate,npcWorldBlocked,avatars,getId:()=>id,getLocalHeight:()=>playerHeight,camera,renderer,me,keys,roomCameraFocus,guideRoomView,setHeight:h=>playerHeight=h,forceDoor:()=>{roomCameraFocus(performance.now());roomFocusStarted=performance.now()-1000;},projectScreen:()=>new THREE.Vector3(0,8.1,voteWallZ+.09).project(camera),orbitTarget:()=>({x:_cameraTarget.x,y:_cameraTarget.y,z:_cameraTarget.z,yaw,playerHeight}),renderUI,renderWallet,paintVoteWall,voteResultLayout,wallCanvas:()=>voteWallCtx.canvas,screenReady:()=>voteWall.material.map===voteWallTexture,door:()=>window.__blackIntroDoor,scene,outdoorWorld};performance.mark("island-room-ready");`);
+   code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.bootTest={status:()=>({ready:worldReady,outdoorVisible:outdoorWorld.visible,outdoorMeshes:outdoorWorld.children.length,obstacles:obstacles.length,hidingSpots:hidingSpots.length,stairs:stairways.length,clearingClean:hidingSpots.every(p=>!nearBlackBuildingVegetation(p.x,p.z))&&obstacles.every(o=>![.85,1.65,.65].includes(o.r)||!nearBlackBuildingVegetation(o.x,o.z))}),getState:()=>state,advanceState,pauseHostForTest:()=>{host=false;},introPage:()=>introPlaybackFor(state)?.page,completeIntroForTest:async()=>{introPlayback=null;let now=performance.now();for(let i=0;i<=9;i++){tickIntroPlayback(state,now+i*6001,true,true);paintVoteWall();renderer.render(scene,camera);markIntroFramePresented(state,now+i*6001);}await syncIntroCompletion(performance.now());},npcSimulate,npcWorldBlocked,avatars,getId:()=>id,getLocalHeight:()=>playerHeight,camera,renderer,me,keys,roomCameraFocus,guideRoomView,setHeight:h=>playerHeight=h,forceDoor:()=>{roomCameraFocus(performance.now());roomFocusStarted=performance.now()-1000;},projectScreen:()=>new THREE.Vector3(0,8.1,voteWallZ+.09).project(camera),projectPlayer:h=>new THREE.Vector3(me.x,playerHeight+h,me.z).project(camera),setMe:(x,z)=>{me.x=x;me.z=z;playerHeight=0;},orbitTarget:()=>({x:_cameraTarget.x,y:_cameraTarget.y,z:_cameraTarget.z,yaw,playerHeight}),renderUI,renderWallet,paintVoteWall,voteResultLayout,wallCanvas:()=>voteWallCtx.canvas,screenReady:()=>voteWall.material.map===voteWallTexture,door:()=>window.__blackIntroDoor,scene,outdoorWorld};performance.mark("island-room-ready");`);
    window.addEventListener('islandGameModuleReady',()=>{window.firstRoom=window.bootTest.status();window.roomReadyMs=performance.now()-window.bootClick;});
   });
   await page.click('#solo');await page.waitForFunction(()=>window.__islandGameReady,{timeout:60000});
@@ -43,6 +43,15 @@ const {chromium}=require('playwright');
    const outside={x:t.me.x,z:t.me.z};t.me.z=50;const released=t.roomCameraFocus(performance.now());Object.assign(t.me,outside);s.phase=previous;
    const expectedX=Math.max(-23.75,Math.min(23.75,t.me.x-Math.sin(orbit.yaw)*10)),expectedZ=Math.max(-20.75,Math.min(20.75,t.me.z-Math.cos(orbit.yaw)*10));return{normalTPSPosition:Math.abs(orbit.x-expectedX)<.05&&Math.abs(orbit.z-expectedZ)<.05,centered:Math.abs(v.x)<.0001&&Math.abs(v.y)<.0001,normalTPSHeight:Math.abs(orbit.y-(orbit.playerHeight+8))<.0001,first,next,released,scale:window.visualViewport.scale};});
   assert(focus.centered);assert(focus.normalTPSHeight);assert(focus.normalTPSPosition);assert.equal(focus.first,'screen');assert.equal(focus.next,'door');assert.equal(focus.released,null);assert.equal(focus.scale,1);
+  const framing=[];
+  for(const viewport of [{width:390,height:844},{width:1280,height:720}]){
+   await page.setViewportSize(viewport);
+   for(const [x,z] of [[14,15.6],[0,19.8],[-20,18]]){
+    await page.evaluate(([x,z])=>window.bootTest.setMe(x,z),[x,z]);
+    await page.waitForFunction(()=>{const t=window.bootTest,s=t.projectScreen(),orbit=t.orbitTarget(),yaw=Math.atan2(-t.me.x,-18-t.me.z),expectedX=Math.max(-23.75,Math.min(23.75,t.me.x-Math.sin(yaw)*10)),expectedZ=Math.max(-20.75,Math.min(20.75,t.me.z-Math.cos(yaw)*10));return Math.abs(t.camera.position.x-expectedX)<.1&&Math.abs(t.camera.position.z-expectedZ)<.1&&Math.abs(s.x)<.0001&&Math.abs(s.y)<.0001&&[.1,3.65].every(h=>{const p=t.projectPlayer(h);return p.z<1&&p.z>-1&&Math.abs(p.x)<.88&&Math.abs(p.y)<.88;});});
+    framing.push(await page.evaluate(()=>({position:{...window.bootTest.me},fov:window.bootTest.camera.fov})));
+   }
+  }
   await page.setViewportSize({width:1280,height:720});
   const pageBefore=await page.evaluate(()=>{window.bootTest.pauseHostForTest();return window.bootTest.introPage();});
   await page.waitForFunction(previous=>window.bootTest.introPage()===previous+1,pageBefore,{timeout:10000});
@@ -52,6 +61,7 @@ const {chromium}=require('playwright');
    return {before,after,search,npcs:Object.values(s.players).filter(p=>p.npc).length,collisions:Object.values(s.players).filter(p=>p.npc&&t.npcWorldBlocked(s,p.x,p.z,.65)).length};
   });
   assert.equal(transitions.before,'instructions');assert.equal(transitions.after,'sitIntro');assert.equal(transitions.search,'search');assert.equal(transitions.npcs,19);assert.equal(transitions.collisions,0);assert.deepEqual(errors,[]);
+  await page.waitForFunction(()=>window.bootTest.camera.fov===65);
   await page.evaluate(()=>{const t=window.bootTest,s=t.getState(),id=t.getId();s.chairs[900]={x:10,z:6,y:15,occupied:id};s.chairs[901]={x:15,z:6,y:7,occupied:'NPC0'};s.players[id].sitting=900;s.players.NPC0.sitting=901;});
   await page.waitForFunction(()=>{const t=window.bootTest;return t.avatars[t.getId()].position.y===15&&t.avatars.NPC0.position.y===7&&t.getLocalHeight()===15&&t.camera.position.y>15;});
   const seatedHeights=await page.evaluate(()=>{const t=window.bootTest,s=t.getState(),result={local:t.avatars[t.getId()].position.y,remote:t.avatars.NPC0.position.y,cameraFollows:t.camera.position.y>15};s.players[t.getId()].sitting=0;s.players.NPC0.sitting=0;delete s.chairs[900];delete s.chairs[901];return result;});
@@ -66,6 +76,6 @@ const {chromium}=require('playwright');
   });
   assert(display.unchanged,'wallet rebuilt on position-only snapshots');assert(display.sameScreen,'results changed during chair selection');assert.equal(display.leaders,3);
   await page.screenshot({path:'/tmp/vote-results.png'});
-  console.log(JSON.stringify({initial,loaded,transitions,display,focus,seatedHeights,errors},null,2));
+  console.log(JSON.stringify({initial,loaded,transitions,display,focus,framing,seatedHeights,errors},null,2));
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

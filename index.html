@@ -2588,6 +2588,34 @@ function guideRoomView(now){
   yaw=Math.atan2(x-me.x,z-me.z);pitch=0;
  }return focus;
 }
+// Fit the whole character while keeping the presentation at the exact view center.
+function screenViewFov(cx,cy,cz,px,py,pz,aspect){
+ const dx=-cx,dy=8.1-cy,dz=voteWallZ+.09-cz,len=Math.hypot(dx,dy,dz),horizontal=Math.hypot(dx,dz);
+ if(horizontal<.001)return 120;
+ const fx=dx/len,fy=dy/len,fz=dz/len,rx=-dz/horizontal,rz=dx/horizontal;
+ const ux=-rz*fy,uy=horizontal/len,uz=rx*fy;
+ let tangent=0;
+ for(const height of [.1,3.65]){
+  const x=px-cx,y=py+height-cy,z=pz-cz,depth=x*fx+y*fy+z*fz;
+  if(depth<=.05)return 120;
+  tangent=Math.max(tangent,Math.abs(x*ux+y*uy+z*uz)/(depth*.82),Math.abs(x*rx+z*rz)/(depth*Math.max(.2,aspect)*.82));
+ }
+ return Math.max(65,Math.atan(tangent)*360/Math.PI);
+}
+function fitScreenCamera(cx,cy,cz,px,py,pz,aspect){
+ let best={y:cy,fov:screenViewFov(cx,cy,cz,px,py,pz,aspect)};
+ if(best.fov<=75)return best;
+ for(let y=cy-.25;y>=py+1.5;y-=.25){
+  const fov=screenViewFov(cx,y,cz,px,py,pz,aspect);
+  if(fov<best.fov)best={y,fov};
+  if(fov<=75){
+   let low=y,high=y+.25;
+   for(let i=0;i<8;i++){const mid=(low+high)/2;if(screenViewFov(cx,mid,cz,px,py,pz,aspect)>75)high=mid;else low=mid;}
+   return {y:low,fov:screenViewFov(cx,low,cz,px,py,pz,aspect)};
+  }
+ }
+ return best;
+}
 let stackIdle=null;
 function resetStackIdle(now){stackIdle={x:me.x,z:me.z,since:now};$('stackButton').hidden=true;}
 function updateStackButton(now){
@@ -2609,7 +2637,7 @@ $('stackButton').onclick=async event=>{
   applyAssignedSpawn(state);resetStackIdle(performance.now());
  }finally{relocating=false;$('stackButton').disabled=false;}
 };
-let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(isOnlineLobby()){pauseIntroPlayback();previous=t;return;}syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;if(player()?.carrying)speed*=0.5;let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
+let _screenViewActive=false;let _opaqueRoofConfigured=false;const _cameraTarget=new THREE.Vector3();let previous=performance.now(),lastDraw=0,lastActionRefresh=0,lastAccessoryUpdate=0;function frame(t){requestAnimationFrame(frame);if(isOnlineLobby()){pauseIntroPlayback();previous=t;return;}syncRendererSize();outdoorWorld.visible=worldReady&&state?.phase!=='instructions';if(document.hidden){pauseIntroPlayback();previous=t;return;}if(t-lastDraw<(innerWidth<700?48:40))return;lastDraw=t;if(state&&t-lastActionRefresh>450){lastActionRefresh=t;refreshActions();}let dt=Math.min((t-previous)/1000,.06);previous=t;const roomFocus=guideRoomView(t);updateSpotAction(t);let f=joyY+Number(!!(keys.KeyW||keys.ArrowUp))-Number(!!(keys.KeyS||keys.ArrowDown)),side=joyX+Number(!!(keys.KeyD||keys.ArrowRight))-Number(!!(keys.KeyA||keys.ArrowLeft));if(relocating||!worldReady&&state?.phase!=='instructions'){f=0;side=0;}if(spotAction&&(Math.abs(f)>.20||Math.abs(side)>.20)){spotAction=null;}if(player()?.sitting){let chair=state?.chairs?.[player().sitting];if(chair&&!chair.removed){me.x=chair.x;me.z=chair.z;playerHeight=chair.y||0;}f=0;side=0;}if(f||side){let l=Math.hypot(f,side),strength=Math.min(1,l),speed=(keys.ShiftLeft||keys.ShiftRight||strength>.78)?13:7;if(player()?.carrying)speed*=0.5;let dx=((Math.sin(yaw)*f+-Math.cos(yaw)*side)/l)*speed*dt*strength,dz=((Math.cos(yaw)*f+Math.sin(yaw)*side)/l)*speed*dt*strength;const canStep=(x,z)=>{const current=elevationAt(me.x,me.z),next=elevationAt(x,z);
  // Never step off the rooftop slab, including the stair-side entrance corner.
  // A descent is permitted only onto a real stair flight or its bridge.
  if(current>2.5 && playerHeight>2.5){
@@ -2688,7 +2716,7 @@ let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSyn
   }
  }
 }const isSearching=(k===id&&!!spotAction)||(k!==id&&v.npcSpotSearch?.stage==='searching');const actionShake=isSearching?Math.sin(t*.0038)*.18:0;a.userData.torso.position.y=(seated?1.95:1.6)+actionShake;if(a.userData.lanyard)a.userData.lanyard.position.y=(seated?.35:0)+actionShake;a.userData.head.position.y=(seated?3.05:2.75)+actionShake;a.rotation.z=isSearching?Math.sin(t*.0038)*.16:0;if(a.userData.searchGlass){a.userData.searchGlass.visible=(k===id&&spotAction?.kind==='reveal')||(k!==id&&v.npcSpotSearch?.stage==='searching');a.userData.searchGlass.position.y=4.05+Math.sin(t*.0038)*.10;}for(const leg of a.userData.legs||[]){leg.rotation.x=seated?-Math.PI/2:0;leg.position.y=seated?1.30:.55;leg.position.z=seated?.95:0;}}for(let k of Object.keys(avatars))if(!state?.players?.[k]){scene.remove(avatars[k]);avatars[k].userData.prizeTexture?.dispose();delete avatars[k]}for(let [k,v] of Object.entries(state?.chairs||{})){if(!chairs[k])chairs[k]=chairObj({...v,number:k});let c=chairs[k];c.visible=!v.removed&&!v.hiddenAt;let carrier=v.carrier&&state.players?.[v.carrier];if(carrier){const av=avatars[v.carrier];const angle=v.carrier===id?me.rot:(av?av.rotation.y:(carrier.rot||0));const px=v.carrier===id?me.x:(av?av.position.x:(carrier.x||0));const pz=v.carrier===id?me.z:(av?av.position.z:(carrier.z||0));const carryOffset=carriedChairBlocked(px,pz,angle,v.carrier===id?playerHeight:(carrier.y||0))?.25:.82;const targetX=px+Math.sin(angle)*carryOffset,targetZ=pz+Math.cos(angle)*carryOffset;const targetY=(v.carrier===id?playerHeight:(av?av.position.y:(carrier.y||0)))+1.48;if(!c.userData.wasCarried){c.position.set(targetX,targetY,targetZ);c.userData.wasCarried=true;}else{const alpha=1-Math.exp(-18*dt);c.position.x+=(targetX-c.position.x)*alpha;c.position.y+=(targetY-c.position.y)*alpha;c.position.z+=(targetZ-c.position.z)*alpha;}c.rotation.order='YXZ';c.rotation.set(Math.PI/2,angle,0);}else{c.userData.wasCarried=false;c.position.set(v.x,v.y||0,v.z);c.rotation.set(0,0,0)}}// Keep all ceilings and rooftop fences fully opaque, including while indoors.
-// The normal third-person camera is unchanged.
+// Roofs remain opaque during both free and guided third-person views.
 // These roofs and rails are static: configure once, not every rendered frame.
 if(!_opaqueRoofConfigured){
  for(const fence of interiorRoofRails)for(const mesh of fence.meshes){mesh.visible=true;mesh.material.opacity=1;mesh.material.transparent=false;mesh.material.depthWrite=true;}
@@ -2713,15 +2741,21 @@ if(indoorBuilding){
  camera.position.z=THREE.MathUtils.clamp(camera.position.z,minZ,maxZ);
  camera.position.y=Math.min(camera.position.y,b.h-1.7);
 }
-camera.position.lerp(_cameraTarget,.12);
+if(roomFocus==='screen'&&!_screenViewActive)camera.position.copy(_cameraTarget);else camera.position.lerp(_cameraTarget,.12);_screenViewActive=roomFocus==='screen';
 if(indoorBuilding){
  const b=indoorBuilding,margin=1.25;
  camera.position.x=THREE.MathUtils.clamp(camera.position.x,b.x-b.w/2+margin,b.x+b.w/2-margin);
  camera.position.z=THREE.MathUtils.clamp(camera.position.z,b.z-b.d/2+margin,b.z+b.d/2-margin);
  camera.position.y=Math.min(camera.position.y,b.h-1.7);
 }
-// Keep the normal TPS orbit position; only aim at the presentation center.
-if(roomFocus==='screen')camera.lookAt(0,8.1,voteWallZ+.09);else camera.lookAt(me.x,playerHeight+3,me.z);if(t-lastAccessoryUpdate>90){lastAccessoryUpdate=t;drawCoinDrops();renderGroundAccessories();}updateStackButton(performance.now());
+// Keep the TPS orbit behind the character and fit their body below the centered screen.
+let viewFov=65;
+if(roomFocus==='screen'){
+ const fit=fitScreenCamera(camera.position.x,camera.position.y,camera.position.z,me.x,playerHeight,me.z,camera.aspect);
+ camera.position.y=fit.y;viewFov=fit.fov;camera.lookAt(0,8.1,voteWallZ+.09);
+}else camera.lookAt(me.x,playerHeight+3,me.z);
+if(Math.abs(camera.fov-viewFov)>.05){camera.fov=viewFov;camera.updateProjectionMatrix();}
+if(t-lastAccessoryUpdate>90){lastAccessoryUpdate=t;drawCoinDrops();renderGroundAccessories();}updateStackButton(performance.now());
 tickIntroPlayback(state,performance.now(),true,worldReady&&!state?.worldPreparing);
 paintVoteWall();renderer.render(scene,camera);
 markIntroFramePresented(state,performance.now());syncIntroCompletion(performance.now());
