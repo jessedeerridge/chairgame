@@ -1855,7 +1855,7 @@ const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=40000, VOTE_MS=30000, ERASE_M
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
 const randBetween=(a,b)=>a+Math.random()*(b-a);
 function announce(message){const el=$('gameNotice');el.textContent=message;el.style.display='block';clearTimeout(announce.timer);announce.timer=setTimeout(()=>el.style.display='none',3600)}
-function initRound(s){s.noChairErased=false;s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=Date.now()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const p of Object.values(s.players)){p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
+function initRound(s){s.noChairErased=false;s.soloVotesPreparedRound=null;s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=Date.now()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const p of Object.values(s.players)){p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
 function indoorSpawn(i){const b=buildingSites[3];return {x:b.x+((i%5)-2)*7,z:b.z+3+Math.floor(i/5)*4.2};}
 function indoorPositionFree(s,k,point,occupied=[]){
  const b=buildingSites[3];
@@ -1992,11 +1992,20 @@ function updateSpotAction(t){
 
 $('moveChair').onclick=()=>mutate(s=>{let p=s.players[id];if(!p||s.phase==='finished')return;if(p.carrying){let c=s.chairs[p.carrying];if(c){{const x=p.x+Math.sin(p.rot)*1.8,z=p.z+Math.cos(p.rot)*1.8;const level=p.y??playerHeight;if(carriedChairBlocked(p.x,p.z,p.rot,level)||carriedChairBlocked(x,z,p.rot,level))return;const floor=chairFloorAt(x,z,level);if(Math.abs(floor-level)>1.05||!validChairPosition(x,z,p.carrying))return;c.carrier=null;c.x=x;c.z=z;c.y=floor}}p.carrying=0;return}for(let [n,c] of Object.entries(s.chairs)){if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.hypot(c.x-p.x,c.z-p.z)<3){c.carrier=id;p.carrying=Number(n);break}}});
 $('send').onclick=()=>{};
-$('vote').onclick=()=>{if(Math.hypot(me.x-VOTE_X,me.z-VOTE_Z)>=11)return;const target=$('voteTarget').value;mutate(s=>{const p=s.players[id];if(!canCastVote(s,id)||!p||Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)>=11||s.votes?.[id]||!s.players[target]?.alive)return;s.votes??={};if(s.votes[id])return;s.votes[id]=target;p.voted=true})};
+$('vote').onclick=()=>{if(Math.hypot(me.x-VOTE_X,me.z-VOTE_Z)>=11)return;const target=$('voteTarget').value;mutate(s=>{const p=s.players[id];if(!canCastVote(s,id)||!p||Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)>=11||s.votes?.[id]||!s.players[target]?.alive)return;s.votes??={};if(s.votes[id])return;s.votes[id]=target;p.voted=true;if(soloMode){s.deadline=Date.now();advanceState(s,s.deadline);}})};
 function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=true;c.carrier=null;c.occupied=null;s.noChairErased=false;s.lastRemoved=n;s.selectedEraseChair=n;s.phase='eraseReveal';s.deadline=Date.now()+7000}
 $('erase').onclick=()=>{const n=$('chairNumber').value;mutate(s=>{if(s.phase!=='erase'||s.parent!==id)return;finishErase(s,n)})};
 function chooseNPCVote(s,k){const p=s.players[k],candidates=Object.entries(s.players).filter(([_,v])=>v.alive);if(!candidates.length)return null;let best=null,score=-Infinity;for(const [key,c] of candidates){let value=Math.random()*2.4+(p.trust?.[key]||0)*3+(key===k?(p.personality==='積極型'?2:0):0);if(p.personality==='追従型')value+=(p.trust?.[key]||0)*3;if(p.personality==='独立型'&&key===k)value+=1.8;if(p.personality==='戦略型')value+=(s.lastVoteCounts?.[key]||0)*.2;if(p.personality==='気まぐれ型')value+=Math.random()*3;if(value>score){score=value;best=key}}return best}
 function chooseErase(s,k){const p=s.players[k],available=Object.entries(s.chairs).filter(([_,c])=>!c.removed);if(!available.length)return null;const scored=available.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
+function prepareSoloNPCVotes(s){
+ if(!soloMode||s.phase!=='vote'||s.soloVotesPreparedRound===s.round)return;
+ s.votes??={};
+ for(const [k,p] of Object.entries(s.players||{})){
+  if(!p.npc||p.online===false||p.voteIntent===false||!canCastVote(s,k)||!insideBlackBuilding(p.x,p.z)||s.votes[k])continue;
+  const target=chooseNPCVote(s,k);if(target){s.votes[k]=target;p.voted=true;}
+ }
+ s.soloVotesPreparedRound=s.round;
+}
 function advanceState(s,now){const phase=s.phase;
  if(phase==='instructions'){
   if(!worldReady||s.worldPreparing||!introParticipantsReady(s))return;
@@ -2013,8 +2022,8 @@ else if(phase==='search'){for(const p of Object.values(s.players)){p.wasAliveBef
   for(const [k,p] of Object.entries(s.players))if(zeroPrizePlayer(s,p)){const chair=s.chairs?.[p.sitting];if(chair?.occupied===k)chair.occupied=null;p.sitting=0;}
   return} s.phase='return';s.deadline=now+RETURN_MS}
 else if(phase==='return'){for(const p of Object.values(s.players))p.returned=Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)<11;s.phase='voteIntro';s.deadline=now+VOTE_INTRO_MS;s.votes={};s.voteEligible={}}
-else if(phase==='voteIntro'){s.voteEligible={};for(const [k,p] of Object.entries(s.players||{})){if(insideBlackBuilding(Number(p.x),Number(p.z)))s.voteEligible[k]=true;}s.phase='vote';s.deadline=now+VOTE_MS}
-else if(phase==='vote'){const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+6000;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
+else if(phase==='voteIntro'){s.voteEligible={};for(const [k,p] of Object.entries(s.players||{})){if(insideBlackBuilding(Number(p.x),Number(p.z)))s.voteEligible[k]=true;}s.phase='vote';s.deadline=now+VOTE_MS;prepareSoloNPCVotes(s);}
+else if(phase==='vote'){prepareSoloNPCVotes(s);const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+6000;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
 else if(phase==='results'){if(s.tieNoErase){s.tieNoErase=false;s.noChairErased=true;s.lastRemoved=null;s.selectedEraseChair=null;s.phase='eraseReveal';s.deadline=now+6000;}else{s.phase='erase';s.deadline=now+86400000}}
 else if(phase==='eraseReveal'){initRound(s)}}
 let advancing=false;
@@ -2397,7 +2406,7 @@ function npcSimulate(s,dt,now){
  const entries=npcActors.filter(([_,p])=>p.npc),offset=npcNavOrder++%Math.max(1,entries.length);
  const npcEntries=entries.slice(offset).concat(entries.slice(0,offset));
  for(const [k,p] of npcEntries){
- if(s.phase==='search')npcTryCostume(s,k,p);if(s.phase==='search'&&p.alive&&p.sitting)continue;if(s.phase==='vote'&&insideBlackBuilding(p.x,p.z)){if(canCastVote(s,k)&&!s.votes?.[k]&&now>s.deadline-VOTE_MS+randBetween(2500,15000)){const choice=chooseNPCVote(s,k);if(choice){s.votes[k]=choice;p.voted=true}}}if(s.phase==='finished')continue;// A chair-search intention is independent of alive/sitting status. Only willing NPCs exit.
+ if(s.phase==='search')npcTryCostume(s,k,p);if(s.phase==='search'&&p.alive&&p.sitting)continue;if(!soloMode&&s.phase==='vote'&&insideBlackBuilding(p.x,p.z)){if(canCastVote(s,k)&&!s.votes?.[k]&&now>s.deadline-VOTE_MS+randBetween(2500,15000)){const choice=chooseNPCVote(s,k);if(choice){s.votes[k]=choice;p.voted=true}}}if(s.phase==='finished')continue;// A chair-search intention is independent of alive/sitting status. Only willing NPCs exit.
 if(s.phase==='search'&&p.searchIntentRound!==s.round){
  p.searchIntentRound=s.round;p.searchIntent=true;p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
  // The front rows depart first; waiting NPCs stay clear of the doorway.
@@ -2462,7 +2471,7 @@ const speed=(s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run
 npcMove(s,k,p,destination,speed,dt);
 
 }
-if(s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
+if(!soloMode&&s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
 let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=Date.now();const tickEvery=soloMode?280:850;if(tickNow-npcLastTick<tickEvery)return;npcLastTick=tickNow;if(!worldReady||!host||!state||npcBusy||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=Date.now();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,soloMode?.28:.85,now)})}finally{npcBusy=false}},140);
 const modal=$('modal');$('modalCancel').onclick=()=>{modal.classList.remove('open');$('modalConfirm').textContent='決定';$('modalCancel').textContent='キャンセル';};
 function nearbyPickup(){if(!state?.coinDrops)return null;const now=Date.now();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(now-d.created>=10000||d.recipient===id||d.owner===id)).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
@@ -2593,7 +2602,7 @@ $('modalConfirm').onclick=async()=>{if(modalMode==='voteButtons'){
  confirm.disabled=true;
  try{
   let accepted=false;
-  await mutate(s=>{const voter=s.players?.[id];if(!canCastVote(s,id)||!voter||voter.voted||s.votes?.[id]||!s.players[key]?.alive)return;s.votes??={};s.votes[id]=key;voter.voted=true;voter.returned=true;accepted=true;});
+  await mutate(s=>{const voter=s.players?.[id];if(!canCastVote(s,id)||!voter||voter.voted||s.votes?.[id]||!s.players[key]?.alive)return;s.votes??={};s.votes[id]=key;voter.voted=true;voter.returned=true;accepted=true;if(soloMode){s.deadline=Date.now();advanceState(s,s.deadline);}});
   if(accepted){log('親決めに投票しました：'+(state.players?.[key]?.name||key));modal.classList.remove('open');modalMode='';selectedVoteCandidate=null;}
   else{closeVoteWhenEnded();if(phase()==='vote')alert('投票できませんでした');}
  }catch(e){alert('投票の通信に失敗しました：'+(e.message||e));}

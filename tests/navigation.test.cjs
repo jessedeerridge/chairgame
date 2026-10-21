@@ -13,7 +13,7 @@ const cut=(a,b)=>{const start=html.indexOf(a),end=html.indexOf(b,start);assert(s
 function setup(){
  const c=vm.createContext({performance,assert,console});
  vm.runInContext(`const {obstacles,hidingSpots,buildingSites,stairways,largeBuildings,VOTE_X,VOTE_Z}=${world};
- let roofRoomWalls=[],playerHeight=0,state=null,room='TEST',id='local',me={x:150,z:150};
+ let roofRoomWalls=[],playerHeight=0,state=null,soloMode=false,room='TEST',id='local',me={x:150,z:150};
  let randomSeed=123456;Math.random=()=>{randomSeed=(Math.imul(randomSeed,1664525)+1013904223)>>>0;return randomSeed/4294967296;};
  function randBetween(a,b){return a+(b-a)*Math.random()}
  function insideBlackBuilding(x,z){return Math.abs(x)<23.8&&Math.abs(z)<20.8}

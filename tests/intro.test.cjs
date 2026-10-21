@@ -7,7 +7,7 @@ function setup(){
  const context=vm.createContext({assert,console});
  const start=html.indexOf('const INTRO_PAGE_MS='),end=html.indexOf('function character',start);
  assert(start>=0&&end>start);
- const advanceStart=html.indexOf('function advanceState(s,now)'),advanceEnd=html.indexOf('let advancing=false;',advanceStart);
+ const advanceStart=html.indexOf('function prepareSoloNPCVotes(s)'),advanceEnd=html.indexOf('let advancing=false;',advanceStart);
  const roundStart=html.indexOf('function initRound(s)'),roundEnd=html.indexOf('function indoorSpawn',roundStart);
  vm.runInContext(`
  const listeners={},document={addEventListener:(name,fn)=>listeners[name]=fn};
