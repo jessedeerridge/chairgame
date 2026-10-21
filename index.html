@@ -153,10 +153,16 @@ window.addEventListener('error',e=>{const d=document.getElementById('runtimeErro
 const outdoorWorld=new THREE.Group();outdoorWorld.name='outdoor-world';outdoorWorld.visible=false;scene.add(outdoorWorld);
 let worldTarget=scene,worldReady=false,worldLoadPromise=null;
 const materialCache=new Map();const mat=c=>{if(!materialCache.has(c))materialCache.set(c,new THREE.MeshLambertMaterial({color:c}));return materialCache.get(c)};const boxGeometryCache=new Map();function boxGeo(w,h,d){const key=`${w},${h},${d}`;if(!boxGeometryCache.has(key))boxGeometryCache.set(key,new THREE.BoxGeometry(w,h,d));return boxGeometryCache.get(key)}const green=mat(0x497b46),sand=mat(0xc8b37c),water=mat(0x398bb0),brown=mat(0x65482d);function cube(w,h,d,m,x,y,z){let o=new THREE.Mesh(boxGeo(w,h,d),m);o.position.set(x,y,z);worldTarget.add(o);return o}const cylinderGeometryCache=new Map();function cylinder(r,h,m,x,y,z){const key=`${r},${h}`;let geo=cylinderGeometryCache.get(key);if(!geo){geo=new THREE.CylinderGeometry(r,r,h,12);cylinderGeometryCache.set(key,geo)}let o=new THREE.Mesh(geo,m);o.position.set(x,y,z);worldTarget.add(o);return o}let rand=(n)=>{let x=Math.sin(n*91.73+12.3)*43758.5453;return x-Math.floor(x)};function terrain(x,z){return Math.max(0,Math.sin(x*.022)*1.6+Math.cos(z*.018)*1.4+Math.sin((x+z)*.034)*.6)};
-const obstacles=[];function addObstacle(x,z,r){obstacles.push({x,z,r})}
+const obstacles=[];function addObstacle(x,z,r){const obstacle={x,z,r};obstacles.push(obstacle);return obstacle;}
 // Three guaranteed large buildings, spaced around the island.
 const buildingSites=[{x:0,z:205,w:38,d:34,h:9},{x:-210,z:-112,w:36,d:34,h:6},{x:210,z:-112,w:40,d:32,h:9},{x:0,z:0,w:50,d:44,h:9}];
 buildingSites.forEach(b=>{b.h=15;});
+// Keep a clear apron around the black room, including overhanging crowns.
+const BLACK_BUILDING_VEGETATION_CLEARANCE=20;
+function nearBlackBuildingVegetation(x,z,canopy=5){
+ const b=buildingSites[3],padding=BLACK_BUILDING_VEGETATION_CLEARANCE+canopy;
+ return Math.abs(x-b.x)<b.w/2+padding&&Math.abs(z-b.z)<b.d/2+padding;
+}
 const largeBuildings=buildingSites.map(b=>({...b,doorW:13,stairs:true}));
 const roofRoomWalls=[];
 const interiorRoofs=[];const interiorRoofRails=[]; // roof meshes that become transparent only for the local camera
@@ -658,6 +664,9 @@ function buildBuilding(i,interiorOnly=false){
 const finishBlackExterior=buildBuilding(3,true);
 const hidingSpots=[];
 function* buildOutdoorWorld(){
+ // Keep original placement metadata until signs have been positioned. Removing
+ // nearby plants must not resample plants or move existing signs elsewhere.
+ const removedVegetationObstacles=new Set();
 cube(1100,.1,1100,water,0,-2,0);cylinder(333,3,sand,0,-2.7,0);cylinder(310.5,3,green,0,-1.5,0);
 yield;
 // Unified road surface: one continuous union mesh, without overlapping rectangular ends.
@@ -708,7 +717,7 @@ yield* buildRoadSurface();
 
 // Avoid generating trees within or immediately around building footprints.
 const sharedTreeCrownGeometry=new THREE.ConeGeometry(1,1,7);
-for(let i=0;i<600;i++){if(i%12===0)yield;let a=rand(i+1)*Math.PI*2,r=Math.sqrt(rand(i+800))*297,x=Math.cos(a)*r,z=Math.sin(a)*r;if(r<22||onPath(x,z,4)||buildingSites.some((b,j)=>j!==2&&Math.abs(x-(b.x+b.w*.28))<9&&z>b.z-b.d/2-53&&z<b.z-b.d/2+3))continue;if(buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+8&&Math.abs(z-b.z)<b.d/2+8))continue;if(buildingSites.some((b,j)=>{const side=j===0?1:-1,sw=4.3,inner=b.x+side*(b.w/2+1.5+sw/2+1.2),outer=inner+side*(sw+1),front=b.z+b.d/2-4,back=front-(b.d-9);return x>Math.min(inner,outer)-sw/2-5&&x<Math.max(inner,outer)+sw/2+5&&z>back-6.2-5&&z<front+sw/2+5;}))continue;addObstacle(x,z,.85);let h=3+rand(i+300)*7;cylinder(.45,h,brown,x,h/2,z);let crown=new THREE.Mesh(sharedTreeCrownGeometry,mat([0x25552e,0x376b39,0x46763b][i%3]));crown.scale.set(2.5+rand(i+80)*2,7+rand(i+60)*4,2.5+rand(i+80)*2);crown.position.set(x,h+3,z);worldTarget.add(crown)}
+for(let i=0;i<600;i++){if(i%12===0)yield;let a=rand(i+1)*Math.PI*2,r=Math.sqrt(rand(i+800))*297,x=Math.cos(a)*r,z=Math.sin(a)*r;if(r<22||onPath(x,z,4)||buildingSites.some((b,j)=>j!==2&&Math.abs(x-(b.x+b.w*.28))<9&&z>b.z-b.d/2-53&&z<b.z-b.d/2+3))continue;if(buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+8&&Math.abs(z-b.z)<b.d/2+8))continue;if(buildingSites.some((b,j)=>{const side=j===0?1:-1,sw=4.3,inner=b.x+side*(b.w/2+1.5+sw/2+1.2),outer=inner+side*(sw+1),front=b.z+b.d/2-4,back=front-(b.d-9);return x>Math.min(inner,outer)-sw/2-5&&x<Math.max(inner,outer)+sw/2+5&&z>back-6.2-5&&z<front+sw/2+5;}))continue;const solid=addObstacle(x,z,.85);if(nearBlackBuildingVegetation(x,z)){removedVegetationObstacles.add(solid);continue;}let h=3+rand(i+300)*7;cylinder(.45,h,brown,x,h/2,z);let crown=new THREE.Mesh(sharedTreeCrownGeometry,mat([0x25552e,0x376b39,0x46763b][i%3]));crown.scale.set(2.5+rand(i+80)*2,7+rand(i+60)*4,2.5+rand(i+80)*2);crown.position.set(x,h+3,z);worldTarget.add(crown)}
 for(const i of [0,1,2]){
  const exterior=buildBuilding(i,true);yield;exterior();yield;
 }
@@ -724,16 +733,18 @@ for(let i=0;i<220;i++){if(i%4===0)yield;
   const a=rand(i*31+attempt+3200)*Math.PI*2,r=25+rand(i*43+attempt+3300)*268,x=Math.cos(a)*r,z=Math.sin(a)*r;
   if(onPath(x,z,4)||stairways.some(st=>x>st.minX-5&&x<st.maxX+5&&z>st.back-5&&z<st.front+5)||buildingSites.some(b=>Math.abs(x-b.x)<b.w/2+6&&Math.abs(z-b.z)<b.d/2+6))continue;
   if(hidingSpots.some(q=>Math.hypot(x-q.x,z-q.z)<(type==='bush'?4.8:5)))continue;
-  const g=new THREE.Group();g.position.set(x,0,z);
+  const cleared=nearBlackBuildingVegetation(x,z),g=new THREE.Group();g.position.set(x,0,z);
   if(type==='tree'){
-   const trunk=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.5,7,7),brown);trunk.position.y=3.5;g.add(trunk);
-   const crown=new THREE.Mesh(new THREE.ConeGeometry(4,9,7),green);crown.position.y=10;g.add(crown);
-   addObstacle(x,z,1.65);
-  }else{
+   if(!cleared){
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.5,7,7),brown);trunk.position.y=3.5;g.add(trunk);
+    const crown=new THREE.Mesh(new THREE.ConeGeometry(4,9,7),green);crown.position.y=10;g.add(crown);
+   }
+   const solid=addObstacle(x,z,1.65);if(cleared)removedVegetationObstacles.add(solid);
+  }else if(!cleared){
    // Shared geometry and materials keep 40 bushes lightweight.
    for(let j=0;j<5;j++){const a=j*2.39996;bushInstances[j%3].push([x+Math.cos(a)*1.65,1.45,z+Math.sin(a)*1.65]);}
   }
-  if(type==='tree')worldTarget.add(g);hidingSpots.push({id:'H'+i,x,z,type});placed=true;
+  if(type==='tree'&&!cleared)worldTarget.add(g);hidingSpots.push({id:'H'+i,x,z,type});placed=true;
  }
 }
 const _bushMatrix=new THREE.Matrix4(),_bushScale=new THREE.Vector3(1.4,1,1.4),_bushQuaternion=new THREE.Quaternion();
@@ -763,9 +774,9 @@ for(let row=0;row<25;row++){yield;
   if(Math.hypot(xx,zz)>296||Math.hypot(xx,zz)<22||onPath(xx,zz,5.3))continue;
   if(buildingSites.some(b=>Math.abs(xx-b.x)<b.w/2+9&&Math.abs(zz-b.z)<b.d/2+9))continue;
   if(stairways.some(st=>xx>st.minX-6&&xx<st.maxX+6&&zz>st.back-9&&zz<st.front+8))continue;
+  const solid=addObstacle(xx,zz,.65);if(nearBlackBuildingVegetation(xx,zz)){removedVegetationObstacles.add(solid);continue;}
   forestInstances[0].push([xx,3,zz]);
   forestInstances[1+(row+j)%3].push([xx,10.2,zz]);
-  addObstacle(xx,zz,.65);
  }
 }
 const _forestMatrix=new THREE.Matrix4();
@@ -865,6 +876,9 @@ for(const c of signCandidates){yield;
  board.position.set(c.x,3.55,c.z);board.rotation.y=nearestRoadAngle(c.x,c.z)??(c.angle+Math.PI/2);worldTarget.add(board);
  addObstacle(c.x,c.z,.45);signPositions.push(c);signPlaced++;
 }
+ // Remove collision and hiding targets as well as visuals, before gameplay starts.
+ for(let i=obstacles.length-1;i>=0;i--)if(removedVegetationObstacles.has(obstacles[i]))obstacles.splice(i,1);
+ for(let i=hidingSpots.length-1;i>=0;i--)if(nearBlackBuildingVegetation(hidingSpots[i].x,hidingSpots[i].z))hidingSpots.splice(i,1);
 }
 function startWorldLoading(){
  if(worldReady)return Promise.resolve(true);
@@ -885,9 +899,12 @@ function startWorldLoading(){
   await compiling;
   npcCollisionIndex=null;npcTerrainGrid=null;npcGroundStairs=null;npcNavigation.clear();_opaqueRoofConfigured=false;
   worldReady=true;performance.mark('island-world-ready');
-  if(state&&host&&state.worldPreparing)await mutate(s=>{
-   if(s.host!==id||!s.worldPreparing)return;
-   s.chairs=seedChairs();s.worldPreparing=false;
+  const clearedChair=c=>c.hiddenAt&&nearBlackBuildingVegetation(c.x,c.z);
+  if(state&&host&&(state.worldPreparing||Object.values(state.chairs||{}).some(clearedChair)))await mutate(s=>{
+   if(s.host!==id)return;
+   if(s.worldPreparing){s.chairs=seedChairs();s.worldPreparing=false;}
+   // Existing rooms may still have a chair hidden in a bush that was removed.
+   for(const c of Object.values(s.chairs||{}))if(clearedChair(c))c.hiddenAt=null;
   });
   return true;
  })().catch(error=>{
