@@ -189,5 +189,18 @@ test('indoor departure starts with no A-star budget and retains the distant actu
  npcNavNodesLeft=0;npcNavDeadline=0;
  const target=npcNavigationTarget(s,'NPC0',p,10000);
  assert(target);assert.equal(target.x,buildingSites[3].x);assert.equal(target.z,buildingSites[3].z+buildingSites[3].d/2+4);assert.equal(p.goal,goal);assert(p.npcExitPending);
- p.x=target.x;p.z=target.z;npcNavigationTarget(s,'NPC0',p,11000);assert.equal(p.npcExitPending,false);assert.equal(p.goal,goal);
+ p.x=target.x;p.z=target.z;const outside=npcNavigationTarget(s,'NPC0',p,11000);assert(outside);assert.equal(p.npcExitStage,'spread');assert.equal(p.goal,goal);
+`));
+test('nineteen NPCs leave around a stationary player at the entrance without following that player',()=>setup()(`
+ const s=game({human:{x:0,z:24,y:0,online:true}}),goals=[];
+ for(let i=0;i<19;i++){const goal=safe({x:(i%5-2)*7,z:65+Math.floor(i/5)*4.2});goals.push(goal);s.players['NPC'+i]=npc((i%5-2)*7,3+Math.floor(i/5)*4.2,goal);}
+ simulate(s,180);const arrived=Object.entries(s.players).filter(([k,p])=>p.npc&&Math.hypot(p.x-goals[Number(k.slice(3))].x,p.z-goals[Number(k.slice(3))].z)<3);
+ assert.equal(arrived.length,19,JSON.stringify(Object.entries(s.players).filter(([k,p])=>p.npc&&!arrived.some(([key])=>key===k)).map(([k,p])=>({k,x:p.x,z:p.z,goal:p.goal}))));
+`));
+test('outdoor dispersal targets differ by NPC and never track a moving player',()=>setup()(`
+ const a=npc(0,26,{x:-200,z:-200}),b=npc(2,26,{x:-200,z:-200}),s=game({NPC0:a,NPC1:b,human:{x:0,z:24,online:true}});
+ for(const p of [a,b]){p.npcExitPending=true;p.npcExitStage='spread';}
+ npcNavDeadline=Infinity;npcNavNodesLeft=Infinity;const first=npcNavigationTarget(s,'NPC0',a,10000),second=npcNavigationTarget(s,'NPC1',b,10000);
+ assert(first&&second);assert.notEqual(first.x,second.x);assert(first.z>=buildingSites[3].z+buildingSites[3].d/2+10);
+ s.players.human.x=60;s.players.human.z=40;const unchanged=npcNavigationTarget(s,'NPC0',a,10280);assert.equal(unchanged.x,first.x);assert.equal(unchanged.z,first.z);assert.equal(a.goal.x,-200);assert.equal(a.goal.z,-200);
 `));

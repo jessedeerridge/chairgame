@@ -49,3 +49,10 @@ test('multiple survivors still go to voting after return and the elimination ann
  advanceState(s,s.deadline);assert.equal(s.phase,'voteIntro');advanceState(s,s.deadline-1);assert.equal(s.phase,'voteIntro');
  advanceState(s,s.deadline);assert.equal(s.phase,'vote');assert.equal(s.winner,undefined);
 `));
+test('disconnected participants lie down until reconnecting, independently of prize coins',()=>run(`
+ const s={phase:'search',started:10},p={npc:false,initial:true,online:false,wallet:{me:23}},avatar={userData:{pose:{rotation:{x:0}}}};
+ assert.equal(updateFinishedPose(avatar,s,p,1000),0);assert(updateFinishedPose(avatar,s,p,1500)>0);
+ assert.equal(updateFinishedPose(avatar,s,p,2100),Math.PI/2);assert.equal(updateFinishedPose(avatar,s,p,10000),Math.PI/2);
+ p.online=true;assert.equal(updateFinishedPose(avatar,s,p,10100),0);assert.equal(avatar.userData.pose.rotation.x,0);
+ p.online=false;assert.equal(updateFinishedPose(avatar,s,p,10200),0);
+`));
