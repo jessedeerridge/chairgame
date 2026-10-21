@@ -25,7 +25,7 @@ test('an active participant takes over a disconnected host and keeps ownership o
 test('delayed online advancement keeps absolute deadlines instead of restarting timers',async()=>{
  const c=vm.createContext({assert});
  vm.runInContext(`function roomNow(){return Date.now()}
-let state={phase:'search',round:1,deadline:1000,players:{a:{alive:true,sitting:1,x:0,z:0},b:{alive:true,sitting:2,x:0,z:0}},votes:{}},host=true,worldReady=true,soloMode=false;
+let id='a',joiningRoom=false;let state={phase:'search',host:'a',round:1,deadline:1000,players:{a:{alive:true,sitting:1,x:0,z:0},b:{alive:true,sitting:2,x:0,z:0}},votes:{}},host=true,worldReady=true,soloMode=false;
  const SEARCH_MS=90000,RETURN_MS=40000,VOTE_INTRO_MS=7000,VOTE_MS=30000,RESULTS_MS=7000,VOTE_X=0,VOTE_Z=-7;
  Date.now=()=>50000;const phase=()=>state.phase;async function mutate(fn){fn(state)}function insideBlackBuilding(){return true}function prepareSoloNPCVotes(){}
  `+cut('function advanceState(s,now)','setInterval(advance,250);'),c);
@@ -52,4 +52,10 @@ test('lobby admission does not replace NPCs and enforces the actual human capaci
  const s={phase:'lobby',players:{NPC0:{npc:true,alive:false}}};assert.equal(admitRoomPlayer(s,'a','A',1),null);assert(s.players.NPC0.npc);
  for(let i=1;i<12;i++)assert.equal(admitRoomPlayer(s,'p'+i,'P',i),null);
  assert.equal(admitRoomPlayer(s,'extra','Extra',20),'full');assert(!s.players.extra);
+`));
+test('a suspended or stale host yields to a visible participant, without reclaiming on return',()=>setup()(`
+ Date.now=()=>100000;
+ const s={host:'a',players:{a:{name:'A',online:true,lastSeen:99000,hostAvailable:false},b:{name:'B',online:true,lastSeen:99000,joined:2},c:{name:'C',online:true,lastSeen:1000,joined:1}}};
+ assert(claimRoomHost(s));assert.equal(s.host,'b');s.players.a.hostAvailable=true;assert(!claimRoomHost(s));
+ Date.now=()=>120000;s.players.a.lastSeen=120000;assert(claimRoomHost(s));assert.equal(s.host,'a');
 `));

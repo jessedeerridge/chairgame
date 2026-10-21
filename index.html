@@ -177,7 +177,7 @@ async function syncRoomClock(){
   // A reconnect must restore visibility and flush the latest local position.
   lastPositionPacket='';lastPositionSent=0;
   onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(false).catch(console.warn);
-  update(ref(database(),`rooms/${room}/players/${id}`),{online:true}).catch(console.warn);
+  update(ref(database(),`rooms/${room}/players/${id}`),{online:true,lastSeen:roomNow(),hostAvailable:!document.hidden}).catch(console.warn);
  });
 }
 // Child update()/set() cancels an overlapping parent transaction in the Firebase SDK.
@@ -201,13 +201,13 @@ function reconcileRoomPositions(s){
 }
 let lastPositionPacket='',lastPositionSent=0,positionWriteBusy=false;
 function publishPlayerPosition(t,moving=false){
- const p=player();if(!p||relocating||state.phase==='lobby'||t-lastSync<80)return;
+ const p=player();if(!p||joiningRoom||relocating||state.phase==='lobby'||t-lastSync<80)return;
  const packet={x:Math.round(me.x*100)/100,y:Math.round(playerHeight*100)/100,z:Math.round(me.z*100)/100,rot:Math.round(me.rot*1000)/1000,moving:!!moving,
   ...(mapUnlocked?{mapUnlockedFor:mapVisitKey}:{}),...(lastAppliedSpawn?{spawnApplied:lastAppliedSpawn}:{})};
  if(soloMode){lastSync=t;Object.assign(p,packet);return;}
  const signature=JSON.stringify(packet),needsAck=p.spawn?.version&&p.spawnApplied!==p.spawn.version;
  if(positionWriteBusy||roomTransactions||!needsAck&&signature===lastPositionPacket&&t-lastPositionSent<1500)return;
- lastSync=t;positionWriteBusy=true;packet.positionAt=roomNow();const packetRoom=room,packetId=id;
+ lastSync=t;positionWriteBusy=true;packet.positionAt=roomNow();packet.lastSeen=packet.positionAt;packet.hostAvailable=true;const packetRoom=room,packetId=id;
  update(ref(database(),`rooms/${packetRoom}/players/${packetId}`),packet).then(()=>{
   if(room===packetRoom&&id===packetId){lastPositionPacket=signature;lastPositionSent=t;if(p.carrying)prepareDisconnectChair({...p,...packet});}
  }).catch(console.warn).finally(()=>{positionWriteBusy=false;});
@@ -219,13 +219,15 @@ function captureRemoteMotion(s,now=roomNow()){
   if(key===id)continue;
   const version=[s.started||0,p.spawn?.version||'',p.sitting||0,p.online!==false].join(':');
   let track=remoteMotionHistory.get(key),last=track?.samples.at(-1);
-  if(!track||track.version!==version||last&&Math.hypot(p.x-last.x,p.z-last.z)>28){track={version,samples:[],period:p.npc?420:100};remoteMotionHistory.set(key,track);last=null;}
+  if(!track||track.version!==version||last&&Math.hypot(p.x-last.x,p.z-last.z)>28){track={version,samples:[],period:p.npc?420:100,lag:0,jitter:0,renderAt:null};remoteMotionHistory.set(key,track);last=null;}
   const at=Number(p.npc?s.npcFrameAt:p.positionAt)||now,changed=!last||p.x!==last.x||p.z!==last.z||(p.y||0)!==last.y||p.rot!==last.rot;
   if(last&&at<=last.at&&!changed)continue;
   const stamp=last&&at<=last.at?now:at;if(last&&stamp<=last.at)continue;
+  const lag=Math.max(0,Math.min(2000,now-stamp));track.lag=Math.max(lag,track.lag*.95);
   const sample={x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0,at:stamp,moving:p.npc?p.motionMoving:p.moving,trip:p.npcRoofTrip?.active?p.npcRoofTrip:null};
   if(last){
    const gap=stamp-last.at;
+   if(gap>20&&gap<1200)track.jitter=Math.max(Math.abs(gap-track.period),track.jitter*.9);
    // A long idle period is not the duration of the first walking step.
    if(sample.moving===true&&gap>(p.npc?650:250)){
     track.samples.push({...last,at:stamp-Math.min(gap,p.npc?420:100)});
@@ -239,7 +241,9 @@ function remoteMotionPose(key,p,now=roomNow()){
  const track=remoteMotionHistory.get(key),samples=track?.samples,last=samples?.at(-1);
  if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0};
  const delay=p.npc?Math.max(300,Math.min(420,track.period*.75+50)):Math.max(80,Math.min(150,track.period*.8));
- const time=now-delay;
+ const adaptiveDelay=Math.min(1500,delay+(track.lag||0)+Math.min(250,(track.jitter||0)*.5));
+ // Growing the buffer may slow the visual clock, never move it backwards.
+ const time=track.renderAt=Math.max(track.renderAt??-Infinity,now-adaptiveDelay);
  if(time<=samples[0].at)return samples[0];
  for(let i=1;i<samples.length;i++)if(time<=samples[i].at){
   const a=samples[i-1],b=samples[i],f=Math.max(0,Math.min(1,(time-a.at)/(b.at-a.at))),turn=Math.atan2(Math.sin(b.rot-a.rot),Math.cos(b.rot-a.rot));
@@ -1715,7 +1719,7 @@ function availableShirtColor(s,k,preferred){
 // Admission and NPC takeover run atomically on the room, so two guests cannot claim one slot.
 function admitRoomPlayer(s,key,name,now){
  if(!s)return 'missing';s.players??={};const old=s.players[key];
- if(old&&!old.npc){Object.assign(old,{name,online:true,worldReady:false});return null;}
+ if(old&&!old.npc){Object.assign(old,{name,online:true,lastSeen:now,hostAvailable:true,worldReady:false});return null;}
  if(s.phase==='lobby'){
   if(lobbyParticipants(s).length>=12)return 'full';
   const shirtColor=availableShirtColor(s,key);if(!shirtColor)return 'full';
@@ -1782,15 +1786,25 @@ function renderShirtColors(){
   button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));
  }
 }
+function roomHostAvailable(p,now=roomNow()){
+ return !!p&&!p.npc&&p.online!==false&&p.hostAvailable!==false&&(!p.lastSeen||now-p.lastSeen<15000);
+}
 function claimRoomHost(s){
- if(s.players?.[s.host]?.online!==false&&s.players?.[s.host])return false;
- const humans=lobbyParticipants(s).sort(([a,p],[b,q])=>(p.joined||0)-(q.joined||0)||a.localeCompare(b));
+ if(roomHostAvailable(s.players?.[s.host]))return false;
+ const humans=lobbyParticipants(s).filter(([k,p])=>roomHostAvailable(p)).sort(([a,p],[b,q])=>(p.joined||0)-(q.joined||0)||a.localeCompare(b));
  if(!humans.length)return false;const [key,p]=humans[0];s.host=key;s.hostName=p.name;return true;
 }
 let hostRecoveryBusy=false;
 async function recoverRoomHost(){
- if(soloMode||!state||hostRecoveryBusy||state.players?.[state.host]?.online!==false&&state.players?.[state.host])return;
+ if(soloMode||joiningRoom||!state||hostRecoveryBusy||roomHostAvailable(state.players?.[state.host]))return;
  hostRecoveryBusy=true;try{await mutate(claimRoomHost);}catch(error){console.warn('進行役の引き継ぎを再試行します',error);}finally{hostRecoveryBusy=false;}
+}
+let presenceBusy=false;
+async function syncRoomPresence(){
+ if(soloMode||joiningRoom||!room||!state?.players?.[id]||presenceBusy)return;
+ const presenceRoom=room,presenceId=id;presenceBusy=true;
+ try{await update(ref(database(),`rooms/${presenceRoom}/players/${presenceId}`),{online:true,lastSeen:roomNow(),hostAvailable:!document.hidden});}
+ catch(error){console.warn('接続状態を再確認します',error);}finally{presenceBusy=false;}
 }
 let playerPreloadTask=null;
 function preloadRoomPlayer(){
@@ -1900,24 +1914,26 @@ function scheduleRoomUI(immediate=false){
 }
 async function mutate(fn){
  if(soloMode){if(!state)return;fn(state);renderUI();return;}if(!room)return;
- const mutationRoom=room;roomTransactions++;
+ const mutationRoom=room,mutationId=id;roomTransactions++;
  const task=async()=>{
   try{
-   await Promise.allSettled([...roomUpdateFlights]);if(room!==mutationRoom)return;
+   await Promise.allSettled([...roomUpdateFlights]);if(room!==mutationRoom||id!==mutationId||joiningRoom)return;
    const result=await runTransaction(ref(database(),`rooms/${mutationRoom}`),s=>{if(!s)return;reconcileRoomPositions(s);fn(s);return s},{applyLocally:false});
    if(!result.committed)log('操作できませんでした');return result;
   }finally{roomTransactions--;releaseRoomWrites();}
  };
  const pending=roomMutationQueue.then(task,task);roomMutationQueue=pending.catch(()=>{});return pending;
 }
-let roomSubscription=null,joiningRoom=false;
-$('join').onclick=async()=>{if(joiningRoom)return;joiningRoom=true;try{$('join').disabled=true;await ensureFirebase();await syncRoomClock();$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;pendingShirtChoice=null;remoteMotionHistory.clear();
+let roomSubscription=null,joiningRoom=false,roomJoinSequence=0;
+$('join').onclick=async()=>{if(joiningRoom)return;const joinSequence=++roomJoinSequence;joiningRoom=true;try{$('join').disabled=true;await ensureFirebase();await syncRoomClock();$('join').textContent='接続中…';let name=$('name').value.trim()||'プレイヤー',code=$('room').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,16);if(!code)return alert('部屋コードを入力');roomSubscription?.();roomSubscription=null;state=null;host=false;room=code;soloMode=false;playerPreloadTask=null;lastAppliedSpawn=null;pendingShirtChoice=null;remoteMotionHistory.clear();
 // Same room + same exact name always resolves to the same Firebase player record.
 // Hex encoding avoids Firebase-invalid key characters and accidental name collisions.
 id='U'+Array.from(new TextEncoder().encode(name)).map(b=>b.toString(16).padStart(2,'0')).join('');
 let root=ref(database(),`rooms/${room}`),admissionError=null;
 const joinTime=roomNow(),newRoomSeed=Math.floor(Math.random()*4294967295)+1;
 let joined;
+// Warm the cache before admission: a cached refusal may belong to an older round.
+await get(root);
 for(let attempt=0;attempt<3;attempt++){
  admissionError=null;
  joined=await runTransaction(root,s=>{
@@ -1926,8 +1942,8 @@ for(let attempt=0;attempt<3;attempt++){
  s??={host:id,hostName:name,phase:'lobby',round:0,worldSeed:newRoomSeed,chairs:{},accessories:initialAccessories(),players:{},votes:{}};
  admissionError=admitRoomPlayer(s,id,name,joinTime);if(admissionError)return;return s;
  },{applyLocally:false});
- if(joined.committed||admissionError)break;
- // Refresh before retrying a canceled transaction; keep legitimate admission refusals final.
+ if(joined.committed)break;
+ // Refresh even a refusal: the cached room may predate this player's saved record.
  if(attempt<2)await get(root);
 }
 if(!joined.committed)throw new Error(admissionError==='full'?'この部屋は満員です（最大12人）':admissionError==='noNpc'?'交代できる脱落NPCがまだいません':admissionError==='finished'?'このゲームは終了しています':'入室を完了できませんでした。もう一度お試しください');
@@ -1935,13 +1951,13 @@ const saved=joined.snapshot.val().players[id];lastAppliedSpawn=saved?.spawnAppli
 await onDisconnect(ref(database(),`rooms/${room}/players/${id}/online`)).set(false);
 // Chair state belongs to the shared room. Preserve sitting and the occupied chair
 // across reconnects; only a chair being carried is dropped on disconnection.
-await prepareDisconnectChair(saved);
+prepareDisconnectChair(saved).catch(console.warn);
 roomSubscription?.();
-await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=reconcileRoomPositions(incoming);captureRemoteMotion(state);host=state.host===id;recoverRoomHost();if(host&&worldReady&&state.worldPreparing)syncWorldPrepared(loadedWorldSeed).catch(console.warn);
+await new Promise((resolve,reject)=>{roomSubscription=onValue(root,snap=>{if(joinSequence!==roomJoinSequence)return;const incoming=snap.val();if(!incoming)return;const oldPhase=state?.phase;state=reconcileRoomPositions(incoming);captureRemoteMotion(state);host=state.host===id;recoverRoomHost();if(host&&worldReady&&state.worldPreparing)syncWorldPrepared(loadedWorldSeed).catch(console.warn);
 if(state?.players?.[id]){applyAssignedSpawn(state);prepareDisconnectChair(state.players[id]);}
 if(state?.phase==='instructions'&&oldPhase!=='instructions'&&state.players?.[id]&&!state.players[id].spawn){
  const p=state.players[id];me.x=p.x;me.z=p.z;playerHeight=0;me.rot=p.rot||Math.PI;yaw=me.rot;
-}scheduleRoomUI(oldPhase!==state.phase||state.phase==='lobby');$('entry').hidden=true;document.getElementById('runtimeError').textContent='';resolve();},reject);});log('部屋 '+room+' に参加（保存データを復元）')}catch(e){console.error('参加失敗',e);alert('部屋に参加できません：'+(e?.message||e))}finally{joiningRoom=false;$('join').disabled=false;$('join').textContent='あそぶ ➜'}};
+}scheduleRoomUI(oldPhase!==state.phase||state.phase==='lobby');$('entry').hidden=true;document.getElementById('runtimeError').textContent='';resolve();},reject);});log('部屋 '+room+' に参加（保存データを復元）')}catch(e){console.error('参加失敗',e);alert('部屋に参加できません：'+(e?.message||e))}finally{joiningRoom=false;if(state?.players?.[id]){syncRoomPresence();recoverRoomHost();}$('join').disabled=false;$('join').textContent='あそぶ ➜'}};
 // Server-side disconnect actions work even when the browser is abruptly closed.
 // Re-arm only when the carried chair or last recorded drop position changes.
 let disconnectChairId=null,disconnectChairPos='',disconnectChairBusy=false;
@@ -2126,7 +2142,7 @@ $('vote').onclick=()=>{if(Math.hypot(me.x-VOTE_X,me.z-VOTE_Z)>=11)return;const t
 function finishErase(s,n){const c=s.chairs[n];if(!c||c.removed)return;c.removed=true;c.carrier=null;c.occupied=null;s.noChairErased=false;s.lastRemoved=n;s.selectedEraseChair=n;s.phase='eraseReveal';s.deadline=roomNow()+7000}
 $('erase').onclick=()=>{const n=$('chairNumber').value;mutate(s=>{if(s.phase!=='erase'||s.parent!==id)return;finishErase(s,n)})};
 function chooseNPCVote(s,k){const p=s.players[k],candidates=Object.entries(s.players).filter(([_,v])=>v.alive);if(!candidates.length)return null;let best=null,score=-Infinity;for(const [key,c] of candidates){let value=Math.random()*2.4+(p.trust?.[key]||0)*3+(key===k?(p.personality==='積極型'?2:0):0);if(p.personality==='追従型')value+=(p.trust?.[key]||0)*3;if(p.personality==='独立型'&&key===k)value+=1.8;if(p.personality==='戦略型')value+=(s.lastVoteCounts?.[key]||0)*.2;if(p.personality==='気まぐれ型')value+=Math.random()*3;if(value>score){score=value;best=key}}return best}
-function chooseErase(s,k){const p=s.players[k],available=Object.entries(s.chairs).filter(([_,c])=>!c.removed);if(!available.length)return null;const scored=available.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
+function chooseErase(s,k){const p=s.players[k]||{},available=Object.entries(s.chairs).filter(([_,c])=>!c.removed);if(!available.length)return null;const scored=available.map(([n,c])=>{let score=Math.random()*5;const enemy=Object.entries(s.players).filter(([id,v])=>id!==k&&v.alive&&((p.trust?.[id]||0)<.3));for(const [id,v] of enemy)if(v.previous===Number(n))score-=2;if(p.personality==='戦略型')score+=enemy.filter(([id,v])=>Math.hypot(v.x-c.x,v.z-c.z)<35).length*2;if(p.previous===Number(n))score+=1;return [n,score]}).sort((a,b)=>b[1]-a[1]);return scored[0]?.[0]}
 function prepareSoloNPCVotes(s){
  if(!soloMode||s.phase!=='vote'||s.soloVotesPreparedRound===s.round)return;
  s.votes??={};
@@ -2156,17 +2172,28 @@ else if(phase==='voteIntro'){
   return}
  s.voteEligible={};for(const [k,p] of Object.entries(s.players||{})){if(insideBlackBuilding(Number(p.x),Number(p.z)))s.voteEligible[k]=true;}s.phase='vote';s.deadline=now+VOTE_MS;prepareSoloNPCVotes(s);}
 else if(phase==='vote'){prepareSoloNPCVotes(s);const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+6000;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
-else if(phase==='results'){if(s.tieNoErase){s.tieNoErase=false;s.noChairErased=true;s.lastRemoved=null;s.selectedEraseChair=null;s.phase='eraseReveal';s.deadline=now+6000;}else{s.phase='erase';s.deadline=now+86400000}}
+else if(phase==='results'){if(s.tieNoErase){s.tieNoErase=false;s.noChairErased=true;s.lastRemoved=null;s.selectedEraseChair=null;s.phase='eraseReveal';s.deadline=now+6000;}else{s.phase='erase';s.eraseParentMissingAt=null;s.deadline=now+60000}}
+else if(phase==='erase'){
+ // A missing parent must not block the entire room until they reconnect.
+ const n=chooseErase(s,s.parent);if(n)finishErase(s,n);
+ else{s.noChairErased=true;s.phase='eraseReveal';s.deadline=now+6000;}
+}
 else if(phase==='eraseReveal'){initRound(s)}}
+function eraseParentMissing(s){const p=s.players?.[s.parent];return !p||p.online===false||!p.npc&&!roomHostAvailable(p);}
 let advancing=false;
 async function advance(){
- if(!host||!state||advancing||phase()==='lobby'||phase()==='finished')return;
+ if(!host||!state||joiningRoom||advancing||phase()==='lobby'||phase()==='finished')return;
  if(state.phase==='instructions'){
   if(!worldReady||state.worldPreparing||!introParticipantsReady(state))return;
- }else if(roomNow()<state.deadline)return;
+ }else if(roomNow()<state.deadline&&!(state.phase==='erase'&&(state.deadline>roomNow()+60000||!state.eraseParentMissingAt&&eraseParentMissing(state))))return;
  advancing=true;
  try{await mutate(s=>{
+  if(!soloMode&&s.host!==id)return;
   const now=roomNow();
+  if(s.phase==='erase'){
+   s.deadline=Math.min(s.deadline,now+60000);
+   if(eraseParentMissing(s)){s.eraseParentMissingAt??=now;s.deadline=Math.min(s.deadline,s.eraseParentMissingAt+20000);}
+  }
   for(let i=0;i<8;i++){
    if(s.phase==='lobby'||s.phase==='finished')break;
    const before=s.phase;
@@ -2181,6 +2208,8 @@ async function advance(){
  finally{advancing=false;}
 }
 setInterval(advance,250);
+setInterval(()=>{syncRoomPresence();recoverRoomHost();},4000);
+document.addEventListener('visibilitychange',()=>{syncRoomPresence();if(!document.hidden)recoverRoomHost();});
 // Host alone simulates all NPC decisions; the shared database is authoritative.
 function npcRoofForChair(c){
  if(!c||(c.y||0)<3)return null;
@@ -2779,7 +2808,7 @@ let anyMoving=false;
 for(const [k,p] of npcEntries){const before=beforeMotion.get(k);p.motionMoving=!!before&&Math.hypot(p.x-before.x,p.z-before.z,(p.y||0)-before.y)>.001;anyMoving||=p.motionMoving;}
 if(anyMoving||s.npcMoving)s.npcFrameAt=now;s.npcMoving=anyMoving;
 if(!soloMode&&s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
-let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=roomNow();const tickEvery=soloMode?280:400;if(tickNow-npcLastTick<tickEvery)return;const tickDt=soloMode?.28:Math.max(.05,Math.min(.85,(tickNow-npcLastTick)/1000));npcLastTick=tickNow;if(!worldReady||!host||!state||npcBusy||!['search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=roomNow();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,tickDt,now)})}finally{npcBusy=false}},140);
+let npcBusy=false;let npcLastTick=0;setInterval(async()=>{const tickNow=roomNow();const tickEvery=soloMode?280:400;if(tickNow-npcLastTick<tickEvery)return;const tickDt=soloMode?.28:Math.max(.05,Math.min(.85,(tickNow-npcLastTick)/1000));npcLastTick=tickNow;if(!worldReady||!host||!state||joiningRoom||npcBusy||!['search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;npcBusy=true;try{await mutate(s=>{if(s.host!==id)return;const now=roomNow();if(s.phase==='erase'&&s.players[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n)}else npcSimulate(s,tickDt,now)})}finally{npcBusy=false}},140);
 const modal=$('modal');$('modalCancel').onclick=()=>{modal.classList.remove('open');$('modalConfirm').textContent='決定';$('modalCancel').textContent='キャンセル';syncGiftInteraction();};
 function nearbyPickup(){if(!state?.coinDrops)return null;const now=roomNow();return Object.entries(state.coinDrops).filter(([k,d])=>d.count>0&&Math.hypot(me.x-d.x,me.z-d.z)<2.8&&(now-d.created>=10000||d.recipient===id||d.owner===id)).sort((a,b)=>Math.hypot(me.x-a[1].x,me.z-a[1].z)-Math.hypot(me.x-b[1].x,me.z-b[1].z))[0]||null;}
 $('pickupCoin').onclick=()=>{const nearest=nearbyPickup();if(!nearest)return;mutate(s=>{const d=s.coinDrops?.[nearest[0]],p=s.players?.[id];if(!d||!p||Math.hypot(p.x-d.x,p.z-d.z)>3||roomNow()-d.created<10000&&d.recipient!==id&&d.owner!==id)return;p.wallet??={};p.wallet[d.issuer]=(p.wallet[d.issuer]||0)+d.count;delete s.coinDrops[nearest[0]];})};

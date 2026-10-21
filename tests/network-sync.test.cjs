@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 function cut(a,b){const i=html.indexOf(a),j=html.indexOf(b,i);assert(i>=0&&j>i);return html.slice(i,j)}
 function setup(){const c=vm.createContext({assert,console});vm.runInContext(`
- let soloMode=false,room='TEST',id='me',state={phase:'instructions',players:{me:{online:true,spawn:{version:'start',x:12,z:15},spawnApplied:'start'}}},me={x:12,z:15,rot:0},playerHeight=0,lastAppliedSpawn='start',lastSync=0,relocating=false,mapUnlocked=false,mapVisitKey=null;
+ let joiningRoom=false,soloMode=false,room='TEST',id='me',state={phase:'instructions',players:{me:{online:true,spawn:{version:'start',x:12,z:15},spawnApplied:'start'}}},me={x:12,z:15,rot:0},playerHeight=0,lastAppliedSpawn='start',lastSync=0,relocating=false,mapUnlocked=false,mapVisitKey=null;
  const writes=[];let backendUpdate=async(target,values)=>{writes.push({target,values})},backendTransaction=async(target,fn)=>{fn(state);return {committed:true}};
  const database=()=>({}),ref=(db,path)=>path,player=()=>state.players[id],renderUI=()=>{},log=()=>{},prepareDisconnectChair=()=>{};
  function firebaseUpdate(...args){return backendUpdate(...args)}function runTransaction(...args){return backendTransaction(...args)}
@@ -44,7 +44,7 @@ test('different device clocks resolve the same shared time and intro page',()=>{
 test('remote motion interpolates regular NPC packets continuously and stops without drift',()=>{
  setup()(`const p={npc:true,x:0,z:0,rot:3.1,motionMoving:true};const s={started:1,players:{npc:p}};
  for(let i=0;i<8;i++){p.x=i*4.2;s.npcFrameAt=1000+i*420;captureRemoteMotion(s,s.npcFrameAt);}
- const steps=[];for(let t=3500;t<3800;t+=20)steps.push(remoteMotionPose('npc',p,t+20).x-remoteMotionPose('npc',p,t).x);
+ const steps=[];for(let t=3500;t<3800;t+=20){const a=remoteMotionPose('npc',p,t).x,b=remoteMotionPose('npc',p,t+20).x;steps.push(b-a)};
  assert(steps.every(step=>Math.abs(step-.2)<.001));
  p.motionMoving=false;s.npcFrameAt+=420;captureRemoteMotion(s,s.npcFrameAt);
  assert.equal(remoteMotionPose('npc',p,10000).x,p.x);assert(remoteMotionHistory.get('npc').samples.length<=8);
@@ -64,5 +64,14 @@ test('rotation takes the short turn and roof interpolation follows the stair rou
  function npcRoofVisualPoint(trip,travel){return{x:travel,y:travel*2,z:0}}
  const pose=remoteMotionPose('other',p,1575);assert(Math.abs(pose.rot-Math.PI)<.01);assert(Math.abs(pose.y-pose.x*2)<.001);
  const predicted=remoteMotionPose('other',p,2000);assert.equal(predicted.y,predicted.x*2);
+ `);
+});
+test('the motion buffer includes measured network delay, and never rewinds on a late packet',()=>{
+ setup()(`const p={npc:true,x:0,z:0,rot:0,motionMoving:true};const s={players:{other:p}};
+ for(let i=0;i<8;i++){p.x=i*4.2;s.npcFrameAt=1000+i*420;captureRemoteMotion(s,s.npcFrameAt+500);}
+ const track=remoteMotionHistory.get('other');assert.equal(track.lag,500);
+ const a=remoteMotionPose('other',p,4400).x,b=remoteMotionPose('other',p,4420).x;assert(Math.abs(b-a-.2)<.001);
+ p.x+=4.2;s.npcFrameAt+=420;captureRemoteMotion(s,s.npcFrameAt+900);
+ assert(remoteMotionPose('other',p,4440).x>=b);
  `);
 });

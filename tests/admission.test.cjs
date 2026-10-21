@@ -2,8 +2,8 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 function cut(a,b){const start=html.indexOf(a),end=html.indexOf(b,start);assert(start>=0&&end>start);return html.slice(start,end);}
-async function join(initial,canceled=0){
- const c=vm.createContext({assert,TextEncoder,initial,canceled,structuredClone});
+async function join(initial,canceled=0,staleRefusal=false){
+ const c=vm.createContext({assert,TextEncoder,initial,canceled,staleRefusal,structuredClone});
  vm.runInContext(`function roomNow(){return Date.now()}
 
  let server=structuredClone(initial),room='',id='',soloMode=false,playerPreloadTask=null,lastAppliedSpawn=null,me={},yaw=0,playerHeight=0,state=null,host=false,worldReady=false,loadedWorldSeed=null;
@@ -11,7 +11,7 @@ async function join(initial,canceled=0){
  function database(){return {}}function ref(db,path){return {path}}async function ensureFirebase(){}async function syncRoomClock(){}function captureRemoteMotion(){}function scheduleRoomUI(){renderUI()}const remoteMotionHistory=new Map();function reconcileRoomPositions(s){return s}function initialAccessories(){return {}}
  async function runTransaction(ref,fn){
   // Like the SDK, abort immediately if a callback returns undefined for an uncached null.
-  const provisional=fn(null);if(canceled>0){canceled--;return {committed:false,snapshot:{val:()=>null}};}if(provisional===undefined)return {committed:false,snapshot:{val:()=>null}};
+  const provisional=fn(null);if(staleRefusal){staleRefusal=false;fn({phase:'search',players:{other:{online:true,alive:true}}});return {committed:false,snapshot:{val:()=>null}};}if(canceled>0){canceled--;return {committed:false,snapshot:{val:()=>null}};}if(provisional===undefined)return {committed:false,snapshot:{val:()=>null}};
   const next=fn(structuredClone(server));if(next===undefined)return {committed:false,snapshot:{val:()=>server}};
   server=structuredClone(next);return {committed:true,snapshot:{val:()=>structuredClone(server)}};
  }
@@ -44,4 +44,9 @@ test('server admission refusal does not replace an existing game with the provis
 
 test('a transient canceled admission retries automatically without requiring another click',async()=>{
  const result=await join(null,1);assert.equal(result.alerts.length,0,JSON.stringify(result.alerts));assert(result.server.players.U4775657374);assert.equal(result.state.phase,'lobby');
+});
+
+test('a cached refusal is refreshed and does not reject a player whose saved record exists',async()=>{
+ const result=await join({host:'host',phase:'search',round:4,deadline:123456,players:{host:{online:true},U4775657374:{name:'Guest',online:false,x:42,z:80,wallet:{host:7}}},chairs:{}},0,true);
+ assert.equal(result.alerts.length,0);assert.equal(result.state.phase,'search');assert.equal(result.me.x,42);assert.equal(result.state.players.U4775657374.wallet.host,7);
 });

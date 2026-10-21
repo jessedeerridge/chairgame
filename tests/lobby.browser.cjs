@@ -108,9 +108,17 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   await guest.waitForFunction(old=>Math.hypot(window.lobbyTest.getMe().x-old.x,window.lobbyTest.getMe().z-old.z)>2.2,before,{timeout:10000});
   const relocated=await guest.evaluate(()=>{const t=window.lobbyTest,p=t.getMe();return{point:p,minDistance:Math.min(...Object.entries(t.getState().players).filter(([k,v])=>k!==t.getId()&&v.online!==false).map(([k,v])=>Math.hypot(v.x-p.x,v.z-p.z))),hidden:document.querySelector('#stackButton').hidden};});
   assert(relocated.minDistance>=2.2);assert.equal(relocated.hidden,true);
-  const oldHost=read('rooms/TEST/host');write('rooms/TEST/players/'+oldHost+'/online',false);revision++;notify();
+  const oldHost=read('rooms/TEST/host');
+  // A suspended tab still has online=true; another visible player must take over.
+  await pages[0].evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+  await guest.waitForFunction(()=>window.lobbyTest.getState().host===window.lobbyTest.getId(),null,{timeout:10000});
+  assert.equal(read('rooms/TEST/players/'+oldHost+'/online'),true);
+  await pages[0].evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
+  await pages[0].waitForFunction(()=>lobbyTest.getState().players[lobbyTest.getId()].hostAvailable===true);assert.notEqual(read('rooms/TEST/host'),oldHost);
+  // Disconnect runs after the closed client's outstanding server writes.
+  await pages[0].close();await new Promise(resolve=>setTimeout(resolve,50));
+  write('rooms/TEST/players/'+oldHost+'/online',false);revision++;notify();
   await guest.waitForFunction(()=>window.lobbyTest.getState().host===window.lobbyTest.getId());
-  await pages[0].close();
   await guest.waitForFunction(key=>{const a=lobbyTest.getAvatarPose(key);return a?.visible&&a.angle<-1.56;},oldHost,{timeout:5000});
   const guestId=await guest.evaluate(()=>window.lobbyTest.getId());
   const started=read('rooms/TEST/started'),introStarted=read('rooms/TEST/introStarted');
