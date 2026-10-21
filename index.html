@@ -654,7 +654,9 @@ for(const [i,p] of [...worldLayout.trees,...worldLayout.spots].entries()){
   for(let j=0;j<5;j++){const a=j*2.39996;bushInstances[j%3].push([p.x+Math.cos(a)*1.65,1.45,p.z+Math.sin(a)*1.65]);}
  }else{
   addObstacle(p.x,p.z,p.id?1.65:.85);
-  forestInstances[0].push([p.x,3,p.z]);forestInstances[1+p.color].push([p.x,10.2,p.z]);
+  forestInstances[0].push([p.x,3,p.z]);
+  // Lower only hiding-tree crowns: their bottom sits at head height (y=3).
+  forestInstances[1+p.color].push([p.x,p.id?7.5:10.2,p.z]);
  }
 }
 const matrix=new THREE.Matrix4(),quaternion=new THREE.Quaternion(),bushScale=new THREE.Vector3(1.4,1,1.4);
@@ -1677,7 +1679,7 @@ const TOTAL_PLAYERS=20, SEARCH_MS=90000, RETURN_MS=40000, VOTE_MS=30000, ERASE_M
 const personalities=['慎重型','積極型','追従型','独立型','気まぐれ型','戦略型'];
 const randBetween=(a,b)=>a+Math.random()*(b-a);
 function announce(message){const el=$('gameNotice');el.textContent=message;el.style.display='block';clearTimeout(announce.timer);announce.timer=setTimeout(()=>el.style.display='none',3600)}
-function initRound(s){s.noChairErased=false;s.soloVotesPreparedRound=null;s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=Date.now()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const p of Object.values(s.players)){p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
+function initRound(s){s.noChairErased=false;s.soloVotesPreparedRound=null;s.round=(s.round||0)+1;s.phase='sitIntro';s.deadline=Date.now()+3000;s.votes={};s.voteEligible={};s.parent=null;s.voteCounts=null;for(const c of Object.values(s.chairs)){c.occupied=null}for(const [k,p] of Object.entries(s.players)){if(p.npc&&p.carrying)npcDropCarriedChair(s,k,p);p.npcSpotHide=null;p.sitting=0;p.touched=true;p.carrying=0;p.returned=false;p.voted=false;p.targetChair=null}}
 function indoorSpawn(i){const b=buildingSites[3];return {x:b.x+((i%5)-2)*7,z:b.z+3+Math.floor(i/5)*4.2};}
 function indoorPositionFree(s,k,point,occupied=[]){
  const b=buildingSites[3];
@@ -1721,7 +1723,7 @@ function beginGame(s){
  }
  for(let i=0;i<npcCount;i++)for(let j=i+1;j<npcCount;j++)if(Math.random()<.12){const a=s.players['NPC'+i],b=s.players['NPC'+j];a.trust['NPC'+j]=randBetween(.2,.8);b.trust['NPC'+i]=a.trust['NPC'+j];}
  if(s.started||!s.worldSeed)s.worldSeed=Math.floor(Math.random()*4294967295)+1;
- s.started=Date.now();s.chairs=makeWorldLayout(s.worldSeed).chairs;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
+ s.spotSearchHistory={};s.started=Date.now();s.chairs=makeWorldLayout(s.worldSeed).chairs;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
  initRound(s);s.phase='instructions';s.introStarted=Date.now();s.deadline=s.introStarted+54000;
 }
 function createNPC(s,k,i,pt=indoorSpawn(i)){const angle=Math.PI;return {name:'NPC '+(i+1),npc:true,online:true,joined:Date.now(),x:pt.x,z:pt.z,rot:angle,alive:true,initial:true,wallet:{[k]:23},touched:true,sitting:0,previous:0,carrying:0,personality:personalities[Math.floor(Math.random()*6)],walk:randBetween(3.5,6),run:randBetween(8,12),caution:Math.random(),loyalty:Math.random(),memory:{},trust:{},friends:[],goal:null,decisionAt:0,returned:false,voted:false};}
@@ -1800,7 +1802,7 @@ function updateSpotAction(t){
   mutate(s=>{const p=s.players[id];if(!p||p.carrying!==a.chair)return;const c=s.chairs[p.carrying];if(!c||c.removed||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===a.spotId))return;c.hiddenAt=a.spotId;c.x=spot.x;c.y=0;c.z=spot.z;c.carrier=null;p.carrying=0;});
   recentHiddenChair={number:String(a.chair),x:spot.x,z:spot.z,anchorX:me.x,anchorZ:me.z,y:playerHeight,at:Date.now()};
  }else{
-  mutate(s=>{const p=s.players[id];if(!p||p.carrying)return;const found=Object.entries(s.chairs).find(([n,c])=>!c.removed&&c.hiddenAt===a.spotId);if(!found){
+  mutate(s=>{const p=s.players[id];if(!p||p.carrying)return;recordSpotSearch(s,id,spot,Date.now());if(s.humanSpotSearching)delete s.humanSpotSearching[id];const found=Object.entries(s.chairs).find(([n,c])=>!c.removed&&c.hiddenAt===a.spotId);if(!found){
    // An empty hiding spot has a one-in-three chance to release a random costume.
    if(Math.random()<1/3){
     const chosen=accessoryCatalog[Math.floor(Math.random()*accessoryCatalog.length)];
@@ -2155,13 +2157,64 @@ function npcMove(s,k,p,target,speed,dt){
 }
 // NPC hide-spot inspection: one NPC per spot, 5 seconds, and no crowding.
 // Decisions happen only on the host's existing NPC tick (no extra timers).
+const NPC_SEARCH_OBSERVE_RADIUS=30;
+function recordSpotSearch(s,k,spot,now){
+ const actor=s.players?.[k];if(!actor)return;
+ s.spotSearchHistory??={};s.spotSearchHistory[spot.id]={actor:k,x:spot.x,z:spot.z,at:now,round:s.round||0};
+ for(const [other,p] of Object.entries(s.players||{})){
+  if(!p.npc||p.online===false)continue;
+  if(other!==k&&(Math.hypot(p.x-actor.x,p.z-actor.z)>NPC_SEARCH_OBSERVE_RADIUS||Math.abs((p.y||0)-(actor.y||0))>2))continue;
+  p.npcSearchedSpots??={};p.npcSearchedSpots[spot.id]=true;
+ }
+}
+function npcDropCarriedChair(s,k,p){
+ const c=s.chairs?.[p.carrying];
+ if(c&&c.carrier===k){const spot={x:p.x-Math.sin(p.rot||0),z:p.z-Math.cos(p.rot||0)},landing=accessibleCostumeDrop(p.x,p.z,spot);Object.assign(c,landing,{y:p.y||0,carrier:null,hiddenAt:null});}
+ p.carrying=0;p.npcSpotHide=null;
+}
+function npcUpdateReturnHide(s,k,p,now){
+ // Try once per gathering. Returning on time takes precedence over the detour.
+ if(s.phase!=='return'){
+  if(p.npcSpotHide||p.carrying)npcDropCarriedChair(s,k,p);
+  return false;
+ }
+ if(!p.npcSpotHide){
+  if(p.npcHideRound===s.round)return false;p.npcHideRound=s.round;
+  const number=Number(p.carrying||p.sitting),c=s.chairs?.[number];
+  if(!c||c.removed||c.hiddenAt||c.carrier&&c.carrier!==k||c.occupied&&c.occupied!==k)return false;
+  const home=npcReturnGoal(k),speed=Math.max(1,(p.run||9)*.5),remaining=(s.deadline-now)/1000;
+  let best=null,bestCost=Infinity;
+  for(const spot of hidingSpots){
+   if(Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===spot.id)||npcSpotBusy(s,k,spot))continue;
+   const distance=Math.hypot(p.x-spot.x,p.z-spot.z);if(distance>30)continue;
+   const homeDistance=Math.hypot(spot.x-home.x,spot.z-home.z),direct=Math.hypot(p.x-home.x,p.z-home.z);
+   if(distance+homeDistance-direct>25||distance/speed+homeDistance/(p.run||9)+8>remaining)continue;
+   const goal=npcSpotApproachGoal(s,p,spot);if(!goal)continue;
+   const cost=distance+homeDistance*.25;if(cost>=bestCost)continue;
+   best={spotId:spot.id,chair:number,stage:'approach',until:0};bestCost=cost;
+  }
+  if(!best){if(p.carrying)npcDropCarriedChair(s,k,p);return false;}
+  if(c.occupied===k)c.occupied=null;p.sitting=0;p.carrying=number;c.carrier=k;
+  p.npcSpotHide=best;p.targetChair=null;p.goal=null;p.returned=false;
+ }
+ const job=p.npcSpotHide,spot=hidingSpots.find(q=>q.id===job.spotId),c=s.chairs?.[job.chair],home=npcReturnGoal(k);
+ if(!spot||!c||c.removed||c.carrier!==k||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===job.spotId)||npcSpotBusy(s,k,spot)||s.deadline-now<5000+Math.hypot(p.x-home.x,p.z-home.z)/(p.run||9)*1000){
+  npcDropCarriedChair(s,k,p);p.goal=null;return false;
+ }
+ if(job.stage==='approach'){
+  if(Math.hypot(p.x-spot.x,p.z-spot.z)<=5.5){job.stage='hiding';job.until=now+5000;p.goal=null;}
+  else{p.goal=npcSpotApproachGoal(s,p,spot);if(!p.goal){npcDropCarriedChair(s,k,p);return false;}}
+ }else if(now>=job.until){
+  Object.assign(c,{x:spot.x,y:0,z:spot.z,hiddenAt:spot.id,carrier:null,occupied:null});
+  p.carrying=0;p.npcSpotHide=null;p.goal=null;return false;
+ }
+ return true;
+}
 function npcSpotBusy(s,k,spot){
  for(const [other,v] of Object.entries(s.players||{})){
   if(other===k)continue;
-  if(v.npcSpotSearch?.spotId===spot.id)return true;
+  if(v.npcSpotSearch?.spotId===spot.id||v.npcSpotHide?.spotId===spot.id)return true;
   // Another reservation blocks only its own spot, not every nearby bush.
-  if(v.npc&&v.npcSpotSearch?.spotId===spot.id)return true;
-  if(v.npc&&v.npcSpotSearch?.spotId===spot.id)return true;
   // A human visibly searching here also reserves the area.
   if(!v.npc&&v.online!==false&&s.humanSpotSearching?.[other]?.spotId===spot.id&&s.humanSpotSearching[other].until>Date.now())return true;
  }
@@ -2196,10 +2249,9 @@ function npcChooseSpot(s,k,p,now){
 function npcUpdateSpot(s,k,p,now){
  const job=p.npcSpotSearch;if(!job)return false;
  const spot=hidingSpots.find(v=>v.id===job.spotId);
- if(!spot||s.phase!=='search'||p.sitting||p.carrying){p.npcSpotSearch=null;return false;}
+ if(!spot||s.phase!=='search'||p.sitting||p.carrying||p.npcSearchedSpots?.[job.spotId]){p.npcSpotSearch=null;p.goal=null;return false;}
  if(Object.entries(s.players||{}).some(([other,v])=>other!==k&&v.npcSpotSearch?.spotId===spot.id&&String(other)<String(k))){
   // Only the lowest-key NPC owns a duplicate reservation; do not cancel the legitimate searcher.
-  p.npcSearchedSpots??={};p.npcSearchedSpots[spot.id]=true;
   p.npcSpotSearch=null;p.goal=null;p.decisionAt=0;return false;
  }
  if(job.stage==='approach'){
@@ -2208,7 +2260,7 @@ function npcUpdateSpot(s,k,p,now){
   return true;
  }
  if(now<job.until)return true;
- p.npcSearchedSpots??={};p.npcSearchedSpots[spot.id]=true;
+ recordSpotSearch(s,k,spot,now);
  const found=Object.entries(s.chairs||{}).find(([_,c])=>!c.removed&&c.hiddenAt===spot.id);
  if(found){
   const [n,c]=found;const landing=accessibleCostumeDrop(p.x,p.z,spot);c.hiddenAt=null;c.x=landing.x;c.z=landing.z;
@@ -2236,8 +2288,12 @@ if(s.phase==='search'&&p.searchIntentRound!==s.round){
  p.departureAt=now+(Math.max(0,4-Math.floor((p.z-buildingSites[3].z-3)/4.2))*5+(npcDepartureSlot(k)%5))*850;
  p.departureDone=false;
 }
-// The return objective takes precedence over exploration, costume pickup and chair search.
-if(npcReturning(s)){
+// Hide a carried/seated chair on a short, time-limited detour during gathering.
+if(npcReturning(s)){p.searchIntent=false;p.npcSpotSearch=null;}
+const hidingOnReturn=npcReturning(s)&&npcUpdateReturnHide(s,k,p,now);
+if(hidingOnReturn&&p.npcSpotHide?.stage==='hiding')continue;
+if(npcReturning(s)&&!hidingOnReturn){
+ if(p.sitting){const c=s.chairs?.[p.sitting];if(c?.occupied===k)c.occupied=null;p.sitting=0;}
  p.searchIntent=false;p.npcSpotSearch=null;
  const home=npcReturnGoal(k);
  if(Math.hypot(p.x-home.x,p.z-home.z)<1.5&&npcGoalReachable(s,k,p,home)){
@@ -2249,7 +2305,7 @@ if(npcReturning(s)){
   p.goal=home;
   if(!p.buildingRoute&&!p.returnDoorStep){p.waypoint=null;p.localBypass=null;}
  }
-}else if(s.phase!=='search'){
+}else if(s.phase!=='search'&&!hidingOnReturn){
  p.goal=null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;continue;
 }
 // Queue searching NPCs at the start of the round instead of 20+ simultaneous
@@ -2283,14 +2339,14 @@ if(!p.goal&&!inspectingSpot){if(s.phase==='search'&&!p.departureDone)continue;if
 p.buildingRoute=null;p.waypoint=null;p.localBypass=null;p.returnDoorStep=false;
 if(!p.goal){p.waypoint=null;continue;}
 const distToGoal=Math.hypot(p.goal.x-p.x,p.goal.z-p.z);
-if(!inspectingSpot&&distToGoal<(npcReturning(s)?1.4:2.5)&&npcGoalReachable(s,k,p,p.goal)){
+if(!hidingOnReturn&&!inspectingSpot&&distToGoal<(npcReturning(s)?1.4:2.5)&&npcGoalReachable(s,k,p,p.goal)){
  if(s.phase==='search'&&p.alive){const c=s.chairs[p.targetChair];if(c&&!c.removed&&!c.carrier&&!c.occupied&&!c.hiddenAt&&Number(p.targetChair)!==p.previous&&Math.hypot(c.x-p.x,c.z-p.z)<2.5){p.sitting=Number(p.targetChair);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=k;p.memory??={};p.memory[p.targetChair]=true;continue;}}
  p.goal=null;p.decisionAt=0;npcNavigation.delete(room+":"+k);continue;
 }
 const destination=npcNavigationTarget(s,k,p,now);
 if(!destination){p.waypoint=null;continue;}
 p.waypoint={x:destination.x,z:destination.z};
-const speed=(s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run:p.walk;
+const speed=((s.phase==='return'||s.phase==='search'&&s.deadline-now<35000)?p.run:p.walk)*(p.carrying?.5:1);
 npcMove(s,k,p,destination,speed,dt);
 
 }
@@ -2585,7 +2641,7 @@ let p=player();if(p&&!relocating&&state.phase!=='lobby'&&t-lastSync>110){lastSyn
    a.rotation.y+=diff*blend;
   }
  }
-}const isSearching=(k===id&&!!spotAction)||(k!==id&&v.npcSpotSearch?.stage==='searching');const actionShake=isSearching?Math.sin(t*.0038)*.18:0;a.userData.torso.position.y=(seated?1.95:1.6)-.62+actionShake;if(a.userData.lanyard)a.userData.lanyard.position.y=(seated?.35:0)-.62+actionShake;a.userData.head.position.y=(seated?3.05:2.75)-.62+actionShake;a.rotation.z=isSearching?Math.sin(t*.0038)*.16:0;if(a.userData.searchGlass){a.userData.searchGlass.visible=(k===id&&spotAction?.kind==='reveal')||(k!==id&&v.npcSpotSearch?.stage==='searching');a.userData.searchGlass.position.y=4.05+Math.sin(t*.0038)*.10;}for(const leg of a.userData.legs||[]){leg.rotation.x=seated?-Math.PI/2:0;leg.position.y=(seated?1.30:.55)-.62;leg.position.z=seated?.95:0;}}for(let k of Object.keys(avatars))if(!state?.players?.[k]){scene.remove(avatars[k]);avatars[k].userData.prizeTexture?.dispose();delete avatars[k]}for(let [k,v] of Object.entries(state?.chairs||{})){if(!chairs[k])chairs[k]=chairObj({...v,number:k});let c=chairs[k];c.visible=!v.removed&&!v.hiddenAt;let carrier=v.carrier&&state.players?.[v.carrier];if(carrier){const av=avatars[v.carrier];const angle=v.carrier===id?me.rot:(av?av.rotation.y:(carrier.rot||0));const px=v.carrier===id?me.x:(av?av.position.x:(carrier.x||0));const pz=v.carrier===id?me.z:(av?av.position.z:(carrier.z||0));const carryOffset=carriedChairBlocked(px,pz,angle,v.carrier===id?playerHeight:(carrier.y||0))?.25:.82;const targetX=px+Math.sin(angle)*carryOffset,targetZ=pz+Math.cos(angle)*carryOffset;const targetY=(v.carrier===id?playerHeight:(av?av.position.y:(carrier.y||0)))+1.48;if(!c.userData.wasCarried){c.position.set(targetX,targetY,targetZ);c.userData.wasCarried=true;}else{const alpha=1-Math.exp(-18*dt);c.position.x+=(targetX-c.position.x)*alpha;c.position.y+=(targetY-c.position.y)*alpha;c.position.z+=(targetZ-c.position.z)*alpha;}c.rotation.order='YXZ';c.rotation.set(Math.PI/2,angle,0);}else{c.userData.wasCarried=false;c.position.set(v.x,v.y||0,v.z);c.rotation.set(0,0,0)}}// Keep all ceilings and rooftop fences fully opaque, including while indoors.
+}const isSearching=(k===id&&!!spotAction)||(k!==id&&(v.npcSpotSearch?.stage==='searching'||v.npcSpotHide?.stage==='hiding'));const actionShake=isSearching?Math.sin(t*.0038)*.18:0;a.userData.torso.position.y=(seated?1.95:1.6)-.62+actionShake;if(a.userData.lanyard)a.userData.lanyard.position.y=(seated?.35:0)-.62+actionShake;a.userData.head.position.y=(seated?3.05:2.75)-.62+actionShake;a.rotation.z=isSearching?Math.sin(t*.0038)*.16:0;if(a.userData.searchGlass){a.userData.searchGlass.visible=(k===id&&spotAction?.kind==='reveal')||(k!==id&&v.npcSpotSearch?.stage==='searching');a.userData.searchGlass.position.y=4.05+Math.sin(t*.0038)*.10;}for(const leg of a.userData.legs||[]){leg.rotation.x=seated?-Math.PI/2:0;leg.position.y=(seated?1.30:.55)-.62;leg.position.z=seated?.95:0;}}for(let k of Object.keys(avatars))if(!state?.players?.[k]){scene.remove(avatars[k]);avatars[k].userData.prizeTexture?.dispose();delete avatars[k]}for(let [k,v] of Object.entries(state?.chairs||{})){if(!chairs[k])chairs[k]=chairObj({...v,number:k});let c=chairs[k];c.visible=!v.removed&&!v.hiddenAt;let carrier=v.carrier&&state.players?.[v.carrier];if(carrier){const av=avatars[v.carrier];const angle=v.carrier===id?me.rot:(av?av.rotation.y:(carrier.rot||0));const px=v.carrier===id?me.x:(av?av.position.x:(carrier.x||0));const pz=v.carrier===id?me.z:(av?av.position.z:(carrier.z||0));const carryOffset=carriedChairBlocked(px,pz,angle,v.carrier===id?playerHeight:(carrier.y||0))?.25:.82;const targetX=px+Math.sin(angle)*carryOffset,targetZ=pz+Math.cos(angle)*carryOffset;const targetY=(v.carrier===id?playerHeight:(av?av.position.y:(carrier.y||0)))+1.48;if(!c.userData.wasCarried){c.position.set(targetX,targetY,targetZ);c.userData.wasCarried=true;}else{const alpha=1-Math.exp(-18*dt);c.position.x+=(targetX-c.position.x)*alpha;c.position.y+=(targetY-c.position.y)*alpha;c.position.z+=(targetZ-c.position.z)*alpha;}c.rotation.order='YXZ';c.rotation.set(Math.PI/2,angle,0);}else{c.userData.wasCarried=false;c.position.set(v.x,v.y||0,v.z);c.rotation.set(0,0,0)}}// Keep all ceilings and rooftop fences fully opaque, including while indoors.
 // Roofs remain opaque during both free and guided third-person views.
 // These roofs and rails are static: configure once, not every rendered frame.
 if(!_opaqueRoofConfigured){

@@ -18,9 +18,10 @@ function setup(){
  function randBetween(a,b){return a+(b-a)*Math.random()}
  function insideBlackBuilding(x,z){return Math.abs(x)<23.8&&Math.abs(z)<20.8}
  function npcTryCostume(){}function npcChooseSpot(){}function npcUpdateSpot(){return false}
+ function accessibleCostumeDrop(x,z){return{x:x+2,z:z+2}}
  function canCastVote(){return false}function chooseNPCVote(){}
  const SEARCH_MS=90000,VOTE_MS=30000,accessoryCatalog=[];
- `+cut('function roofEdgeBlocked','function occupiedAt')+cut('// Spatial buckets','// NPC hide-spot inspection')+cut('function npcDecision','// NPCs try to collect')+cut('function npcSpotBusy','// Update decisions and local motion')+cut('function npcSimulate','let npcBusy='),c);
+ `+cut('function roofEdgeBlocked','function occupiedAt')+cut('// Spatial buckets','// NPC hide-spot inspection')+cut('function npcDecision','// NPCs try to collect')+cut('const NPC_SEARCH_OBSERVE_RADIUS','// Update decisions and local motion')+cut('function npcSimulate','let npcBusy='),c);
  vm.runInContext(`
  function game(players={},phase='search'){state={phase,round:1,deadline:1000000,players,chairs:{},votes:{},accessories:{}};return state;}
  function npc(x,z,goal){return {npc:true,alive:false,initialDispersed:true,departureDone:true,searchIntentRound:1,searchIntent:true,x,z,goal,walk:5,run:9,decisionAt:1e9,npcSpotDecisionAt:1e9,memory:{}};}
@@ -106,4 +107,14 @@ test('a human entering an existing route is avoided without discarding the stati
  const p=npc(-8,35,{x:8,z:35}),s=game({NPC0:p});npcSimulate(s,.28,10000);const route=npcNavigation.get(room+':NPC0');
  s.players.human={x:p.x+2,z:p.z,online:true};for(let i=1;i<80;i++){npcSimulate(s,.28,10000+i*280);assert(Math.hypot(p.x-s.players.human.x,p.z-s.players.human.z)>=1.34);}
  assert(p.x>5,'NPC failed to pass the intervening player');assert(!npcNavigation.has(room+':NPC0')||npcNavigation.get(room+':NPC0')===route,'human movement caused global replanning');
+`));
+
+test('a seated NPC hides its chair during gathering and then reaches its indoor destination',()=>setup()(`
+ const s=game({},'return');s.deadline=50000;
+ const spot=hidingSpots.find(q=>Math.hypot(q.x,q.z)<120&&Math.hypot(q.x,q.z)>65&&q.z>55);
+ assert(spot);const start=safe({x:spot.x*1.08,z:spot.z*1.08}),p=npc(start.x,start.z,null);p.sitting=2;s.players.NPC0=p;
+ s.chairs={2:{x:p.x,z:p.z,y:0,occupied:'NPC0'}};
+ npcSimulate(s,.28,10000);assert(p.carrying===2||s.chairs[2].hiddenAt,'NPC never picked up its chair');
+ simulate(s,220);assert(s.chairs[2].hiddenAt,'NPC did not hide its chair');assert.equal(s.chairs[2].carrier,null);assert.equal(p.carrying,0);
+ assert(p.returned,'NPC did not finish returning after hiding');assert(!s.spotSearchHistory,'hiding created a search history');
 `));
