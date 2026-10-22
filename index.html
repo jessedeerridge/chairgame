@@ -278,7 +278,7 @@ function captureRemoteMotion(s,now=roomNow()){
   const source=useLive?live:p;
   const version=[s.started||0,p.npc?s.host:'',p.spawn?.version||'',p.sitting||0,p.online!==false,useLive?'stream':'room'].join(':');
   let track=remoteMotionHistory.get(key);
-  if(!track||track.version!==version){track={version,last:null,previous:null,vx:0,vy:0,vz:0};remoteMotionHistory.set(key,track);}
+  if(!track||track.version!==version){track={version,last:null,previous:null,samples:[],interval:useLive?40:p.npc?280:100,lag:0,renderAt:null,vx:0,vy:0,vz:0};remoteMotionHistory.set(key,track);}
   const at=Number(useLive?live.at:p.npc?s.npcFrameAt:p.positionAt)||0,last=track.last;
   // An old room snapshot is not a new position, even if its coordinates differ.
   if(last&&at<=last.at)continue;
@@ -296,6 +296,14 @@ function captureRemoteMotion(s,now=roomNow()){
   const limit=13,speed=Math.hypot(vx,vz);
   if(speed>limit*1.25){vx*=limit*1.25/speed;vz*=limit*1.25/speed;}
   if(sample.moving===false||p.online===false){vx=0;vy=0;vz=0;}
+  // Keep timestamped snapshots so a short segment does not end in a visible stop
+  // while the next authoritative packet is still in transit.
+  if(last&&elapsed<1.5)track.interval=track.samples.length<2?elapsed*1000:track.interval*.75+elapsed*250;
+  if(last&&last.moving===false&&sample.moving&&elapsed>1.2){
+   track.samples.push({...last,at:sample.at-Math.min(100,track.interval)});
+  }
+  track.lag=Math.max(0,now-sample.at);
+  track.samples.push(sample);if(track.samples.length>8)track.samples.splice(0,track.samples.length-8);
   track.previous=last;track.last=sample;track.vx=vx;track.vy=Math.max(-16,Math.min(16,vy));track.vz=vz;
  }
  for(const key of remoteMotionHistory.keys())if(!s.players?.[key])remoteMotionHistory.delete(key);
@@ -304,8 +312,33 @@ function captureRemoteMotion(s,now=roomNow()){
 function remoteMotionPose(key,p,now=roomNow()){
  const track=remoteMotionHistory.get(key),last=track?.last;
  if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0,vx:0,vy:0,vz:0,moving:false};
- const horizon=last.stream ? .35 : p.npc ? .75 : .35,age=Math.max(0,Math.min(horizon,(now-last.at)/1000));
- const moving=last.moving!==false&&p.online!==false&&(now-last.at)<(last.stream?650:p.npc?1100:650);
+ const delay=track.lag+(last.stream?80:p.npc?track.interval*.5+155:50);
+ const target=now-delay;
+ // Absorb jitter by gently changing playback speed, never by pausing or
+ // rewinding the render clock whenever the measured delivery delay increases.
+ const elapsedRender=Math.max(0,now-(track.renderNow??now));
+ let at=target;
+ if(track.renderAt!==null){
+  if(elapsedRender>1500)at=Math.max(track.renderAt,target);
+  else{const predicted=track.renderAt+elapsedRender,rate=Math.max(.8,Math.min(1.2,1+(target-predicted)/250));at=track.renderAt+elapsedRender*rate;}
+ }
+ track.renderAt=at;track.renderNow=now;
+ const samples=track.samples;
+ for(let i=1;i<samples.length;i++){
+  const a=samples[i-1],b=samples[i];if(at>b.at)continue;
+  const alpha=Math.max(0,Math.min(1,(at-a.at)/Math.max(1,b.at-a.at)));
+  let x=a.x+(b.x-a.x)*alpha,y=a.y+(b.y-a.y)*alpha,z=a.z+(b.z-a.z)*alpha;
+  if(a.trip&&b.trip&&a.trip.building===b.trip.building&&!!a.trip.descending===!!b.trip.descending){
+   const point=npcRoofVisualPoint(b.trip,a.trip.travel+(b.trip.travel-a.trip.travel)*alpha);x=point.x;y=point.y;z=point.z;
+  }
+  const moving=p.online!==false&&at>=a.at&&Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z)>.001;
+  const elapsed=Math.max(.02,(b.at-a.at)/1000);
+  const rot=a.rot+Math.atan2(Math.sin(b.rot-a.rot),Math.cos(b.rot-a.rot))*alpha;
+  return {x,y,z,rot,vx:moving?(b.x-a.x)/elapsed:0,vy:moving?(b.y-a.y)/elapsed:0,vz:moving?(b.z-a.z)/elapsed:0,moving,version:track.version};
+ }
+ const horizon=last.stream ? .25 :Math.min(.9,track.interval/1000+.15);
+ const age=Math.max(0,Math.min(horizon,(at-last.at)/1000));
+ const moving=last.moving!==false&&p.online!==false&&at-last.at<horizon*1000;
  const vx=moving?track.vx:0,vy=moving?track.vy:0,vz=moving?track.vz:0;
  let x=last.x+vx*age,z=last.z+vz*age,y=last.y+vy*age;
  if(last.trip&&!last.stream&&track.previous?.trip){
@@ -313,9 +346,6 @@ function remoteMotionPose(key,p,now=roomNow()){
   if(previous.trip.building===last.trip.building&&!!previous.trip.descending===!!last.trip.descending){
    const point=npcRoofVisualPoint(last.trip,last.trip.travel+(last.trip.travel-previous.trip.travel)*age/elapsed);x=point.x;y=point.y;z=point.z;
   }
- }else if(p.npc&&!last.stream&&p.waypoint){
-  const dx=p.waypoint.x-last.x,dz=p.waypoint.z-last.z,distance=Math.hypot(dx,dz),prediction=Math.hypot(x-last.x,z-last.z);
-  if(prediction>Math.max(0,distance-.15)){const ratio=Math.max(0,distance-.15)/Math.max(.001,prediction);x=last.x+(x-last.x)*ratio;z=last.z+(z-last.z)*ratio;}
  }
  return {x,y,z,rot:last.rot,vx,vy,vz,moving,version:track.version};
 }
@@ -333,11 +363,9 @@ function moveRemoteAvatar(avatar,key,p,dt,now){
   const distance=Math.hypot(dx,dz),maxStep=Math.max(speed,direction?memory.remoteSpeed||2:7)*dt*1.35;
   if(distance>maxStep&&distance>.0001){dx*=maxStep/distance;dz*=maxStep/distance;}
   const nextX=avatar.position.x+dx,nextZ=avatar.position.z+dz;
-  // Only the host resolves NPC visual terrain. Guests follow that same motion stream.
-  const hostGround=p.npc&&host&&!p.npcRoofTrip?.active&&(p.y||0)<1.5;
-  if(!hostGround||npcStaticClearPath(state,avatar.position.x,avatar.position.z,nextX,nextZ)&&!characterMovementBlocked(state,key,avatar.position.x,avatar.position.z,nextX,nextZ,pose.y,true)){
-   avatar.position.x=nextX;avatar.position.z=nextZ;
-  }
+  // Simulation already resolved collisions. Rechecking against delayed visible
+  // bodies here freezes the host mesh and the motion stream sent to guests.
+  avatar.position.x=nextX;avatar.position.z=nextZ;
   avatar.position.y+=(pose.y-avatar.position.y)*Math.min(1,dt*12);
   if(speed>.05){memory.remoteDirection=direction;memory.remoteSpeed=speed;}
  }
@@ -3621,7 +3649,7 @@ if(s.phase==='search'&&p.searchIntentRound!==s.round){
  p.npcTipGoal=null;p.searchIntentRound=s.round;p.searchIntent=true;p.npcSpotSearch=null;npcEnsureRoundSearchMemory(p,s.round);p.npcSearchStartedRound=null;p.npcSearchOrigin=null;p.targetChair=null;p.npcSpotDecisionAt=0;p.goal=p.npcFixedAssignment?.round===s.round?{x:p.npcFixedAssignment.x,z:p.npcFixedAssignment.z}:null;p.waypoint=null;p.buildingRoute=null;p.localBypass=null;
  // The front rows depart first; waiting NPCs stay clear of the doorway.
  const departureRank=Math.max(0,departureOrder.findIndex(([key])=>key===k));
- p.departureAt=now+departureRank*850;
+ p.departureAt=now+departureRank*120;
  p.departureDone=false;
 }
 // Hide a carried/seated chair on a short, time-limited detour during gathering.
@@ -3657,8 +3685,8 @@ if(npcReturning(s)&&!hidingOnReturn){
 // door collisions. Non-searchers stay inside and do not block the threshold.
 // Stagger intentions; navigation discovers the doorway from collision geometry.
 if(s.phase==='search'&&!p.departureDone){
- // Finish route planning BEFORE exiting, never stop at the entrance to compute.
- if(p.npcPreloadedRoute?.round===s.round&&(p.npcPreloadedRoute.pending||p.npcPreloadedRoute.job)){npcAdvancePreloadedRoute(s,p);continue;}
+ // Keep planning while traversing the known doorway; route work must not delay the first step.
+ if(p.npcPreloadedRoute?.round===s.round&&(p.npcPreloadedRoute.pending||p.npcPreloadedRoute.job))npcAdvancePreloadedRoute(s,p);
  if(!p.searchIntent||insideBlackBuilding(p.x,p.z)&&now<(p.departureAt||0)){
   // Preserve each actor's distinct starting/return position while its exit slot is pending.
   // Moving every waiting actor to a shared staging area created a second bottleneck.
@@ -3829,14 +3857,14 @@ setInterval(async()=>{
  if(!state||joiningRoom||npcBusy||!['sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;
  if(!soloMode&&!host){if(!roomHostAvailable(state.players?.[state.host]))recoverRoomHost();return;}
  if(!worldReady){if(!soloMode&&host)startWorldLoading().catch(console.warn);return;}
- const tickNow=roomNow(),tickEvery=soloMode?280:550;
+ const tickNow=roomNow(),tickEvery=280;
  if(tickNow-npcLastTick<tickEvery)return;
  const dt=Math.max(.05,Math.min(1.5,npcLastTick?(tickNow-npcLastTick)/1000:tickEvery/1000));
  npcBusy=true;
  try{
   if(soloMode)await mutate(s=>{const now=roomNow();if(s.phase==='sitIntro')npcPrepareDepartureRoutes(s,now);else if(s.phase==='erase'&&s.players?.[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n);}else npcSimulate(s,dt,now)});
   else await tickOnlineNPC(dt);
-  npcLastTick=roomNow();npcErrorCount=0;
+  npcLastTick=tickNow;npcErrorCount=0;
  }catch(e){npcErrorCount++;console.error('NPCオンライン更新失敗',e);if(npcErrorCount===3)log('NPC同期エラー：ホストの接続を確認してください');}
  finally{npcBusy=false;}
 },140);

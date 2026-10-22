@@ -104,3 +104,52 @@ test('queued online NPC updates cannot simulate after host ownership changes',as
  state.host='other';finish();await tick;assert.equal(state.players.NPC0.x,0);assert.equal(roomTransactions,0);
  })()`);
 });
+
+test('NPCs keep moving between packets even when each waypoint ends at the snapshot',()=>setup()(`
+ const p={npc:true,x:0,z:0,rot:0,motionMoving:true},s={started:1,players:{npc:p}};
+ let lastX=null;const steps=[];
+ for(let now=1000;now<=5000;now+=20){
+  if((now-1000)%280===0){s.npcFrameAt=now;p.x=(now-1000)*.005;p.waypoint={x:p.x+.1,z:0};captureRemoteMotion(s,now);}
+  const x=remoteMotionPose('npc',p,now).x;
+  if(now>2000)steps.push(x-lastX);lastX=x;
+ }
+ assert(steps.every(dx=>dx>.08&&dx<.12),'visible movement paused or accelerated at packet/waypoint boundaries');
+`));
+test('buffered NPC motion tolerates uneven delivery without reversing or periodic stops',()=>setup()(`
+ const p={npc:true,x:0,z:0,rot:0,motionMoving:true},s={started:1,players:{npc:p}};
+ let next=0,lastX=0;const steps=[];
+ for(let now=1000;now<6500;now+=20){
+  while(next<20&&1000+next*280+[80,160,100,140][next%4]<=now){
+   const at=1000+next*280;s.npcFrameAt=at;p.x=next*1.4;captureRemoteMotion(s,now);next++;
+  }
+  const x=remoteMotionPose('npc',p,now).x;if(now>2200)steps.push(x-lastX);lastX=x;
+ }
+ assert(steps.every(dx=>dx>=0),'packet jitter moved an NPC backwards');
+ assert(steps.filter(dx=>dx<.001).length<steps.length*.05,'packet jitter repeatedly stopped an NPC');
+`));
+
+test('host avatar keeps following authoritative motion without a second delayed collision check',()=>setup()(`
+ state={started:1};const host=true;
+ function npcStaticClearPath(){throw Error('authoritative movement was collision-tested twice')}
+ function characterMovementBlocked(){throw Error('delayed avatar blocked authoritative movement')}
+ const p={npc:true,x:0,z:0,rot:0,motionMoving:true},s={started:1,players:{npc:p}};
+ const avatar={position:{x:0,y:0,z:0,set(x,y,z){Object.assign(this,{x,y,z})}},rotation:{y:0},userData:{}};
+ let lastX=null;const steps=[];
+ for(let now=1000;now<=5000;now+=20){
+  if((now-1000)%280===0){s.npcFrameAt=now;p.x=(now-1000)*.005;p.waypoint={x:p.x+.1,z:0};captureRemoteMotion(s,now);}
+  moveRemoteAvatar(avatar,'npc',p,.02,now);
+  if(now>2400)steps.push(avatar.position.x-lastX);lastX=avatar.position.x;
+ }
+ assert(steps.every(dx=>dx>.08&&dx<.12),'host avatar repeatedly slowed or stopped between room updates');
+`));
+test('NPC tick cadence includes time spent waiting for the previous transaction',async()=>{
+ const c=vm.createContext({assert,console});
+ vm.runInContext(`
+ let now=1000,room='TEST',id='host',host=true,soloMode=false,joiningRoom=false,worldReady=true;
+ const state={host:'host',phase:'search'},phase=()=>state.phase,roomNow=()=>now,ref=()=>{},database=()=>{},log=()=>{},reconcileRoomPositions=()=>{};
+ const dts=[];function npcSimulate(s,dt){dts.push(dt)}
+ async function mutate(fn){fn(state);now+=600;return{committed:true}}
+ let interval;function setInterval(fn){interval=fn}
+ `+cut('let npcBusy=','const modal='),c);
+ await vm.runInContext(`(async()=>{await interval();await interval();assert.equal(dts.length,2);assert.equal(dts[0],.28);assert.equal(dts[1],.6)})()`,c);
+});
