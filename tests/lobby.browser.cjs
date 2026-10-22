@@ -49,8 +49,26 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
    await page.addInitScript(({skew})=>{window.testClockSkew=skew;const realNow=Date.now.bind(Date);Date.now=()=>realNow()+skew;window.holdTestLoad=true;if(!localStorage.getItem('island-chair-game-entry-v1'))localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));},{skew:name==='Guest'?120000:-90000});
    await page.goto('http://127.0.0.1:'+server.address().port);
    assert.equal(await page.inputValue('#name'),'以前の名前');assert.equal(await page.inputValue('#room'),'OLDROOM');
-   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={debug:()=>({joiningRoom,hidden:document.hidden,yaw,keys:{...keys},phase:state.phase,me:{...me},player:player()}),getNow:()=>roomNow(),keys,getAvatarPose:k=>avatars[k]?{visible:avatars[k].visible,angle:avatars[k].userData.pose.rotation.x}:null,getAvatarPosition:k=>avatars[k]?{x:avatars[k].position.x,z:avatars[k].position.z}:null,getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady,getLayout:()=>worldLayout,getGeometry:()=>({key:loadedWorldLayoutKey,spots:hidingSpots,instances:outdoorWorld.children.filter(o=>o.isInstancedMesh).map(o=>Array.from(o.instanceMatrix.array)),chairs:Object.fromEntries(Object.entries(chairs).map(([k,c])=>[k,{visible:c.visible,x:c.position.x,z:c.position.z}]))}),beginSpotAction,updateSpotAction,getHidden:()=>recentHiddenChair,getAvatarColor:k=>avatars[k]?.userData.torso.material.color.getHex()};performance.mark("island-room-ready");`);});
+   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={debug:()=>({joiningRoom,hidden:document.hidden,yaw,keys:{...keys},phase:state.phase,me:{...me},player:player()}),getNow:()=>roomNow(),keys,getAvatarPose:k=>avatars[k]?{visible:avatars[k].visible,angle:avatars[k].userData.pose.rotation.x}:null,getAvatarPosition:k=>avatars[k]?{x:avatars[k].position.x,z:avatars[k].position.z}:null,getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady,getLayout:()=>worldLayout,getGeometry:()=>({key:loadedWorldLayoutKey,spots:hidingSpots,instances:outdoorWorld.children.filter(o=>o.isInstancedMesh).map(o=>Array.from(o.instanceMatrix.array)),chairs:Object.fromEntries(Object.entries(chairs).map(([k,c])=>[k,{visible:c.visible,x:c.position.x,z:c.position.z}]))}),beginSpotAction,updateSpotAction,shareChairPin,getHidden:()=>recentHiddenChair,getAvatarColor:k=>avatars[k]?.userData.torso.material.color.getHex()};performance.mark("island-room-ready");`);});
    await page.fill('#name',name);await page.fill('#room','TEST');await page.click('#join');await page.waitForFunction(()=>window.lobbyTest?.getState()?.players?.[window.lobbyTest.getId()],{timeout:60000});
+   if(process.env.START_SKIP_ONLY&&name==='Host'){
+    const refusal=new Promise(resolve=>page.once('dialog',async dialog=>{resolve(dialog.message());await dialog.accept()}));
+    await page.click('#start');assert.equal(await refusal,'2人以上いません');assert.equal(read('rooms/TEST/phase'),'lobby');
+    const key=await page.evaluate(()=>lobbyTest.getId());write('rooms/TEST/players/'+key+'/name','じぇしー');revision++;notify();
+    await page.waitForFunction(()=>lobbyTest.getState().players[lobbyTest.getId()].name==='じぇしー');
+    await page.click('#start');await page.waitForFunction(()=>lobbyTest.getState().phase==='instructions');
+    await page.evaluate(()=>window.releaseTestLoad());await page.waitForFunction(()=>lobbyTest.worldReady()&&!lobbyTest.getState().worldPreparing,{timeout:60000});
+    await page.evaluate(()=>{lobbyTest.setMe({x:0,z:18});document.querySelector('#touch').click()});
+    await page.click('#introSkipYes');await page.waitForFunction(()=>lobbyTest.getState().phase==='sitIntro',null,{timeout:5000});
+    await page.waitForFunction(()=>lobbyTest.getState().phase==='search',null,{timeout:10000});
+    await page.goto('http://127.0.0.1:'+server.address().port);
+    await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.soloSkipTest={state:()=>state,ready:()=>worldReady,setDoor:()=>{me.x=0;me.z=18}};performance.mark("island-room-ready");`)});
+    await page.click('#solo');await page.waitForFunction(()=>window.soloSkipTest?.ready()&&!soloSkipTest.state().worldPreparing,{timeout:60000});
+    await page.evaluate(()=>{soloSkipTest.setDoor();document.querySelector('#touch').click()});
+    await page.click('#introSkipYes');await page.waitForFunction(()=>soloSkipTest.state().phase==='sitIntro',null,{timeout:5000});
+    await page.waitForFunction(()=>soloSkipTest.state().phase==='search',null,{timeout:10000});
+    assert.deepEqual(errors,[]);console.log(JSON.stringify({ordinarySinglePlayerRefused:true,jesseSinglePlayerAllowed:true,onlineSkipToSeating:true,soloSkipToSeating:true,errors}));return;
+   }
   }
   assert.deepEqual(Object.values(read('rooms/TEST/players')).filter(p=>!p.npc).map(p=>p.name).sort(),['Guest','Host']);
   for(const page of pages){await page.waitForFunction(()=>document.body.classList.contains('in-lobby')&&document.querySelectorAll('.lobby-player').length===2);assert(await page.locator('#lobbyScreen').isVisible());assert.equal(await page.locator('body>canvas').isVisible(),false);const cols=await page.locator('#lobbyParticipants').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length);assert.equal(cols,2);}
@@ -74,6 +92,22 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   assert.equal(read('rooms/TEST/worldPreparing'),true);
   for(const page of pages)await page.evaluate(()=>window.releaseTestLoad());
   for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.worldReady()&&!window.lobbyTest.getState().worldPreparing,{timeout:60000});
+  if(process.env.NPC_REPLY_ONLY){
+   const page=pages[0],key=await page.evaluate(()=>lobbyTest.getId());let dialogs=0;
+   page.on('dialog',async dialog=>{dialogs++;await dialog.accept()});
+   const human=read('rooms/TEST/players/'+key),target=clone(read('rooms/TEST/players/NPC0'));
+   Object.assign(target,{x:human.x+.5,z:human.z,y:0});write('rooms/TEST/players/NPC0',target);write('rooms/TEST/phase','sitIntro');write('rooms/TEST/deadline',Date.now()+60000);revision++;notify();
+   await page.waitForFunction(()=>lobbyTest.getState().phase==='sitIntro'&&Math.hypot(lobbyTest.getState().players.NPC0.x-lobbyTest.getMe().x,lobbyTest.getState().players.NPC0.z-lobbyTest.getMe().z)<1);
+   await page.evaluate(()=>document.querySelector('#trade').click());await page.click('#modalConfirm');
+   await page.waitForFunction(()=>document.querySelector('#npcReplyPopup')?.textContent==='いらないです...'&&!document.querySelector('#npcReplyPopup').hidden);
+   const shown=await page.evaluate(()=>performance.now());await page.waitForFunction(()=>document.querySelector('#npcReplyPopup').hidden,null,{timeout:6000});assert(await page.evaluate(()=>performance.now())-shown>=2800);
+   const updated=clone(read('rooms/TEST/players/'+key));updated.npcDealLieScopes={'team:アキヤマ':0};write('rooms/TEST/players/'+key,updated);revision++;notify();
+   await page.waitForFunction(()=>lobbyTest.getState().players[lobbyTest.getId()].npcDealLieScopes?.['team:アキヤマ']===0);
+   await page.evaluate(()=>{const c=lobbyTest.getState().chairs[7];return lobbyTest.shareChairPin('NPC0','7',c.x,c.z)});
+   await page.waitForFunction(()=>document.querySelector('#npcReplyPopup')?.textContent==='うそだ！'&&!document.querySelector('#npcReplyPopup').hidden);
+   await page.waitForFunction(()=>document.querySelector('#npcReplyPopup').hidden,null,{timeout:6000});
+   assert.equal(dialogs,0);assert.deepEqual(errors,[]);console.log(JSON.stringify({coinRefusal:'いらないです...',pinRefusal:'うそだ！',inGamePopup:true,expiresAfterThreeSeconds:true,systemDialogs:dialogs,errors}));return;
+  }
   if(process.env.SEAT_SYNC_ONLY){
    const hostPage=pages[0],guestPage=pages[1],c=clone(read('rooms/TEST/chairs/7'));
    const ids=await Promise.all(pages.map(p=>p.evaluate(()=>lobbyTest.getId())));
