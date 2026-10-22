@@ -3004,6 +3004,7 @@ function npcClearPath(s,k,x0,z0,x1,z1){
  return true;
 }
 const npcNavigation=new Map();
+// A small goal bias bounds planning latency on long island routes.
 const NPC_GRID_STEP=1.5,NPC_GRID_WIDTH=389,NPC_GRID_MIN=-291;
 const npcGridDirections=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
 let npcTerrainGrid=null,npcNavDeadline=Infinity,npcNavNodesLeft=Infinity,npcNavOrder=0,npcNavRoom=null;
@@ -3049,7 +3050,7 @@ function npcCreateSearch(s,p,goal){
   const x=ix+dx,z=iz+dz;if(x<0||z<0||x>=NPC_GRID_WIDTH||z>=NPC_GRID_WIDTH)continue;
   const n=x+z*NPC_GRID_WIDTH,q=npcGridPoint(n);
   if(!npcGridOpen(s,n)||!npcStaticClearPath(s,p.x,p.z,q.x,q.z,.78))continue;
-  const g=Math.hypot(q.x-p.x,q.z-p.z),node={n,g,f:g+Math.hypot(goal.x-q.x,goal.z-q.z),parent:null};
+  const g=Math.hypot(q.x-p.x,q.z-p.z),node={n,g,f:g+Math.hypot(goal.x-q.x,goal.z-q.z)*1.15,parent:null};
   job.nodes.set(n,node);npcHeapPush(job.heap,node);
  }
  return job;
@@ -3068,14 +3069,14 @@ function npcAdvanceSearch(s,job,limit=256){
   for(let d=0;d<8;d++){
    const next=npcGridNeighbour(s,n.n,d);if(next<0)continue;
    const g=n.g+NPC_GRID_STEP*(d<4?1:Math.SQRT2),old=job.nodes.get(next);if(old&&old.g<=g)continue;
-   const p=npcGridPoint(next),node={n:next,g,f:g+Math.hypot(job.goal.x-p.x,job.goal.z-p.z),parent:n};
+   const p=npcGridPoint(next),node={n:next,g,f:g+Math.hypot(job.goal.x-p.x,job.goal.z-p.z)*1.15,parent:n};
    job.nodes.set(next,node);npcHeapPush(job.heap,node);
   }
   if(job.visited>=16000)break;
  }
  if(!job.heap.length||job.visited>=16000){job.done=true;job.path=[];job.heap=[];job.nodes.clear();}
 }
-// Preload an obstacle-safe shortest A* route to each NPC's own assigned goal.
+// Preload an obstacle-safe A* route to each NPC's own assigned goal.
 // The initial building exit remains a separate mandatory transit segment.
 const npcPreloadedJobs=new Map();
 let npcPreloadedJobScope='';
@@ -3281,7 +3282,9 @@ function npcForbiddenFrontExit(x0,z0,x1,z1){
  const t=(line-z0)/(z1-z0);
  if(t<0||t>1)return false;
  const crossX=x0+(x1-x0)*t;
- return Math.abs(crossX-b.x)>(largeBuildings[3]?.doorW||13)/2-.85;
+ // Restrict only the actual front wall, not its infinite extension across
+ // the island. Distant outdoor NPCs must be able to cross this Z coordinate.
+ return Math.abs(crossX-b.x)<b.w/2+.85&&Math.abs(crossX-b.x)>(largeBuildings[3]?.doorW||13)/2-.85;
 }
 function npcNavigationTarget(s,k,p,now){
  let goal=p.goal;if(!goal)return null;
@@ -3308,10 +3311,11 @@ function npcNavigationTarget(s,k,p,now){
   nav={goal:{...goal},path:direct?[{...goal}]:[],cursor:0,job:null,retryAt:0,failures:0};
   const pre=p.npcPreloadedRoute;
   if(!direct&&pre?.round===s.round&&pre.path?.length&&
-     Math.hypot(pre.goal.x-goal.x,pre.goal.z-goal.z)<.75&&
-     !insideBlackBuilding(p.x,p.z)&&
-     npcStaticClearPath(s,p.x,p.z,pre.path[0].x,pre.path[0].z,.78)){
-    nav.path=pre.path.map(q=>({...q}));
+     Math.hypot(pre.goal.x-goal.x,pre.goal.z-goal.z)<.75&&!insideBlackBuilding(p.x,p.z)){
+   // The doorway ends just before the preload origin. Join any reachable
+   // forward point instead of throwing away the completed outdoor route.
+   const join=pre.path.findIndex(q=>npcStaticClearPath(s,p.x,p.z,q.x,q.z,.78));
+   if(join>=0)nav.path=pre.path.slice(join).map(q=>({...q}));
   }
   npcNavigation.set(key,nav);
  }
@@ -3321,7 +3325,7 @@ function npcNavigationTarget(s,k,p,now){
  }
  if(!nav.path.length&&!nav.job&&now>=nav.retryAt)nav.job=npcCreateSearch(s,p,goal);
  if(nav.job){
-  npcAdvanceSearch(s,nav.job);
+  npcAdvanceSearch(s,nav.job,2048);
   if(nav.job.done){
    nav.path=nav.job.path;nav.cursor=0;nav.job=null;
    if(!nav.path.length){nav.failures++;nav.retryAt=now+Math.min(2200,350*nav.failures);}
@@ -3340,22 +3344,21 @@ function npcNavigationTarget(s,k,p,now){
  // Monotonic path progress: once a waypoint is passed it is never selected
  // again. Skip grid points already behind the direction of travel, provided
  // the new segment is genuinely clear of both terrain and actors.
- while(nav.cursor<nav.path.length-1&&Math.hypot(p.x-nav.path[nav.cursor].x,p.z-nav.path[nav.cursor].z)<2.4)nav.cursor++;
+ while(nav.cursor<nav.path.length-1&&Math.hypot(p.x-nav.path[nav.cursor].x,p.z-nav.path[nav.cursor].z)<2.4&&
+       npcStaticClearPath(s,p.x,p.z,nav.path[nav.cursor+1].x,nav.path[nav.cursor+1].z,.78))nav.cursor++;
  let furthest=nav.cursor;
  for(let i=nav.cursor+1;i<Math.min(nav.path.length,nav.cursor+10);i++){
   const q=nav.path[i];
   if(!npcStaticClearPath(s,p.x,p.z,q.x,q.z,.78)||!npcMovementClear(s,k,p,q.x,q.z))continue;
   furthest=i;
  }
- // If a corner waypoint becomes blocked by a crowd, rebuild the route from
- // the CURRENT position rather than circling the old corner indefinitely.
+ // Keep terrain replanning separate from avoidance of moving characters.
  const candidate=nav.path[furthest];
- if(!npcMovementClear(s,k,p,candidate.x,candidate.z)){
+ // A person on a valid terrain segment is handled by local avoidance in
+ // npcMove. Waiting here prevents avoidance from ever getting a movement step.
+ if(!npcStaticClearPath(s,p.x,p.z,candidate.x,candidate.z,.78)&&!npcNearDoorOrCorner(p)){
   nav.blockedSince??=now;
-  if(now-nav.blockedSince>1600){
-   nav.path=[];nav.cursor=0;nav.job=npcCreateSearch(s,p,goal);
-   nav.blockedSince=0;nav.retryAt=now+400;
-  }
+  if(now-nav.blockedSince>1600&&!nav.job){nav.job=npcCreateSearch(s,p,goal);nav.blockedSince=now;}
   return null;
  }
  nav.blockedSince=0;
@@ -3449,7 +3452,7 @@ function npcMove(s,k,p,target,speed,dt){
   let best=null,bestScore=-Infinity;
   for(const turn of turns){
    const a=heading+turn,x=p.x+Math.sin(a)*step,z=p.z+Math.cos(a)*step;
-   if((!p.npcRoofTrip||p.npcRoofTrip.active)&&npcDetourIntoBuilding(p.x,p.z,x,z)||!npcMovementClear(s,k,p,x,z))continue;
+   if(turn!==0&&(!p.npcRoofTrip||p.npcRoofTrip.active)&&npcDetourIntoBuilding(p.x,p.z,x,z)||!npcMovementClear(s,k,p,x,z))continue;
    const progress=d-Math.hypot(target.x-x,target.z-z);
    if(progress<-.02)continue;
    // Prefer progress, then a consistent right-hand passing side. A small
@@ -3465,6 +3468,18 @@ function npcMove(s,k,p,target,speed,dt){
   p.x=best.x;p.z=best.z;p.rot=best.a;if(best.turn)p.npcPassSide=Math.sign(best.turn);distance-=step;moved+=step;
  }
  return moved;
+}
+function npcMoveAlongRoute(s,k,p,destination,speed,dt,now){
+ let remaining=dt,total=0;
+ for(let segment=0;segment<8&&remaining>.001;segment++){
+  const moved=npcMove(s,k,p,destination,speed,remaining);total+=moved;
+  remaining-=moved/Math.max(.01,speed);
+  if(Math.hypot(destination.x-p.x,destination.z-p.z)>.16||Math.hypot(p.goal.x-p.x,p.goal.z-p.z)<2.45)break;
+  const next=npcNavigationTarget(s,k,p,now);
+  if(!next||Math.hypot(next.x-destination.x,next.z-destination.z)<.1)break;
+  destination=next;p.waypoint={x:next.x,z:next.z};
+ }
+ return total;
 }
 // NPC hide-spot inspection: one NPC per spot, 5 seconds, and no crowding.
 // Decisions happen only on the host's existing NPC tick (no extra timers).
@@ -3737,7 +3752,10 @@ else if(now-p.npcMotionWatch.at>5000&&(p.goal||p.targetChair||p.npcExploreAfterS
  p.npcGhostUntil=now+5000;
  p.npcEscapeUntil=p.npcExitPending?0:now+2600;p.npcEscapeTarget=null;
  p.npcMotionWatch={x:p.x,z:p.z,at:now};
- p.waypoint=null;npcNavigation.delete(room+':'+k);
+ p.waypoint=null;
+ // Preserve in-progress A*: restarting it every five seconds starves long routes.
+ const pendingNavigation=npcNavigation.get(room+':'+k);
+ if(!pendingNavigation?.job)npcNavigation.delete(room+':'+k);
  // Continue immediately: do not introduce a full stopped simulation tick.
 }
 let destination=npcNavigationTarget(s,k,p,now);
@@ -3814,7 +3832,7 @@ if(crossingDoor){
   const axis=destination.doorAxis||'z';
   let vx=axis==='x'||axis==='free'?destination.x-p.x:0;
   let vz=axis==='z'||axis==='free'?destination.z-p.z:0;
-  const mag=Math.hypot(vx,vz);if(mag<.001)break;
+  const mag=Math.hypot(vx,vz);if(mag<.001){destination=npcDoorTransitTarget(s,k,p,now);if(!destination)break;continue;}
   const actualStep=Math.min(step,mag);
   const nx=p.x+vx/mag*actualStep,nz=p.z+vz/mag*actualStep;
   if(!npcMovementClear(s,k,p,nx,nz)&&!(direction===-1&&p.npcExitPending)){
@@ -3831,7 +3849,7 @@ if(crossingDoor){
    p.npcCrowdDetour=null;break;
   }
  }
-}else npcMove(s,k,p,destination,speed,dt);
+}else npcMoveAlongRoute(s,k,p,destination,speed,dt,now);
 
 }
 let anyMoving=false;
