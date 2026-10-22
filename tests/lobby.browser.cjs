@@ -74,6 +74,16 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   assert.equal(read('rooms/TEST/worldPreparing'),true);
   for(const page of pages)await page.evaluate(()=>window.releaseTestLoad());
   for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.worldReady()&&!window.lobbyTest.getState().worldPreparing,{timeout:60000});
+  if(process.env.NPC_START_ONLY){
+   const initial=clone(read('rooms/TEST/players'));
+   write('rooms/TEST/phase','sitIntro');write('rooms/TEST/deadline',Date.now()-50);revision++;notify();
+   await pages[0].waitForFunction(()=>lobbyTest.getState().phase==='search',null,{timeout:15000});
+   await pages[1].waitForFunction(before=>Object.entries(lobbyTest.getState().players).filter(([k,p])=>p.npc&&Math.hypot(p.x-before[k].x,p.z-before[k].z)>1).length===18,initial,{timeout:60000});
+   const moved=Object.entries(read('rooms/TEST/players')).filter(([k,p])=>p.npc&&Math.hypot(p.x-initial[k].x,p.z-initial[k].z)>1).length;
+   assert.equal(moved,18);assert.deepEqual(errors,[]);
+   for(const page of pages)assert.equal(await page.evaluate(()=>window.testCanceledTransactions),0);
+   console.log(JSON.stringify({onlineNPCsMoved:moved,guestReceivedMovement:true,errors}));return;
+  }
   for(const page of pages){await page.waitForFunction(()=>window.lobbyTest.getAvatarColor(window.lobbyTest.getId())!==undefined);const own=await page.evaluate(()=>{const t=window.lobbyTest;return{color:t.getState().players[t.getId()].shirtColor,hex:t.getAvatarColor(t.getId())};});const hexes={red:0xe66b70,orange:0xee9a54,yellow:0xe9c84d,lime:0xabc85b,green:0x4eaa78,teal:0x43aaa6,sky:0x71b9df,blue:0x527bc5,purple:0x9575c3,pink:0xdc91bd,cream:0xe4d8bd,brown:0x9a7563};assert.equal(own.hex,hexes[own.color]);}
   const layouts=await Promise.all(pages.map(page=>page.evaluate(()=>JSON.stringify(window.lobbyTest.getLayout()))));
   assert.equal(layouts[0],layouts[1],'clients generated different worlds');

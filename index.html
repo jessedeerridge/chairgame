@@ -3049,6 +3049,16 @@ function npcAdvanceSearch(s,job,limit=256){
 }
 // Preload an obstacle-safe shortest A* route to each NPC's own assigned goal.
 // The initial building exit remains a separate mandatory transit segment.
+const npcPreloadedJobs=new Map();
+let npcPreloadedJobScope='';
+function npcPreloadedJob(s,r){
+ const scope=JSON.stringify([room,s.started,s.worldSeed,s.round]);
+ if(scope!==npcPreloadedJobScope){npcPreloadedJobs.clear();npcPreloadedJobScope=scope;}
+ const key=JSON.stringify([r.from,r.goal]);
+ let job=npcPreloadedJobs.get(key);
+ if(!job){job=npcCreateSearch(s,r.from,r.goal);npcPreloadedJobs.set(key,job);}
+ return job;
+}
 function npcPreloadAssignedRoute(s,k,p){
  const a=p.npcFixedAssignment;
  if(!a||!p.goal)return;
@@ -3057,15 +3067,19 @@ function npcPreloadAssignedRoute(s,k,p){
  const doorFront=b.z+b.d/2;
  const lane=((npcDepartureSlot(k)%3)-1)*1.45;
  const start=insideBlackBuilding(p.x,p.z)?{x:b.x+lane,z:doorFront+11}:{x:p.x,z:p.z};
- p.npcPreloadedRoute={round:s.round,goal,from:start,path:null,job:null};
+ p.npcPreloadedRoute={round:s.round,goal,from:start,path:null,pending:false};
  if(npcStaticClearPath(s,start.x,start.z,goal.x,goal.z,.78))p.npcPreloadedRoute.path=[goal];
- else p.npcPreloadedRoute.job=npcCreateSearch(s,start,goal);
+ else p.npcPreloadedRoute.pending=true;
 }
 function npcAdvancePreloadedRoute(s,p){
  const r=p.npcPreloadedRoute;
- if(!r||r.round!==s.round||!r.job)return;
- npcAdvanceSearch(s,r.job,1024);
- if(r.job.done){r.path=r.job.path?.length?r.job.path:null;r.job=null;}
+ if(!r||r.round!==s.round)return;
+ // Discard legacy serialized jobs and rebuild from their plain start/goal data.
+ if(r.job){delete r.job;r.pending=true;}
+ if(!r.pending)return;
+ const job=npcPreloadedJob(s,r);
+ npcAdvanceSearch(s,job,1024);
+ if(job.done){r.path=job.path?.length?job.path:null;r.pending=false;}
 }
 // Plan the complete outdoor routes during the seating countdown, before
 // any NPC is permitted to step through the entrance. Do not store A* jobs
@@ -3101,9 +3115,9 @@ function npcPrepareDepartureRoutes(s,now){
    const g=p.goal,r=p.npcPreloadedRoute;
    if(!r||r.round!==s.round||Math.hypot(r.goal.x-g.x,r.goal.z-g.z)>.75){
     const b=buildingSites[3],start={x:b.x+((npcDepartureSlot(k)%3)-1)*1.45,z:b.z+b.d/2+11};
-    p.npcPreloadedRoute={round:s.round,goal:{...g},from:start,path:null,job:null};
+    p.npcPreloadedRoute={round:s.round,goal:{...g},from:start,path:null,pending:false};
     if(npcStaticClearPath(s,start.x,start.z,g.x,g.z,.78))p.npcPreloadedRoute.path=[{...g}];
-    else p.npcPreloadedRoute.job=npcCreateSearch(s,start,g);
+    else p.npcPreloadedRoute.pending=true;
    }
   }
   npcAdvancePreloadedRoute(s,p);
@@ -3644,7 +3658,7 @@ if(npcReturning(s)&&!hidingOnReturn){
 // Stagger intentions; navigation discovers the doorway from collision geometry.
 if(s.phase==='search'&&!p.departureDone){
  // Finish route planning BEFORE exiting, never stop at the entrance to compute.
- if(p.npcPreloadedRoute?.round===s.round&&p.npcPreloadedRoute.job){npcAdvancePreloadedRoute(s,p);continue;}
+ if(p.npcPreloadedRoute?.round===s.round&&(p.npcPreloadedRoute.pending||p.npcPreloadedRoute.job)){npcAdvancePreloadedRoute(s,p);continue;}
  if(!p.searchIntent||insideBlackBuilding(p.x,p.z)&&now<(p.departureAt||0)){
   // Preserve each actor's distinct starting/return position while its exit slot is pending.
   // Moving every waiting actor to a shared staging area created a second bottleneck.
