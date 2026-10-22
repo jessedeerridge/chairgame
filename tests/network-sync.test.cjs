@@ -169,3 +169,16 @@ test('NPC motion broadcasts authoritative coordinates and sample time, not the d
  assert.equal(writes.length,1);assert.equal(writes[0].values.npc.x,10);assert.equal(writes[0].values.npc.z,20);assert.equal(writes[0].values.npc.at,1000);
  })()`);
 });
+
+test('motion packets with a new spawn label but an old acknowledgement cannot override a stand',()=>setup()(`
+ motionChannelReady=true;
+ const p={x:12,z:15,rot:0,online:true,spawn:{version:'stand',x:12,z:15}},s={started:1,players:{other:p}};
+ liveMotionPackets.set('other',{owner:'other',game:1,spawn:'stand',ack:'seated',seat:0,x:10,z:10,at:1000,vx:0,vy:0,vz:0});
+ captureRemoteMotion(s,1000);assert.equal(remoteMotionHistory.get('other').last.x,12);assert.equal(remoteMotionHistory.get('other').last.z,15);
+`));
+test('NPC motion does not require the human-only spawn acknowledgement',()=>setup()(`
+ motionChannelReady=true;
+ const p={npc:true,x:12,z:15,online:true,spawn:{version:'start'}},s={host:'host',started:1,players:{npc:p}};
+ liveMotionPackets.set('npc',{owner:'host',game:1,spawn:'start',ack:'',seat:0,x:14,z:16,at:1000,vx:1,vy:0,vz:0});
+ captureRemoteMotion(s,1000);assert.equal(remoteMotionHistory.get('npc').last.stream,true);assert.equal(remoteMotionHistory.get('npc').last.x,14);
+`));

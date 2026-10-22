@@ -216,7 +216,7 @@ function reconcileRoomPositions(s){
   const spawn=p.spawn,chair=p.sitting&&s.chairs?.[p.sitting];
   if(!p.npc&&chair&&!chair.removed&&!chair.carrier&&!chair.hiddenAt){p.x=chair.x;p.z=chair.z;p.y=chair.y||0;continue;}
   // An older position packet must not override a newly assigned start/relocation.
-  if(!p.npc&&spawn&&p.spawnApplied!==spawn.version){p.x=spawn.x;p.z=spawn.z;p.y=spawn.y||0;p.rot=spawn.rot||Math.PI;}
+  if(!p.npc&&spawn&&p.spawnApplied!==spawn.version){p.x=spawn.x;p.z=spawn.z;p.y=spawn.y||0;p.rot=spawn.rot??Math.PI;}
  }
  return s;
 }
@@ -260,7 +260,7 @@ function flushMotionPackets(t){
  if(soloMode||joiningRoom||!roomTransportConnected||!motionChannelReady||motionChannelRoom!==room||!state||state.phase==='lobby'||motionWritesInFlight>=32||localMoving===lastLocalMotionMoving&&t-lastMotionFlush<40)return;
  const now=roomNow(),values={};lastMotionFlush=t;lastLocalMotionMoving=localMoving;
  for(const [key,p] of Object.entries(state.players||{})){
-  if(p.online===false||key!==id&&(!host||!p.npc))continue;
+  if(p.online===false||key===id&&relocating||key!==id&&(!host||!p.npc))continue;
   const avatar=avatars[key];if(key!==id&&!avatar)continue;
   // Publish the authoritative NPC pose, not an already delayed visible mesh.
   // Otherwise guests interpolate the host's interpolation a second time.
@@ -291,7 +291,7 @@ function captureRemoteMotion(s,now=roomNow()){
   if(key===id)continue;
   const live=liveMotionPackets.get(key);
   const useLive=motionChannelReady&&live&&p.online!==false&&!(p.npc&&s.host===id)&&live.owner===(p.npc?s.host:key)&&
-   live.game===(s.started||0)&&live.spawn===(p.spawn?.version||'')&&Number(live.seat||0)===Number(p.sitting||0)&&now-live.at<1200&&live.at<=now+1000;
+   live.game===(s.started||0)&&live.spawn===(p.spawn?.version||'')&&(p.npc||!p.spawn||live.ack===p.spawn.version)&&Number(live.seat||0)===Number(p.sitting||0)&&now-live.at<1200&&live.at<=now+1000;
   const source=useLive?live:p;
   const version=[s.started||0,p.npc?s.host:'',p.spawn?.version||'',p.sitting||0,p.online!==false,useLive?'stream':'room'].join(':');
   let track=remoteMotionHistory.get(key);
@@ -1150,11 +1150,11 @@ function characterMovementBlocked(s,k,x0,z0,x1,z1,level,includeVisual=false,radi
  }
  return false;
 }
-function occupiedAt(x,z,r=.7,ignorePlayer=null,ignoreChair=null,forHuman=false){
+function occupiedAt(x,z,r=.7,ignorePlayer=null,ignoreChair=null,forHuman=false,roomState=state){
  if(staticBlocked(x,z,r)||blackEntranceClosed(x,z,r)||openedDoorBlocked(x,z,r)||(forHuman&&bushBlocked(x,z,r)))return true;
- if(state){
-  if(characterMovementBlocked(state,ignorePlayer,x,z,x,z,playerHeight,forHuman,r+.65))return true;
-  for(const [k,c] of Object.entries(state.chairs||{})){
+ if(roomState){
+  if(characterMovementBlocked(roomState,ignorePlayer,x,z,x,z,playerHeight,forHuman,r+.65))return true;
+  for(const [k,c] of Object.entries(roomState.chairs||{})){
    if(k===String(ignoreChair)||c.removed||c.hiddenAt||c.carrier||Math.abs((c.y||0)-playerHeight)>2.2)continue;
    if(Math.hypot(x-c.x,z-c.z)<r+1.1)return true;
   }
@@ -1982,7 +1982,7 @@ function applyAssignedSpawn(s){
  const p=s?.players?.[id],spawn=p?.spawn;
  if(!spawn||spawn.version===lastAppliedSpawn)return;
  const restoring=lastAppliedSpawn===null&&p.spawnApplied===spawn.version;
- lastAppliedSpawn=spawn.version;if(restoring)return;me.x=spawn.x;me.z=spawn.z;me.rot=spawn.rot||Math.PI;yaw=me.rot;playerHeight=0;
+ lastAppliedSpawn=spawn.version;if(restoring)return;me.x=spawn.x;me.z=spawn.z;me.rot=spawn.rot??Math.PI;yaw=me.rot;playerHeight=spawn.y||0;
  lastSync=performance.now();resetStackIdle(performance.now());
 }
 function walletMedalIcon(className='coin-stack-icon'){
@@ -2335,7 +2335,7 @@ $('markChair').onclick=()=>{
  else if(nearby)upsertChairNote(nearby[0],nearby[1].x,nearby[1].z);
  refreshActions();
 };
-function findStandingSpot(chair,chairNumber){
+function findStandingSpot(chair,chairNumber,roomState=state){
  const savedHeight=playerHeight,level=chair.y||0;
  playerHeight=level;
  try{
@@ -2343,22 +2343,54 @@ function findStandingSpot(chair,chairNumber){
   for(let r=2.2;r<=6;r+=.5)for(let i=0;i<24;i++){const angle=i*Math.PI/12;candidates.push({x:chair.x+Math.sin(angle)*r,z:chair.z+Math.cos(angle)*r});}
   for(const point of candidates){
    const y=elevationAt(point.x,point.z);
-   if(Math.abs(y-level)>.8||occupiedAt(point.x,point.z,.7,id,chairNumber,true))continue;
+   if(Math.abs(y-level)>.8||occupiedAt(point.x,point.z,.7,id,chairNumber,true,roomState))continue;
    const supported=[[-.6,-.6],[-.6,.6],[.6,-.6],[.6,.6]].every(([dx,dz])=>Math.abs(elevationAt(point.x+dx,point.z+dz)-y)<.8);
    if(supported)return {...point,y};
   }
   return null;
  }finally{playerHeight=savedHeight;}
 }
-$('sit').onclick=()=>mutate(s=>{
- const p=s.players[id];if(!p)return;
- if(p.sitting){
-  const c=s.chairs[p.sitting];
-  if(c){const spot=findStandingSpot(c,p.sitting);if(!spot)return;c.occupied=null;Object.assign(p,spot);}
-  p.sitting=0;me.x=p.x;me.z=p.z;playerHeight=p.y||0;return;
- }
- for(const [n,c] of Object.entries(s.chairs))if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&(s.phase!=='search'||Number(n)!==p.previous)&&Math.abs((c.y||0)-(p.y||0))<2.2&&Math.hypot(c.x-p.x,c.z-p.z)<3){p.sitting=Number(n);p.x=c.x;p.z=c.z;p.y=c.y||0;c.occupied=id;break;}
-}).then(()=>{const p=state?.players?.[id],n=p?.sitting,c=state?.chairs?.[n];if(n&&c?.occupied===id)upsertChairNote(n,c.x,c.z);});
+let seatPositionSequence=0;
+function assignSeatPosition(p,version){
+ p.spawn={x:p.x,y:p.y||0,z:p.z,rot:p.rot??0,version};
+ p.positionAt=roomNow();p.moving=false;
+}
+$('sit').onclick=async()=>{
+ if(relocating||!state)return;
+ const actionRoom=room,actionId=id,game=state.started,priorSpawn=state.players?.[id]?.spawn?.version;
+ const oldSeat=state.players?.[id]?.sitting,version='seat:'+id+':'+roomNow()+':'+(++seatPositionSequence);
+ relocating=true;
+ try{
+  const result=await mutate(s=>{
+   if(s.started!==game)return;
+   const p=s.players[id];if(!p)return;
+   if(p.sitting){
+    const c=s.chairs[p.sitting];
+    if(!c)return;
+    const spot=findStandingSpot(c,p.sitting,s);if(!spot)return;
+    if(c.occupied===id)c.occupied=null;
+    Object.assign(p,spot);p.sitting=0;assignSeatPosition(p,version);return;
+   }
+   for(const [n,c] of Object.entries(s.chairs))if(!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&(s.phase!=='search'||Number(n)!==p.previous)&&Math.abs((c.y||0)-(p.y||0))<2.2&&Math.hypot(c.x-p.x,c.z-p.z)<3){
+    p.sitting=Number(n);p.x=c.x;p.z=c.z;p.y=c.y||0;p.rot=0;c.occupied=id;assignSeatPosition(p,version);break;
+   }
+  });
+  if(room!==actionRoom||id!==actionId||state?.started!==game||!soloMode&&!result?.committed)return;
+  const committed=soloMode?state:result.snapshot.val(),p=committed?.players?.[id],current=state.players?.[id];
+  if(p?.spawn?.version!==version||!current)return;
+  // A committed seat transition wins over old position packets, but never over
+  // a later relocation/game reset that this client has already received.
+  if(current.spawn?.version!==priorSpawn&&current.spawn?.version!==version)return;
+  for(const field of ['x','y','z','rot','sitting','spawn','positionAt','moving'])current[field]=p[field];
+  if(oldSeat&&state.chairs?.[oldSeat])state.chairs[oldSeat].occupied=committed.chairs?.[oldSeat]?.occupied||null;
+  if(p.sitting&&state.chairs?.[p.sitting])state.chairs[p.sitting].occupied=id;
+  applyAssignedSpawn(state);
+  localMotionVelocity.x=0;localMotionVelocity.y=0;localMotionVelocity.z=0;
+  lastPositionPacket='';lastPositionSent=0;
+  if(p.sitting){const c=committed.chairs?.[p.sitting];if(c?.occupied===id)upsertChairNote(p.sitting,c.x,c.z);}
+ }catch(error){console.error('着席・起立の同期に失敗',error);}
+ finally{relocating=false;}
+};
 // Five-second hide/search action; cancel if the player moves away or conditions change.
 let spotAction=null;
 function beginSpotAction(kind){

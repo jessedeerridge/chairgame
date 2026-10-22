@@ -30,7 +30,7 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
    const page=await browser.newPage(name==='Guest'?{viewport:{width:390,height:844},isMobile:true,hasTouch:true}:{});pages.push(page);page.on('pageerror',e=>errors.push(e.message));
    await page.exposeBinding('testRead',(_,key)=>({value:clone(read(key)),revision}));
    await page.exposeBinding('testCommit',async(_,key,next,expected)=>{
-    await new Promise(resolve=>setTimeout(resolve,20));
+    await new Promise(resolve=>setTimeout(resolve,process.env.SEAT_SYNC_ONLY?180:20));
     if(revision!==expected)return{ok:false};const before=JSON.stringify(read(key));if(before!==JSON.stringify(next)){write(key,next);revision++;notify();}return{ok:true,value:clone(next)};
    });
    await page.exposeBinding('testUpdate',async(_,key,values)=>{
@@ -74,6 +74,25 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   assert.equal(read('rooms/TEST/worldPreparing'),true);
   for(const page of pages)await page.evaluate(()=>window.releaseTestLoad());
   for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.worldReady()&&!window.lobbyTest.getState().worldPreparing,{timeout:60000});
+  if(process.env.SEAT_SYNC_ONLY){
+   const hostPage=pages[0],guestPage=pages[1],c=clone(read('rooms/TEST/chairs/7'));
+   const ids=await Promise.all(pages.map(p=>p.evaluate(()=>lobbyTest.getId())));
+   for(let actor=0;actor<2;actor++){
+    const key=ids[actor],page=pages[actor],observer=pages[1-actor],p=clone(read('rooms/TEST/players/'+key));
+    Object.assign(p,{x:c.x+2,z:c.z,y:c.y||0,sitting:0,previous:0,spawn:{x:c.x+2,z:c.z,y:c.y||0,rot:0,version:'seat-test:'+key}});write('rooms/TEST/players/'+key,p);revision++;notify();
+    await page.waitForFunction(()=>lobbyTest.getState().players[lobbyTest.getId()].spawn?.version==='seat-test:'+lobbyTest.getId());
+    for(let cycle=0;cycle<3;cycle++){
+     await page.evaluate(()=>document.getElementById('sit').onclick());
+     for(const client of pages)await client.waitForFunction(key=>lobbyTest.getState().players[key].sitting===7,key);
+     await page.evaluate(()=>document.getElementById('sit').onclick());
+     const stood=clone(read('rooms/TEST/players/'+key));assert.equal(stood.sitting,0);assert(Math.hypot(stood.x-c.x,stood.z-c.z)>=2.15);
+     await page.waitForFunction(({x,z,version})=>{const t=lobbyTest,p=t.getState().players[t.getId()],me=t.getMe();return p.sitting===0&&p.spawnApplied===version&&Math.hypot(me.x-x,me.z-z)<.05},{x:stood.x,z:stood.z,version:stood.spawn.version},{timeout:10000});
+     await observer.waitForFunction(({key,x,z})=>{const a=lobbyTest.getAvatarPosition(key);return a&&Math.hypot(a.x-x,a.z-z)<.15},{key,x:stood.x,z:stood.z},{timeout:10000});
+     const shared=read('rooms/TEST/players/'+key);assert(Math.hypot(shared.x-c.x,shared.z-c.z)>=2.15,'a delayed position packet moved the standing player back into the chair');
+    }
+   }
+   assert.deepEqual(errors,[]);console.log(JSON.stringify({delayedTransactionsMs:180,sitStandCycles:6,localAndRemotePositionsMatch:true,standingOutsideChair:true,errors}));return;
+  }
   if(process.env.WORLD_SYNC_ONLY){
    const hostPage=pages[0],guestPage=pages[1];
    const canonical=clone(read('rooms/TEST/worldLayout'));assert(canonical,'room must own the world geometry');
