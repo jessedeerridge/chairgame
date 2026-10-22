@@ -49,7 +49,7 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
    await page.addInitScript(({skew})=>{window.testClockSkew=skew;const realNow=Date.now.bind(Date);Date.now=()=>realNow()+skew;window.holdTestLoad=true;if(!localStorage.getItem('island-chair-game-entry-v1'))localStorage.setItem('island-chair-game-entry-v1',JSON.stringify({name:'以前の名前',room:'OLDROOM'}));},{skew:name==='Guest'?120000:-90000});
    await page.goto('http://127.0.0.1:'+server.address().port);
    assert.equal(await page.inputValue('#name'),'以前の名前');assert.equal(await page.inputValue('#room'),'OLDROOM');
-   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={debug:()=>({joiningRoom,hidden:document.hidden,yaw,keys:{...keys},phase:state.phase,me:{...me},player:player()}),getNow:()=>roomNow(),keys,getAvatarPose:k=>avatars[k]?{visible:avatars[k].visible,angle:avatars[k].userData.pose.rotation.x}:null,getAvatarPosition:k=>avatars[k]?{x:avatars[k].position.x,z:avatars[k].position.z}:null,getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady,getLayout:()=>worldLayout,getAvatarColor:k=>avatars[k]?.userData.torso.material.color.getHex()};performance.mark("island-room-ready");`);});
+   await page.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('function startWorldLoading(){',"function startWorldLoading(){if(window.holdTestLoad)return new Promise(resolve=>window.releaseTestLoad=()=>{window.holdTestLoad=false;resolve(startWorldLoading());});");code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.lobbyTest={debug:()=>({joiningRoom,hidden:document.hidden,yaw,keys:{...keys},phase:state.phase,me:{...me},player:player()}),getNow:()=>roomNow(),keys,getAvatarPose:k=>avatars[k]?{visible:avatars[k].visible,angle:avatars[k].userData.pose.rotation.x}:null,getAvatarPosition:k=>avatars[k]?{x:avatars[k].position.x,z:avatars[k].position.z}:null,getState:()=>state,getMe:()=>({...me}),getId:()=>id,setMe:(p)=>{me.x=p.x;me.z=p.z;playerHeight=0;},updateMapVisibility,showStack:()=>{resetStackIdle(performance.now()-6001);updateStackButton(performance.now());},worldReady:()=>worldReady,getLayout:()=>worldLayout,getGeometry:()=>({key:loadedWorldLayoutKey,spots:hidingSpots,instances:outdoorWorld.children.filter(o=>o.isInstancedMesh).map(o=>Array.from(o.instanceMatrix.array)),chairs:Object.fromEntries(Object.entries(chairs).map(([k,c])=>[k,{visible:c.visible,x:c.position.x,z:c.position.z}]))}),beginSpotAction,updateSpotAction,getHidden:()=>recentHiddenChair,getAvatarColor:k=>avatars[k]?.userData.torso.material.color.getHex()};performance.mark("island-room-ready");`);});
    await page.fill('#name',name);await page.fill('#room','TEST');await page.click('#join');await page.waitForFunction(()=>window.lobbyTest?.getState()?.players?.[window.lobbyTest.getId()],{timeout:60000});
   }
   assert.deepEqual(Object.values(read('rooms/TEST/players')).filter(p=>!p.npc).map(p=>p.name).sort(),['Guest','Host']);
@@ -74,6 +74,36 @@ export const onDisconnect=()=>({set:async()=>{},update:async()=>{},cancel:async(
   assert.equal(read('rooms/TEST/worldPreparing'),true);
   for(const page of pages)await page.evaluate(()=>window.releaseTestLoad());
   for(const page of pages)await page.waitForFunction(()=>window.lobbyTest.worldReady()&&!window.lobbyTest.getState().worldPreparing,{timeout:60000});
+  if(process.env.WORLD_SYNC_ONLY){
+   const hostPage=pages[0],guestPage=pages[1];
+   const canonical=clone(read('rooms/TEST/worldLayout'));assert(canonical,'room must own the world geometry');
+   for(const page of pages)assert.deepEqual(await page.evaluate(()=>lobbyTest.getLayout()),canonical);
+   canonical.trees[0].x+=1;canonical.spots[0].z+=1;
+   write('rooms/TEST/worldLayout',canonical);write('rooms/TEST/worldLayoutId','sync-test');write('rooms/TEST/introStarted',Date.now());write('rooms/TEST/deadline',Date.now()+54000);revision++;notify();
+   for(const page of pages)await page.waitForFunction(()=>lobbyTest.worldReady()&&lobbyTest.getGeometry().key.endsWith(':sync-test'),null,{timeout:60000});
+   const geometry=await Promise.all(pages.map(p=>p.evaluate(()=>lobbyTest.getGeometry())));
+   assert.deepEqual(geometry[0].spots,geometry[1].spots);assert.deepEqual(geometry[0].instances,geometry[1].instances);
+   for(const page of pages)assert.deepEqual(await page.evaluate(()=>lobbyTest.getLayout()),canonical);
+   const hostId=await hostPage.evaluate(()=>lobbyTest.getId()),guestId=await guestPage.evaluate(()=>lobbyTest.getId());
+   const spot=canonical.spots.find(p=>!Object.values(read('rooms/TEST/chairs')).some(c=>c.hiddenAt===p.id));
+   function placePlayer(key,carrying){const p=clone(read('rooms/TEST/players/'+key));Object.assign(p,{carrying,sitting:0,x:spot.x+2,z:spot.z,y:0,spawn:{x:spot.x+2,z:spot.z,y:0,rot:0,version:'spot:'+key}});write('rooms/TEST/players/'+key,p);}
+   placePlayer(hostId,7);const chair=clone(read('rooms/TEST/chairs/7'));Object.assign(chair,{carrier:hostId,hiddenAt:null,occupied:null});write('rooms/TEST/chairs/7',chair);revision++;notify();
+   await hostPage.waitForFunction(()=>lobbyTest.getState().players[lobbyTest.getId()].carrying===7);
+   await hostPage.evaluate(()=>{lobbyTest.beginSpotAction('hide');lobbyTest.updateSpotAction(performance.now()+5001)});
+   for(const page of pages)await page.waitForFunction(id=>lobbyTest.getState().chairs[7].hiddenAt===id,spot.id);
+   assert.equal(read('rooms/TEST/chairs/7/x'),spot.x);assert.equal(read('rooms/TEST/chairs/7/z'),spot.z);
+   await hostPage.waitForFunction(()=>lobbyTest.getHidden()?.number==='7');
+   const confirmed=await hostPage.evaluate(()=>lobbyTest.getHidden());assert.equal(confirmed.x,spot.x);assert.equal(confirmed.z,spot.z);
+   for(const page of pages)await page.waitForFunction(()=>lobbyTest.getGeometry().chairs[7]?.visible===false);
+   placePlayer(guestId,0);revision++;notify();await guestPage.waitForFunction(()=>lobbyTest.getState().players[lobbyTest.getId()].spawn?.version==='spot:'+lobbyTest.getId());
+   await guestPage.evaluate(()=>{lobbyTest.beginSpotAction('reveal');lobbyTest.updateSpotAction(performance.now()+5001)});
+   for(const page of pages)await page.waitForFunction(key=>lobbyTest.getState().chairs[7].carrier===key,guestId);
+   await guestPage.reload();
+   await guestPage.evaluate(()=>{const code=document.querySelector('#deferredGameCode');code.textContent=code.textContent.replace('performance.mark("island-room-ready");',`window.rejoinWorld={ready:()=>worldReady,layout:()=>worldLayout,state:()=>state};performance.mark("island-room-ready");`)});
+   await guestPage.click('#join');await guestPage.waitForFunction(()=>window.rejoinWorld?.ready()&&window.rejoinWorld.state()?.worldLayoutId==='sync-test',null,{timeout:60000});
+   assert.deepEqual(await guestPage.evaluate(()=>rejoinWorld.layout()),canonical);assert.equal(await guestPage.evaluate(()=>rejoinWorld.state().chairs[7].carrier),guestId);
+   assert.deepEqual(errors,[]);console.log(JSON.stringify({sameSeedGeometryRefresh:true,renderedTreesAndBushesMatch:true,hideRevealSynced:true,rejoinWorldMatches:true,errors}));return;
+  }
   if(process.env.NPC_START_ONLY){
    const initial=clone(read('rooms/TEST/players'));
    write('rooms/TEST/phase','sitIntro');write('rooms/TEST/deadline',Date.now()-50);revision++;notify();

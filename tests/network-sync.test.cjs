@@ -145,11 +145,27 @@ test('host avatar keeps following authoritative motion without a second delayed 
 test('NPC tick cadence includes time spent waiting for the previous transaction',async()=>{
  const c=vm.createContext({assert,console});
  vm.runInContext(`
- let now=1000,room='TEST',id='host',host=true,soloMode=false,joiningRoom=false,worldReady=true;
+ let now=1000,room='TEST',id='host',host=true,soloMode=false,joiningRoom=false,worldReady=true,loadedWorldLayoutKey='test';function roomWorldLayoutKey(){return 'test'}
  const state={host:'host',phase:'search'},phase=()=>state.phase,roomNow=()=>now,ref=()=>{},database=()=>{},log=()=>{},reconcileRoomPositions=()=>{};
  const dts=[];function npcSimulate(s,dt){dts.push(dt)}
  async function mutate(fn){fn(state);now+=600;return{committed:true}}
  let interval;function setInterval(fn){interval=fn}
  `+cut('let npcBusy=','const modal='),c);
  await vm.runInContext(`(async()=>{await interval();await interval();assert.equal(dts.length,2);assert.equal(dts[0],.28);assert.equal(dts[1],.6)})()`,c);
+});
+
+test('a stopped NPC converges back to its true location after prediction overshoots',()=>setup()(`
+ const p={npc:true,x:0,z:0,rot:0,motionMoving:false,online:true},s={started:1,npcFrameAt:1000,players:{npc:p}};state=s;
+ captureRemoteMotion(s,1000);
+ const avatar={position:{x:3,y:0,z:0,set(x,y,z){Object.assign(this,{x,y,z})}},rotation:{y:0},userData:{smoothReady:true,motionLife:'1::true',remoteDirection:{x:1,z:0},remoteSpeed:5}};
+ for(let i=0;i<100;i++)moveRemoteAvatar(avatar,'npc',p,.02,1100+i*20);
+ assert(Math.abs(avatar.position.x)<.01,'stopped NPC stayed ahead of the actual chair/hiding spot');
+`));
+test('NPC motion broadcasts authoritative coordinates and sample time, not the delayed mesh',async()=>{
+ await setup()(`const host=true,avatars={npc:{position:{x:999,y:0,z:999},rotation:{y:0}}};(async()=>{
+ Date.now=()=>1050;roomTransportConnected=true;motionChannelReady=true;motionChannelRoom=room;
+ state={phase:'search',started:1,npcFrameAt:1000,players:{npc:{npc:true,x:10,z:20,rot:0,online:true}}};
+ flushMotionPackets(200);for(let i=0;i<8;i++)await Promise.resolve();
+ assert.equal(writes.length,1);assert.equal(writes[0].values.npc.x,10);assert.equal(writes[0].values.npc.z,20);assert.equal(writes[0].values.npc.at,1000);
+ })()`);
 });

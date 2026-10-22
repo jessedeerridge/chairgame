@@ -192,7 +192,20 @@ async function update(target,values){
  try{return await flight;}finally{roomUpdateFlights.delete(flight);}
 }
 function releaseRoomWrites(){if(!roomTransactions)for(const resolve of roomWriteWaiters.splice(0))resolve();}
+function normalizeRoomCollections(s){
+ if(!s||typeof s!=='object')return s;
+ for(const field of ['chairs','players','votes','voteEligible','accessories','coinDrops']){
+  if(Array.isArray(s[field]))s[field]=Object.fromEntries(Object.entries(s[field]).filter(([k,v])=>v!=null));
+ }
+ if(s.worldLayout&&Array.isArray(s.worldLayout.chairs))s.worldLayout.chairs=Object.fromEntries(Object.entries(s.worldLayout.chairs).filter(([k,v])=>v!=null));
+ if(s.worldLayout?.spots){
+  const spots=new Map(s.worldLayout.spots.filter(Boolean).map(p=>[p.id,p]));
+  for(const c of Object.values(s.chairs||{})){const spot=c.hiddenAt&&spots.get(c.hiddenAt);if(spot&&!c.carrier)Object.assign(c,{x:spot.x,y:0,z:spot.z});}
+ }
+ return s;
+}
 function reconcileRoomPositions(s){
+ normalizeRoomCollections(s);
  for(const [key,p] of Object.entries(s?.players||{})){
   const live=motionChannelReady&&liveMotionPackets.get(key);
   if(!p.npc&&!p.sitting&&p.online!==false&&live&&live.owner===key&&live.game===(s.started||0)&&live.spawn===(p.spawn?.version||'')&&!live.seat&&
@@ -249,18 +262,22 @@ function flushMotionPackets(t){
  for(const [key,p] of Object.entries(state.players||{})){
   if(p.online===false||key!==id&&(!host||!p.npc))continue;
   const avatar=avatars[key];if(key!==id&&!avatar)continue;
-  const x=key===id?me.x:avatar.position.x,y=key===id?playerHeight:avatar.position.y,z=key===id?me.z:avatar.position.z,rot=key===id?me.rot:avatar.rotation.y;
+  // Publish the authoritative NPC pose, not an already delayed visible mesh.
+  // Otherwise guests interpolate the host's interpolation a second time.
+  const x=key===id?me.x:p.x,y=key===id?playerHeight:p.y||0,z=key===id?me.z:p.z,rot=key===id?me.rot:p.rot||0;
+  const packetAt=key===id?now:state.npcFrameAt||now;
   const life=[state.started||0,p.spawn?.version||'',p.sitting||0].join(':');
-  const old=sentMotionPackets.get(key),elapsed=old?.life===life&&now-old.at<2000?Math.max(.02,(now-old.at)/1000):0;
+  const old=sentMotionPackets.get(key);if(key!==id&&old?.life===life&&old.at===packetAt)continue;
+  const elapsed=old?.life===life&&packetAt-old.at<2000?Math.max(.02,(packetAt-old.at)/1000):0;
   const vx=key===id?localMotionVelocity.x:elapsed?(x-old.x)/elapsed:0,vz=key===id?localMotionVelocity.z:elapsed?(z-old.z)/elapsed:0,vy=key===id?localMotionVelocity.y:elapsed?(y-old.y)/elapsed:0;
   const round=n=>Math.round(n*100)/100;
   const packet={x:round(x),y:round(y),z:round(z),rot:Math.round(rot*1000)/1000,vx:round(vx),vy:round(vy),vz:round(vz),moving:Math.hypot(vx,vz,vy)>.05,
    game:state.started||0,spawn:p.spawn?.version||'',ack:key===id?lastAppliedSpawn||'':p.spawnApplied||'',seat:p.sitting||0,owner:id};
   const signature=JSON.stringify(packet);
   // Derivatives are based on every sample, including stationary samples.
-  sentMotionPackets.set(key,{x,y,z,at:now,life,signature,lastWrite:old?.lastWrite||0});
+  sentMotionPackets.set(key,{x,y,z,at:packetAt,life,signature,lastWrite:old?.lastWrite||0});
   if(old?.signature===signature&&now-(old.lastWrite||0)<1500)continue;
-  packet.at=now;values[key]=packet;sentMotionPackets.get(key).lastWrite=now;
+  packet.at=packetAt;values[key]=packet;sentMotionPackets.get(key).lastWrite=now;
  }
  if(!Object.keys(values).length)return;
  const channelRoom=room,generation=motionWriteGeneration;motionWritesInFlight++;
@@ -312,7 +329,7 @@ function captureRemoteMotion(s,now=roomNow()){
 function remoteMotionPose(key,p,now=roomNow()){
  const track=remoteMotionHistory.get(key),last=track?.last;
  if(!last)return {x:p.x||0,y:p.y||0,z:p.z||0,rot:p.rot||0,vx:0,vy:0,vz:0,moving:false};
- const delay=track.lag+(last.stream?80:p.npc?track.interval*.5+155:50);
+ const delay=track.lag+(p.npc?track.interval*.5+155:last.stream?80:50);
  const target=now-delay;
  // Absorb jitter by gently changing playback speed, never by pausing or
  // rewinding the render clock whenever the measured delivery delay increases.
@@ -359,7 +376,7 @@ function moveRemoteAvatar(avatar,key,p,dt,now){
   let dx=pose.vx*dt+errorX*Math.min(1,dt*7),dz=pose.vz*dt+errorZ*Math.min(1,dt*7);
   // Being a little ahead is corrected by slowing down, never by walking backwards.
   // A real reversal changes direction with the next velocity packet.
-  if(direction){const forward=dx*direction.x+dz*direction.z;if(forward<0){dx-=forward*direction.x;dz-=forward*direction.z;}}
+  if(direction&&pose.moving){const forward=dx*direction.x+dz*direction.z;if(forward<0){dx-=forward*direction.x;dz-=forward*direction.z;}}
   const distance=Math.hypot(dx,dz),maxStep=Math.max(speed,direction?memory.remoteSpeed||2:7)*dt*1.35;
   if(distance>maxStep&&distance>.0001){dx*=maxStep/distance;dz*=maxStep/distance;}
   const nextX=avatar.position.x+dx,nextZ=avatar.position.z+dz;
@@ -573,12 +590,13 @@ function makeWorldLayout(seed){
  }
  return {seed:Number(seed)>>>0,buildings,paths,trees,spots,signs,chairs,zones};
 }
-let worldLayout=null,loadedWorldSeed=null;
+let worldLayout=null,loadedWorldSeed=null,loadedWorldLayoutKey=null;
+function roomWorldLayoutKey(s){return String(Number(s?.worldSeed)||1)+':'+(s?.worldLayoutId||'generated');}
 const pathSegments=[],roadRenderSegments=[];
 function pathDistance(x,z,p){const dx=p.bx-p.ax,dz=p.bz-p.az,t=Math.max(0,Math.min(1,((x-p.ax)*dx+(z-p.az)*dz)/(dx*dx+dz*dz||1)));return Math.hypot(x-p.ax-t*dx,z-p.az-t*dz);}
 const onPath=(x,z,extra=0)=>pathSegments.some(p=>pathDistance(x,z,p)<p.width/2+extra);
-function configureWorld(seed){
- worldLayout=makeWorldLayout(seed);
+function configureWorld(seed,sharedLayout=null){
+ worldLayout=sharedLayout&&Number(sharedLayout.seed)===(Number(seed)>>>0)?structuredClone(sharedLayout):makeWorldLayout(seed);
  for(let i=0;i<3;i++){Object.assign(buildingSites[i],worldLayout.buildings[i]);Object.assign(largeBuildings[i],worldLayout.buildings[i]);}
  pathSegments.splice(0,pathSegments.length,...worldLayout.paths);roadRenderSegments.splice(0,roadRenderSegments.length,...worldLayout.paths);
 }
@@ -945,15 +963,13 @@ let worldPreparationBusy=false;
 async function syncWorldPrepared(wantedSeed){
  if(worldPreparationBusy)return;worldPreparationBusy=true;
  try{
-  if(state&&host&&Number(state.worldSeed||1)===wantedSeed&&(state.worldPreparing||state.worldLayoutVersion!==WORLD_LAYOUT_VERSION||state.screenBoundaryVersion!==1))await mutate(s=>{
+  if(state&&host&&Number(state.worldSeed||1)===wantedSeed&&(!state.worldLayout||state.worldPreparing||state.worldLayoutVersion!==WORLD_LAYOUT_VERSION||state.screenBoundaryVersion!==1))await mutate(s=>{
    if(s.host!==id||Number(s.worldSeed||1)!==wantedSeed)return;
+   // Pin geometry and hiding IDs to the room, rather than each client's generator.
+   if(!s.worldLayout){s.worldLayout=structuredClone(worldLayout);s.worldLayoutId=wantedSeed+':'+(s.started||'lobby');}
    // Upgrade old rooms without restarting their round or losing carried/seated chairs.
    if(s.worldLayoutVersion!==WORLD_LAYOUT_VERSION){
     if(!Object.keys(s.chairs||{}).length)s.chairs=structuredClone(worldLayout.chairs);
-    else for(const [n,c] of Object.entries(s.chairs||{})){
-     if(c.removed||c.carrier||c.occupied)continue;
-     const replacement=worldLayout.chairs[n];if(replacement)Object.assign(c,{x:replacement.x,y:replacement.y||0,z:replacement.z,hiddenAt:replacement.hiddenAt});
-    }
    }
    for(const p of Object.values(s.players||{}))p.z=screenSafeZ(p.x,p.z,p.y||0);
    for(const c of Object.values(s.chairs||{}))if(!c.hiddenAt&&!c.carrier)c.z=screenSafeZ(c.x,c.z,c.y||0);
@@ -962,9 +978,9 @@ async function syncWorldPrepared(wantedSeed){
  }finally{worldPreparationBusy=false;}
 }
 function startWorldLoading(){
- const wantedSeed=Number(state?.worldSeed)||1;
- if(worldReady&&loadedWorldSeed===wantedSeed)return syncWorldPrepared(wantedSeed).then(()=>true);
- if(worldLoadPromise)return worldLoadPromise.then(ok=>!ok?false:loadedWorldSeed===wantedSeed?true:startWorldLoading());
+ const wantedSeed=Number(state?.worldSeed)||1,wantedKey=roomWorldLayoutKey(state);
+ if(worldReady&&loadedWorldSeed===wantedSeed&&loadedWorldLayoutKey===wantedKey)return syncWorldPrepared(wantedSeed).then(()=>true);
+ if(worldLoadPromise)return worldLoadPromise.then(ok=>!ok?false:loadedWorldSeed===wantedSeed&&loadedWorldLayoutKey===wantedKey?true:startWorldLoading());
  worldLoadPromise=(async()=>{
   worldReady=false;outdoorWorld.visible=false;
   // Dispose per-world geometry/textures while retaining shared material caches.
@@ -973,7 +989,7 @@ function startWorldLoading(){
   outdoorWorld.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.geometry&&!sharedGeometry.has(o.geometry)&&!disposed.has(o.geometry)){o.geometry.dispose();disposed.add(o.geometry);}
    for(const m of Array.isArray(o.material)?o.material:[o.material])if(m&&!sharedMaterial.has(m)&&!disposed.has(m)){m.map?.dispose();m.dispose();disposed.add(m);}});
   outdoorWorld.clear();obstacles.length=indoorMetadata.obstacles;interiorRoofs.length=indoorMetadata.roofs;interiorRoofRails.length=indoorMetadata.rails;roofRoomWalls.length=indoorMetadata.walls;stairways.length=0;hidingSpots.length=0;
-  configureWorld(wantedSeed);
+  configureWorld(wantedSeed,state?.worldLayout);
   // Give the room and the first instruction slide two paint opportunities.
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   const work=buildOutdoorWorld();let done=false;
@@ -988,7 +1004,9 @@ function startWorldLoading(){
   let compiling;try{compiling=renderer.compileAsync(scene,camera);}finally{outdoorWorld.visible=false;}
   await compiling;
   npcCollisionIndex=null;npcTerrainGrid=null;npcGroundStairs=null;npcNavigation.clear();_opaqueRoofConfigured=false;
-  loadedWorldSeed=wantedSeed;worldReady=true;performance.mark('island-world-ready');
+  loadedWorldSeed=wantedSeed;loadedWorldLayoutKey=wantedKey;
+  if(roomWorldLayoutKey(state)!==wantedKey){worldReady=false;return true;}
+  worldReady=true;performance.mark('island-world-ready');
   await syncWorldPrepared(wantedSeed);
   return true;
  })().catch(error=>{
@@ -996,7 +1014,7 @@ function startWorldLoading(){
   $('runtimeError').textContent='マップの読み込みに失敗しました。ページを再読み込みしてください。';
   console.error('World loading failed',error);return false;
  }).finally(()=>{worldLoadPromise=null;});
- return worldLoadPromise;
+ return worldLoadPromise.then(ok=>ok&&loadedWorldLayoutKey!==roomWorldLayoutKey(state)?startWorldLoading():ok);
 }
 // Shared collision tests for world objects, standing people and placed chairs.
 function roofEdgeBlocked(x,z,r=.7){
@@ -2036,7 +2054,7 @@ function renderWallet(p){
  if(key===walletViewKey)return;walletViewKey=key;
  const cells=[];if(p){for(const [issuer,count] of Object.entries(p.wallet||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1])){const cell=document.createElement('span');cell.className='coin-entry';cell.classList.toggle('is-eliminated',state.players?.[issuer]?.initial===true&&state.players[issuer].alive===false);const nm=document.createElement('span');nm.className='coin-name';nm.textContent=(state.players?.[issuer]?.name||'不明')+' ×';const stack=document.createElement('span');stack.className='coin-stack';const icon=walletMedalIcon();const number=document.createElement('span');number.className='coin-stack-number';number.textContent=String(count);stack.append(icon,number);cell.append(nm,stack);cells.push(cell)}}$('wallet').replaceChildren(...cells);
 }
-function renderUI(){if(!state)return;normalizeNPCNames(state);if(worldReady&&loadedWorldSeed!==Number(state.worldSeed||1))playerPreloadTask=null;renderLobby();updateMapVisibility();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));renderWallet(p);const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
+function renderUI(){if(!state)return;normalizeNPCNames(state);if(worldReady&&(loadedWorldSeed!==Number(state.worldSeed||1)||loadedWorldLayoutKey!==roomWorldLayoutKey(state)))playerPreloadTask=null;renderLobby();updateMapVisibility();if(!soloMode)preloadRoomPlayer();else if(state.phase!=='lobby')startWorldLoading();syncVoteResultPopup();let p=player();restorePersonalMap(p);options($('target'),players().filter(([k])=>k!==id).map(([k,v])=>[k,v.name]));options($('issuer'),players().filter(([k,v])=>v.initial).map(([k,v])=>[k,v.name]));options($('voteTarget'),players().filter(([k,v])=>v.alive).map(([k,v])=>[k,v.name]));options($('chairNumber'),Object.entries(state.chairs||{}).filter(([k,v])=>!v.removed).map(([k])=>[k,'イス '+k]));renderWallet(p);const alive=players().filter(([k,v])=>v.alive).length;const gone=players().length-alive;const names={lobby:'待機',instructions:'ルール説明',sitIntro:'着席開始',search:'イス探索',return:'中央へ帰還',voteIntro:'脱落者発表',vote:'親決め投票',results:'開票結果',erase:'椅子消去',eraseReveal:'除外イス発表',finished:'終了'};$('gameStats').textContent=`生存者 ${alive}人 / ガヤ ${gone}人　
 親：${state.parent?state.players[state.parent]?.name:'なし'}　消去：${state.lastRemoved||'なし'}　
 開票：${Object.entries(state.voteCounts||{}).map(([k,n])=>(state.players[k]?.name||k)+' '+n+'票').join(' / ')||'未開票'}`;if(renderUI.oldPhase!==state.phase&&state.phase){const notices={instructions:'',sitIntro:insideBlackBuilding(me.x,me.z)?'':'着席！',search:'',return:'TIME UP!\n投票に戻れ！',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:'',finished:'ゲーム終了！'};if(renderUI.oldPhase!==undefined&&notices[state.phase])announce(notices[state.phase]);else if(!notices[state.phase]){$('gameNotice').style.display='none';clearTimeout(announce.timer)}renderUI.oldPhase=state.phase}if(renderUI.oldRemoved!==state.lastRemoved&&state.lastRemoved){renderUI.oldRemoved=state.lastRemoved}if(state.phase==='sitIntro'&&insideBlackBuilding(me.x,me.z)){$('gameNotice').style.display='none';clearTimeout(announce.timer)}refreshActions();receiveSharedPin()}
 let roomUITimer=null,lastRoomUIAt=0;
@@ -2072,7 +2090,7 @@ for(let attempt=0;attempt<3;attempt++){
  joined=await runTransaction(root,s=>{
  // An uncached transaction starts with null even when the room already exists.
  // Propose creation and admission together; the server retries with its actual room.
- s??={host:id,hostName:name,phase:'lobby',round:0,worldSeed:newRoomSeed,chairs:{},accessories:initialAccessories(),players:{},votes:{}};
+ s??={host:id,hostName:name,phase:'lobby',round:0,worldSeed:newRoomSeed,chairs:{},accessories:initialAccessories(),players:{},votes:{}};normalizeRoomCollections(s);
  admissionError=admitRoomPlayer(s,id,name,joinTime);if(admissionError)return;return s;
  },{applyLocally:false});
  if(joined.committed)break;
@@ -2170,7 +2188,7 @@ function beginGame(s){
  }
  for(let i=0;i<npcCount;i++)for(let j=i+1;j<npcCount;j++)if(Math.random()<.12){const a=s.players['NPC'+i],b=s.players['NPC'+j];a.trust['NPC'+j]=randBetween(.2,.8);b.trust['NPC'+i]=a.trust['NPC'+j];}
  if(s.started||!s.worldSeed)s.worldSeed=Math.floor(Math.random()*4294967295)+1;
- s.screenBoundaryVersion=1;s.spotSearchHistory={};s.started=roomNow();s.chairs=makeWorldLayout(s.worldSeed).chairs;s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
+ s.screenBoundaryVersion=1;s.spotSearchHistory={};s.started=roomNow();if(!s.worldLayout||s.worldLayout.seed!==s.worldSeed){s.worldLayout=makeWorldLayout(s.worldSeed);s.worldLayoutId=s.worldSeed+':'+s.started;}s.chairs=structuredClone(s.worldLayout.chairs);s.worldLayoutVersion=WORLD_LAYOUT_VERSION;s.worldPreparing=!worldReady||loadedWorldSeed!==s.worldSeed||typeof loadedWorldLayoutKey!=='undefined'&&loadedWorldLayoutKey!==s.worldSeed+':'+s.worldLayoutId;s.accessories={};s.round=0;s.winner=null;s.eliminationOrder=[];s.finalRanks=null;
  initRound(s);s.phase='instructions';s.introReadyAt=!s.worldPreparing?roomNow():null;s.introStarted=roomNow();s.deadline=s.introStarted+54000;
 }
 // Core cast and musical-chairs participants from the manga and Reborn adaptation.
@@ -2344,25 +2362,27 @@ $('sit').onclick=()=>mutate(s=>{
 // Five-second hide/search action; cancel if the player moves away or conditions change.
 let spotAction=null;
 function beginSpotAction(kind){
- if(spotAction)return;
+ if(spotAction||!worldReady||loadedWorldLayoutKey!==roomWorldLayoutKey(state))return;
  const spot=closestSpot(),p=player();if(!spot||!p)return;
  if(kind==='hide'&&(!p.carrying||Object.values(state?.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id)))return;
  if(kind==='reveal'&&p.carrying)return;if(kind==='reveal'&&Object.values(state?.players||{}).some(v=>v.npcSpotSearch?.spotId===spot.id&&v.npcSpotSearch?.stage==='searching'))return;
- spotAction={kind,spotId:spot.id,x:me.x,z:me.z,start:performance.now(),chair:p.carrying||0};if(kind==='reveal')mutate(s=>{s.humanSpotSearching??={};s.humanSpotSearching[id]={spotId:spot.id,until:roomNow()+5200};});
+ spotAction={kind,worldKey:roomWorldLayoutKey(state),spotId:spot.id,x:me.x,z:me.z,start:performance.now(),chair:p.carrying||0};if(kind==='reveal')mutate(s=>{s.humanSpotSearching??={};s.humanSpotSearching[id]={spotId:spot.id,until:roomNow()+5200};});
 }
 $('hideChair').onclick=()=>beginSpotAction('hide');
 $('revealChair').onclick=()=>beginSpotAction('reveal');
 function updateSpotAction(t){
  if(!spotAction)return;
  const a=spotAction,p=player(),spot=hidingSpots.find(v=>v.id===a.spotId);
- if(!p||!spot||Math.hypot(me.x-spot.x,me.z-spot.z)>7.0||Math.hypot(me.x-a.x,me.z-a.z)>1.15||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase())||(a.kind==='hide'&&p.carrying!==a.chair)||(a.kind==='reveal'&&p.carrying)){spotAction=null;return;}
+ if(!p||!spot||a.worldKey!==roomWorldLayoutKey(state)||Math.hypot(me.x-spot.x,me.z-spot.z)>7.0||Math.hypot(me.x-a.x,me.z-a.z)>1.15||!['instructions','sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase())||(a.kind==='hide'&&p.carrying!==a.chair)||(a.kind==='reveal'&&p.carrying)){spotAction=null;return;}
  if(t-a.start<5000)return;
  spotAction=null;
  if(a.kind==='hide'){
-  mutate(s=>{const p=s.players[id];if(!p||p.carrying!==a.chair)return;const c=s.chairs[p.carrying];if(!c||c.removed||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===a.spotId))return;c.hiddenAt=a.spotId;c.x=spot.x;c.y=0;c.z=spot.z;c.carrier=null;p.carrying=0;});
-  recentHiddenChair={number:String(a.chair),x:spot.x,z:spot.z,anchorX:me.x,anchorZ:me.z,y:playerHeight,at:roomNow()};
-  // The hide action itself records the confirmed location; same number replaces old pin.
-  upsertChairNote(a.chair,spot.x,spot.z);
+  mutate(s=>{const p=s.players[id];if(!p||p.carrying!==a.chair||roomWorldLayoutKey(s)!==a.worldKey)return;const c=s.chairs[p.carrying],target=s.worldLayout?.spots.find(v=>v.id===a.spotId)||spot;if(!c||c.removed||Object.values(s.chairs||{}).some(q=>!q.removed&&q.hiddenAt===a.spotId))return;c.hiddenAt=a.spotId;c.x=target.x;c.y=0;c.z=target.z;c.carrier=null;p.carrying=0;}).then(result=>{
+   const c=soloMode?state?.chairs?.[a.chair]:result?.committed?result.snapshot.val()?.chairs?.[a.chair]:null;
+   if(!c||c.hiddenAt!==a.spotId||roomWorldLayoutKey(state)!==a.worldKey)return;
+   recentHiddenChair={number:String(a.chair),x:c.x,z:c.z,anchorX:me.x,anchorZ:me.z,y:playerHeight,at:roomNow()};
+   upsertChairNote(a.chair,c.x,c.z);
+  }).catch(console.warn);
  }else{
   mutate(s=>{const p=s.players[id];if(!p||p.carrying)return;recordSpotSearch(s,id,spot,roomNow());if(s.humanSpotSearching)delete s.humanSpotSearching[id];const found=Object.entries(s.chairs).find(([n,c])=>!c.removed&&c.hiddenAt===a.spotId);if(!found){
    // An empty hiding spot has a one-in-three chance to release a random costume.
@@ -2395,7 +2415,7 @@ function prepareSoloNPCVotes(s){
 }
 function advanceState(s,now){const phase=s.phase;
  if(phase==='instructions'){
-  if(!worldReady||s.worldPreparing||!introParticipantsReady(s))return;
+  if(!worldReady||s.worldPreparing||s.worldLayoutId&&loadedWorldLayoutKey!==roomWorldLayoutKey(s)||!introParticipantsReady(s))return;
   s.phase='sitIntro';s.deadline=now+3000;return;
  }
  if(now<s.deadline)return;
@@ -2425,7 +2445,7 @@ let advancing=false;
 async function advance(){
  if(!host||!state||joiningRoom||advancing||phase()==='lobby'||phase()==='finished')return;
  if(state.phase==='instructions'){
-  if(!worldReady||state.worldPreparing||!introParticipantsReady(state))return;
+  if(!worldReady||state.worldPreparing||state.worldLayoutId&&loadedWorldLayoutKey!==roomWorldLayoutKey(state)||!introParticipantsReady(state))return;
  }else if(roomNow()<state.deadline&&!(state.phase==='erase'&&(state.deadline>roomNow()+60000||!state.eraseParentMissingAt&&eraseParentMissing(state))))return;
  advancing=true;
  try{await mutate(s=>{
@@ -3874,7 +3894,7 @@ async function tickOnlineNPC(dt){
 setInterval(async()=>{
  if(!state||joiningRoom||npcBusy||!['sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;
  if(!soloMode&&!host){if(!roomHostAvailable(state.players?.[state.host]))recoverRoomHost();return;}
- if(!worldReady){if(!soloMode&&host)startWorldLoading().catch(console.warn);return;}
+ if(!worldReady||loadedWorldLayoutKey!==roomWorldLayoutKey(state)){if(!soloMode&&host)startWorldLoading().catch(console.warn);return;}
  const tickNow=roomNow(),tickEvery=280;
  if(tickNow-npcLastTick<tickEvery)return;
  const dt=Math.max(.05,Math.min(1.5,npcLastTick?(tickNow-npcLastTick)/1000:tickEvery/1000));
