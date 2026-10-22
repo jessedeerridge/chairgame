@@ -2458,25 +2458,39 @@ function prepareSoloNPCVotes(s){
  }
  s.soloVotesPreparedRound=s.round;
 }
+function soloVoteWaiting(s){
+ const p=s.players?.[id];
+ return s.phase==='vote'&&!!p&&p.online!==false&&s.voteEligible?.[id]===true&&p.voteIntent!==false&&!p.voted&&!s.votes?.[id];
+}
+function soloPhaseReady(s){
+ if(s.phase==='vote')return !soloVoteWaiting(s);
+ if(s.phase!=='return')return false;
+ const participants=Object.values(s.players||{}).filter(p=>p.online!==false);
+ return participants.length>0&&participants.every(p=>insideBlackBuilding(p.x,p.z)&&(p.y||0)<3&&
+  (!p.npc||p.returned&&!p.carrying&&!p.npcSpotHide&&!p.npcRoofTrip?.active));
+}
 function advanceState(s,now){const phase=s.phase;
  if(phase==='instructions'){
   if(!worldReady||s.worldPreparing||s.worldLayoutId&&loadedWorldLayoutKey!==roomWorldLayoutKey(s)||!introParticipantsReady(s))return;
   s.phase='sitIntro';s.deadline=now+3000;return;
  }
- if(now<s.deadline)return;
+ if(soloMode&&phase==='vote'&&soloVoteWaiting(s))return;
+ if(now<s.deadline&&!(soloMode&&soloPhaseReady(s)))return;
  if(phase==='sitIntro'){npcPrepareDepartureRoutes(s,now);s.phase='search';s.deadline=now+SEARCH_MS}
 else if(phase==='search'){for(const p of Object.values(s.players)){p.wasAliveBeforeSearch=!!p.alive;if(p.alive&&!p.sitting)p.alive=false;if(p.sitting)p.previous=p.sitting;p.returned=false}const newlyOut=Object.entries(s.players).filter(([_,p])=>p.wasAliveBeforeSearch&&!p.alive);
  s.eliminatedNames=newlyOut.map(([_,p])=>p.name);
  s.eliminationOrder??=[];for(const [k,p] of newlyOut){p.eliminatedRound=s.round;if(!s.eliminationOrder.includes(k))s.eliminationOrder.push(k);}
  s.phase='return';s.deadline=now+RETURN_MS}
-else if(phase==='return'){for(const p of Object.values(s.players))p.returned=Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)<11;npcPrepareNextRoundTargets(s,now);s.phase='voteIntro';s.deadline=now+VOTE_INTRO_MS;s.votes={};s.voteEligible={}}
+else if(phase==='return'){for(const p of Object.values(s.players))p.returned=soloMode?insideBlackBuilding(p.x,p.z)&&(p.y||0)<3&&(!p.npc||!p.carrying&&!p.npcSpotHide&&!p.npcRoofTrip?.active):Math.hypot((p.x||0)-VOTE_X,(p.z||0)-VOTE_Z)<11;npcPrepareNextRoundTargets(s,now);s.phase='voteIntro';s.deadline=now+VOTE_INTRO_MS;s.votes={};s.voteEligible={}}
 else if(phase==='voteIntro'){
  const alive=Object.entries(s.players).filter(([_,p])=>p.alive);
  if(alive.length<=1){s.phase='finished';s.winner=alive[0]?.[0]||null;
   s.finalRanks=coinPrizeRanks(s);
   for(const [k,p] of Object.entries(s.players))if(zeroPrizePlayer(s,p)){const chair=s.chairs?.[p.sitting];if(chair?.occupied===k)chair.occupied=null;p.sitting=0;}
   return}
- s.voteEligible={};for(const [k,p] of Object.entries(s.players||{})){if(insideBlackBuilding(Number(p.x),Number(p.z)))s.voteEligible[k]=true;}s.phase='vote';s.deadline=now+VOTE_MS;prepareSoloNPCVotes(s);}
+ s.voteEligible={};for(const [k,p] of Object.entries(s.players||{})){if(insideBlackBuilding(Number(p.x),Number(p.z)))s.voteEligible[k]=true;}s.phase='vote';s.deadline=now+VOTE_MS;prepareSoloNPCVotes(s);
+ if(soloMode&&!soloVoteWaiting(s)){s.deadline=now;advanceState(s,now);}
+}
 else if(phase==='vote'){prepareSoloNPCVotes(s);const counts={};for(const target of Object.values(s.votes||{}))if(s.players[target]?.alive)counts[target]=(counts[target]||0)+1;s.voteCounts=counts;s.lastVoteCounts=counts;const top=Math.max(0,...Object.values(counts));const winners=Object.keys(counts).filter(k=>counts[k]===top);s.parent=top>0&&winners.length===1?winners[0]:null;if(!s.parent){s.lastParent='親なし（同票）';s.tieNoErase=true;s.phase='results';s.deadline=now+6000;}else{s.lastParent=s.players[s.parent].name;s.phase='results';s.deadline=now+RESULTS_MS}}
 else if(phase==='results'){if(s.tieNoErase){s.tieNoErase=false;s.noChairErased=true;s.lastRemoved=null;s.selectedEraseChair=null;s.phase='eraseReveal';s.deadline=now+6000;}else{s.phase='erase';s.eraseParentMissingAt=null;s.deadline=now+60000}}
 else if(phase==='erase'){
@@ -2489,9 +2503,10 @@ function eraseParentMissing(s){const p=s.players?.[s.parent];return !p||p.online
 let advancing=false;
 async function advance(){
  if(!host||!state||joiningRoom||advancing||phase()==='lobby'||phase()==='finished')return;
+ if(soloMode&&state.phase==='vote'&&soloVoteWaiting(state))return;
  if(state.phase==='instructions'){
   if(!worldReady||state.worldPreparing||state.worldLayoutId&&loadedWorldLayoutKey!==roomWorldLayoutKey(state)||!introParticipantsReady(state))return;
- }else if(roomNow()<state.deadline&&!(state.phase==='erase'&&(state.deadline>roomNow()+60000||!state.eraseParentMissingAt&&eraseParentMissing(state))))return;
+ }else if(roomNow()<state.deadline&&!(soloMode&&soloPhaseReady(state))&&!(state.phase==='erase'&&(state.deadline>roomNow()+60000||!state.eraseParentMissingAt&&eraseParentMissing(state))))return;
  advancing=true;
  try{await mutate(s=>{
   if(!soloMode&&s.host!==id)return;
@@ -2507,7 +2522,8 @@ async function advance(){
     if(!worldReady||s.worldPreparing||!introParticipantsReady(s))break;
     const end=s.introSkipped?now:Math.max((s.introStarted||s.started)+54000,(s.introReadyAt||0)+6000);
     if(now>=end)advanceState(s,soloMode?now:Math.min(now,end));
-   }else if(s.deadline<=now)advanceState(s,soloMode?now:s.deadline);else break;
+   }else if(soloMode&&s.phase==='vote'&&soloVoteWaiting(s))break;
+   else if(s.deadline<=now||soloMode&&soloPhaseReady(s))advanceState(s,soloMode?now:s.deadline);else break;
    if(soloMode||s.phase===before)break;
   }
  });}
@@ -4104,7 +4120,7 @@ function setActionIcon(id,kind){const button=$(id);if(button.dataset.icon===kind
 function refreshActions(){if(!state)return;syncGiftInteraction();closeVoteWhenEnded();let p=player(),ph=phase(),partner=nearestPartner(),d=Math.hypot(me.x-VOTE_X,me.z-VOTE_Z);$('start').hidden=!isOnlineLobby();$('touch').hidden=(modalMode==='voteButtons'&&modal.classList.contains('open'))||!(ph==='vote'&&state.voteEligible?.[id]===true&&p&&!p.voted&&!state.votes?.[id]&&d<11);setActionIcon('touch','vote');
  const introDoorNearby=ph==='instructions'&&Math.abs(me.x-buildingSites[3].x)<11&&Math.abs(me.z-(buildingSites[3].z+buildingSites[3].d/2))<12;
  if(introDoorNearby){$('touch').hidden=false;$('touch').dataset.actionLabel='スキップ';$('touch').title='ドアにタッチして説明をスキップ';}else{$('touch').dataset.actionLabel='とうひょう';}
- let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=chairForManualRecord();$('markChair').hidden=!mapChair;if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||(!soloMode&&(ph==='sitIntro'||ph==='instructions'||ph==='erase'));if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};$('phaseInstruction').textContent=instructions[ph]||'';$('clockSeconds').textContent=formatCountdown((state.deadline-roomNow())/1000);}}
+ let chair=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&!c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);const occupiedNearby=Object.values(state.chairs||{}).some(c=>!c.removed&&!c.carrier&&!c.hiddenAt&&c.occupied&&Math.abs((c.y||0)-playerHeight)<2.2&&Math.hypot(c.x-me.x,c.z-me.z)<3);$('sit').hidden=occupiedNearby&&!p?.sitting||!(p&&(p.sitting||chair));const mapChair=chairForManualRecord();$('markChair').hidden=!mapChair;if(mapChair){const n=String(mapChair[0]);setActionIcon('markChair','pin');$('markChair').title=$('markChair').ariaLabel='イス'+n+'の位置を地図に記録・更新';}$('sit').dataset.actionLabel=p?.sitting?'たつ':'すわる';setActionIcon('sit',p?.sitting?'walk':'chair');$('sit').title=$('sit').ariaLabel=p?.sitting?'たつ':'すわる';$('moveChair').dataset.actionLabel=p?.carrying?'おく':'はこぶ';setActionIcon('moveChair',p?.carrying?'place':'lift');$('moveChair').title=$('moveChair').ariaLabel=p?.carrying?'イスを置く':'イスを持ち上げる';$('moveChair').hidden=occupiedNearby&&!p?.carrying||!(ph!=='lobby'&&ph!=='finished'&&(p?.carrying||chair));let spot=closestSpot();setActionIcon('hideChair','hide');setActionIcon('revealChair','search');$('hideChair').hidden=!!spotAction||!(ph!=='lobby'&&ph!=='finished'&&p?.carrying&&spot&&!Object.values(state.chairs||{}).some(c=>!c.removed&&c.hiddenAt===spot.id));$('revealChair').hidden=!(ph!=='lobby'&&ph!=='finished'&&!p?.carrying&&(spot||spotAction?.kind==='reveal'));const nearShirt=nearestAccessory('shirt');$('pickupShirt').hidden=!nearShirt;const nearGear=nearestAccessory('other');$('pickupAccessory').hidden=!nearGear;setActionIcon('pickupAccessory',nearGear&&nearGear[1].kind!=='hat'?'glasses':'hat');$('pickupAccessory').dataset.actionLabel=nearGear?(nearGear[1].kind==='hat'?'かぶる':'つける'):'かぶる';$('pickupCoin').hidden=!nearbyPickup();$('trade').hidden=!(ph!=='lobby'&&ph!=='finished'&&partner);$('givePin').hidden=$('trade').hidden||!mapUnlocked;if(partner){$('trade').title='コインを地面に落とす（'+partner.name+'に10秒間優先権）';$('givePin').title='📍位置を共有：'+partner.name;}$('voteOpen').hidden=true;$('eraseOpen').hidden=!(ph==='erase'&&state.parent===id);$('clock').hidden=ph==='lobby'||ph==='finished'||(!soloMode&&(ph==='sitIntro'||ph==='instructions'||ph==='erase'));if(!$('clock').hidden){const instructions={instructions:'',sitIntro:'',search:'',return:'',voteIntro:'',vote:'',results:'',erase:'',eraseReveal:''};const waitingForVote=soloMode&&soloVoteWaiting(state);$('phaseInstruction').textContent=waitingForVote?'投票をえらんでね':instructions[ph]||'';$('clockSeconds').hidden=waitingForVote;$('clockSeconds').textContent=formatCountdown((state.deadline-roomNow())/1000);}}
 function openModal(title,body,mode){$('modalCancel').hidden=false;$('modalConfirm').hidden=false;modalMode=mode;$('modalTitle').textContent=title;$('modalBody').innerHTML=body;modal.classList.add('open');if(mode==='voteButtons')$('touch').hidden=true;syncGiftInteraction();}
 function updateTradeAmount(n){const input=$('tradeAmount'),issuer=$('tradeIssuer');if(!input||!issuer)return;const max=Number(player()?.wallet?.[issuer.value]||0);input.value=String(Math.max(1,Math.min(max||1,Math.floor(n)||1)));$('tradeAmountValue').textContent=input.value;}
 function selectTradeCoin(key){$('tradeIssuer').value=key;for(const btn of document.querySelectorAll('#tradeCoinChoices button'))btn.classList.toggle('selected',btn.dataset.issuer===key);updateTradeAmount(1);}
