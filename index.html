@@ -3796,22 +3796,20 @@ let anyMoving=false;
 for(const [k,p] of npcEntries){const before=beforeMotion.get(k);p.motionMoving=!!before&&Math.hypot(p.x-before.x,p.z-before.z,(p.y||0)-before.y)>.001;anyMoving||=p.motionMoving;}
 if(anyMoving||s.npcMoving)s.npcFrameAt=now;s.npcMoving=anyMoving;
 if(!soloMode&&s.phase==='vote'){for(const [k,p] of npcEntries)if(canCastVote(s,k)&&!s.votes[k]&&now>s.deadline-4000){const choice=chooseNPCVote(s,k);if(choice)s.votes[k]=choice}}}
-// NPC simulation has a dedicated online transaction lane. Player position writes
-// must not block the host's NPC simulation, and a failed transaction must not
-// permanently disable NPC updates.
+// NPC updates share the room mutation queue so local child writes cannot cancel
+// their root transaction. The busy flag is released even after a failed update.
 let npcBusy=false,npcLastTick=0,npcErrorCount=0;
 async function tickOnlineNPC(dt){
  const activeRoom=room,activeId=id;
- const result=await runTransaction(ref(database(),`rooms/${activeRoom}`),s=>{
-  if(!s||s.host!==activeId)return;
+ const result=await mutate(s=>{
+  if(room!==activeRoom||id!==activeId||s.host!==activeId)return;
   reconcileRoomPositions(s);
   const now=roomNow();
   if(s.phase==='sitIntro')npcPrepareDepartureRoutes(s,now);
   else if(s.phase==='erase'&&s.players?.[s.parent]?.npc){const n=chooseErase(s,s.parent);if(n)finishErase(s,n);}
   else if(['search','return','voteIntro','vote','results','erase','eraseReveal'].includes(s.phase))npcSimulate(s,dt,now);
-  return s;
- },{applyLocally:false});
- if(!result.committed&&state?.host===id)console.warn('NPC同期を再試行します');
+ });
+ if(result&&!result.committed&&state?.host===id)console.warn('NPC同期を再試行します');
 }
 setInterval(async()=>{
  if(!state||joiningRoom||npcBusy||!['sitIntro','search','return','voteIntro','vote','results','erase','eraseReveal'].includes(phase()))return;

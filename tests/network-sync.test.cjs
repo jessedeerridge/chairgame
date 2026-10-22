@@ -75,3 +75,32 @@ test('the motion buffer includes measured network delay, and never rewinds on a 
  assert(remoteMotionPose('other',p,4440).x>=b);
  `);
 });
+
+function onlineNPCSetup(){
+ const c=vm.createContext({assert,console});
+ vm.runInContext(`
+ let room='TEST',id='host',soloMode=false,joiningRoom=false,state={host:'host',phase:'search',players:{NPC0:{npc:true,x:0}}};
+ let roomTransactions=0,roomMutationQueue=Promise.resolve();
+ const roomWriteWaiters=[],roomUpdateFlights=new Set(),writes=[];
+ const database=()=>({}),ref=(db,path)=>path,log=()=>{},reconcileRoomPositions=s=>s,roomNow=()=>1000;
+ let finish;function runTransaction(target,fn){return new Promise(resolve=>{finish=()=>{fn(state);resolve({committed:true})}})}
+ async function firebaseUpdate(target,values){writes.push(values)}
+ function npcSimulate(s){s.players.NPC0.x++}function npcPrepareDepartureRoutes(){}
+ `+cut('async function update(target,values)','function reconcileRoomPositions')+
+ cut('async function mutate(fn)','let roomSubscription=')+
+ cut('async function tickOnlineNPC(dt)','setInterval(async()=>{'),c);
+ return code=>vm.runInContext(code,c);
+}
+test('online NPC movement commits before local position writes can cancel its transaction',async()=>{
+ await onlineNPCSetup()(`(async()=>{
+ const tick=tickOnlineNPC(.55);for(let i=0;i<8;i++)await Promise.resolve();assert(finish);
+ const position=update('player',{x:9});await Promise.resolve();assert.equal(writes.length,0);
+ finish();await tick;await position;assert.equal(state.players.NPC0.x,1);assert.equal(writes.length,1);assert.equal(roomTransactions,0);
+ })()`);
+});
+test('queued online NPC updates cannot simulate after host ownership changes',async()=>{
+ await onlineNPCSetup()(`(async()=>{
+ const tick=tickOnlineNPC(.55);for(let i=0;i<8;i++)await Promise.resolve();
+ state.host='other';finish();await tick;assert.equal(state.players.NPC0.x,0);assert.equal(roomTransactions,0);
+ })()`);
+});
