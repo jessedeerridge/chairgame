@@ -28,3 +28,8 @@ test('duplicate chair pins show いらないです... and reset the popup lifeti
  await shareChairPin('npc','7',40,50);assert.equal(elements.npcReplyPopup.textContent,'いらないです...');assert.deepEqual(alerts,[]);
  advanceTime(2999);assert.equal(elements.npcReplyPopup.hidden,false);advanceTime(1);assert.equal(elements.npcReplyPopup.hidden,true);
 })()`));
+test('received chair-information popup omits the truth-status label',()=>setup()(`
+ state.players.npc.team='ガヤ';Math.random=()=>.6;
+ const message=npcDealPin(state,'human','npc','7',0,0);
+ assert.equal(message,'NPCからイス1の情報を受け取った');assert(state.players.human.pinInbox);
+`));

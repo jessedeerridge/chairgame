@@ -22,23 +22,23 @@ test('all tied leaders enlarge within reserved rows, including a full 20-person 
   for(const a of boxes){assert(a.y>=154&&a.y+a.height<=684.001);for(const b of boxes){if(a===b)continue;assert(a.left+a.width<b.left||b.left+b.width<a.left||a.y+a.height<b.y||b.y+b.height<a.y);}}
  }
 `));
-test('hidden-chair marking requires staying near the hiding position and rechecks on click',()=>{
+test('automatically recorded hidden chairs do not require another manual mark',()=>{
  const ctx=vm.createContext({assert});
  vm.runInContext(`function roomNow(){return Date.now()}
-let me={x:0,z:0},playerHeight=0,recentHiddenChair={number:'1',x:5,z:0,anchorX:0,anchorZ:0,y:0,at:Date.now()},state={chairs:{1:{x:5,z:0,hiddenAt:'tree'}}};let marks=0;const button={},$=()=>button;function upsertChairNote(){marks++}function closestBackChair(){return null}function refreshActions(){}`+extract('function nearbyHiddenChairForMark',"$('sit').onclick")+`
- assert(nearbyHiddenChairForMark());button.onclick();assert.equal(marks,1);
- me.x=-3;assert.equal(nearbyHiddenChairForMark(),null);button.onclick();assert.equal(marks,1);
+let id='me',miniNotes=[],me={x:0,z:0},playerHeight=0,recentHiddenChair={number:'1',x:5,z:0,anchorX:0,anchorZ:0,y:0,at:Date.now()},state={chairs:{1:{x:5,z:0,hiddenAt:'tree'}}};let marks=0;const button={},$=()=>button;function upsertChairNote(){marks++}function closestBackChair(){return null}function refreshActions(){}`+extract('function nearbyHiddenChairForMark',"$('sit').onclick")+`
+ assert(nearbyHiddenChairForMark());button.onclick();assert.equal(marks,0);
+ me.x=-3;assert.equal(nearbyHiddenChairForMark(),null);button.onclick();assert.equal(marks,0);
  me.x=0;playerHeight=5;assert.equal(nearbyHiddenChairForMark(),null);playerHeight=0;
  state.chairs[1].hiddenAt=null;assert.equal(nearbyHiddenChairForMark(),null);
  state.chairs[1].hiddenAt='tree';state.chairs[1].x=20;assert.equal(nearbyHiddenChairForMark(),null);
  state.chairs[1].x=5;recentHiddenChair.at-=6000;assert.equal(nearbyHiddenChairForMark(),null);
  `,ctx);
 });
-test('seated player can mark their occupied chair, but not a removed or reassigned chair',()=>{
+test('automatically recorded seated chairs have no manual record action',()=>{
  const ctx=vm.createContext({assert});vm.runInContext(`function roomNow(){return Date.now()}
 let id='me',me={x:10,z:10},playerHeight=0,recentHiddenChair=null,state={players:{me:{sitting:2}},chairs:{2:{x:10,z:10,occupied:'me'}}};const button={},$=()=>button,marks=[];function upsertChairNote(...note){marks.push(note)}function refreshActions(){}`+extract('function nearChairBack',"$('sit').onclick")+`
- assert.equal(closestBackChair()[0],'2');button.onclick();assert.deepEqual(marks[0],['2',10,10]);
- state.chairs[2].removed=true;assert.equal(closestBackChair(),undefined);button.onclick();assert.equal(marks.length,1);
+ assert.equal(closestBackChair()[0],'2');assert.equal(chairForManualRecord(),null);button.onclick();assert.equal(marks.length,0);
+ state.chairs[2].removed=true;assert.equal(closestBackChair(),undefined);button.onclick();assert.equal(marks.length,0);
  state.chairs[2].removed=false;state.chairs[2].occupied='other';assert.equal(closestBackChair(),undefined);
  `,ctx);
 });
@@ -76,3 +76,11 @@ test('gift dialogs close at the interaction boundary and keep their original nea
  state.players.other.y=1.51;assert.equal(syncGiftInteraction(),false);assert(!miniExpanded);assert.equal(pinShareTarget,null);assert(!classes.has('gift-overlay'));
  state.players.other.y=0;pinShareTarget='other';miniExpanded=true;state.players.other.online=false;assert.equal(syncGiftInteraction(),false);assert(!miniExpanded);
 `));
+test('manual record is available for new or moved chair locations, but not matching saved notes',()=>{
+ const ctx=vm.createContext({assert});vm.runInContext(`
+ const id='me',state={players:{me:{sitting:0}}},miniNotes=[];let nearby=['7',{x:10,z:20}];function closestBackChair(){return nearby}
+ `+extract('function chairForManualRecord',"$('markChair').onclick")+`
+ assert.equal(chairForManualRecord(),nearby);miniNotes.push({number:'7',x:10,z:20});assert.equal(chairForManualRecord(),null);
+ nearby[1].x=15;assert.equal(chairForManualRecord(),nearby);
+ `,ctx);
+});
